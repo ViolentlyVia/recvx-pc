@@ -6,9 +6,18 @@
 #include "../../../ps2/veronica/prog/sdfunc.h"
 #include "../../../ps2/veronica/prog/main.h"
 
+#ifdef TARGET_PC
+/* PC: saves go to one place (pc_mc.c), so there is no memory card slot to pick. The slot screen
+ * is skipped on the way in; coming back to it (cancel, or after a message) leaves the screen. */
+static int pcAutoCard;
+#endif
+
 // 100% matching!
 LOAD_SCREEN* CreateLoadScreen(LOAD_SCREEN* pLoad, void* vpWorkPtrSys) // second parameter is not present on the debugging symbols
 {
+#ifdef TARGET_PC
+    pcAutoCard = 1;
+#endif
     pLoad->ulState = 0;
     pLoad->ulSubState = 0;
     
@@ -333,6 +342,24 @@ void ExecuteStateLoadScreenErrUnPS2MemCard(LOAD_SCREEN* pLoad)
 // 100% matching! 
 void SetStateLoadScreenSelectCard(LOAD_SCREEN* pLoad)
 {
+#ifdef TARGET_PC
+    if (pcAutoCard)
+    {
+        pcAutoCard = 0;
+
+        pLoad->sCursorX = 0;
+        pLoad->sSelectCur = 0;
+
+        mcSetFileSelectWindowCursolInit(pLoad->pSelectFileWindow);
+        SetStateLoadScreenDirCheck(pLoad);
+    }
+    else
+    {
+        SetStateLoadScreenTitleExit(pLoad);
+    }
+
+    return;
+#endif
     pLoad->ulState = 10;
     
     pLoad->sCursorY = 0;
@@ -1015,6 +1042,9 @@ void ExecuteStateLoadScreenLoadExit(LOAD_SCREEN* pLoad)
 // 98.37% matching
 void SetDispLoadSelectMessage()
 {
+#ifdef TARGET_PC
+    return;
+#endif
     bhFontScaleSet(0.71f, 0.71f, 0.75f);
     
     bhDispMessage(96.0f, 82.0f, -1.0f, 1, 452, 0, 0);
@@ -1030,6 +1060,9 @@ void SetDispLoadSelectMessage()
 // 100% matching!
 void CheckDispLoadMemoryCard(LOAD_SCREEN* pLoad)
 {
+#ifdef TARGET_PC
+    return;
+#endif
     int lPort0Card, lPort1Card;
     int lPort0CurX, lPort1CurX; 
     int lPort0CurY, lPort1CurY; // not from the debugging symbols

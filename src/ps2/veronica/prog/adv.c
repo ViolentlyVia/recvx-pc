@@ -1071,6 +1071,18 @@ float AutoSaveLoadEasyDispMessage(float PosX, float PosY, unsigned char* ucpMsbT
     sy = PosY;
     
     smp = (unsigned char*)((int)ucpMsbTop + ((int*)ucpMsbTop)[MessageNo + 1]); 
+#ifdef TARGET_PC
+    if (ucpMsbTop == SaveLoadMessage)
+    {
+        extern const unsigned short* pcMessageOverride(int table, int idx, const void* base);
+        const unsigned short* ov = pcMessageOverride(2, MessageNo, ucpMsbTop);
+
+        if (ov != NULL)
+        {
+            smp = (unsigned char*)ov;   /* save/load wording for PC (pc_text.c) */
+        }
+    }
+#endif
     
     dmp = syMalloc(1024); 
     

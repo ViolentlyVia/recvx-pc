@@ -444,6 +444,12 @@ void ExecuteStateSysLoadScreenErrFreeCapacity(SYSLOAD_SCREEN* pSysLoad)
 // 100% matching!
 void SetStateSysLoadScreenNoSysFile(SYSLOAD_SCREEN* pSysLoad)
 {
+#ifdef TARGET_PC
+    /* first start (no saved setup yet): just begin with the default setup */
+    pSysLoad->usExitFlag = 1;
+    SetStateSysLoadScreenTitleExit(pSysLoad);
+    return;
+#endif
     pSysLoad->ulState = 13;
     
     pSysLoad->cMesFlag = 8;

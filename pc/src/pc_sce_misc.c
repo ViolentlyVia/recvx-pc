@@ -1,4 +1,4 @@
-/* PC port: replacements for the remaining PS2 SDK libraries (libpad, libmc, sif, libsdr,
+/* PC port: replacements for the remaining PS2 SDK libraries (libpad, sif, libsdr,
  * libvu0, and a few libc extras the EE toolchain provided). */
 #include <math.h>
 #include <stdlib.h>
@@ -57,61 +57,7 @@ int scePadRead(int port, int slot, unsigned char* rdata)
     return (port == 0) ? 32 : 0;
 }
 
-/* ------------------------------------------------------------------------------------------- */
-/* libmc: no memory card yet (saving comes with the save-file layer) */
-
-static int mc_last_result;
-static int mc_last_cmd;
-
-#define MC_NO_CARD (-10)
-
-static int mc_finish(int cmd, int result)
-{
-    mc_last_cmd = cmd;
-    mc_last_result = result;
-    return 0;
-}
-
-int sceMcInit(void)
-{
-    return 0;
-}
-
-int sceMcGetInfo(int port, int slot, int* type, int* free, int* format)
-{
-    (void)port; (void)slot;
-
-    if (type != NULL)   *type = 0;
-    if (free != NULL)   *free = 0;
-    if (format != NULL) *format = 0;
-
-    return mc_finish(1, MC_NO_CARD);
-}
-
-int sceMcOpen(int port, int slot, const char* name, int mode)       { (void)port; (void)slot; (void)name; (void)mode; return mc_finish(2, MC_NO_CARD); }
-int sceMcClose(int fd)                                              { (void)fd; return mc_finish(3, MC_NO_CARD); }
-int sceMcRead(int fd, void* buf, int size)                          { (void)fd; (void)buf; (void)size; return mc_finish(5, MC_NO_CARD); }
-int sceMcWrite(int fd, const void* buf, int size)                   { (void)fd; (void)buf; (void)size; return mc_finish(6, MC_NO_CARD); }
-int sceMcMkdir(int port, int slot, const char* name)                { (void)port; (void)slot; (void)name; return mc_finish(11, MC_NO_CARD); }
-int sceMcChdir(int port, int slot, const char* newdir, char* olddir) { (void)port; (void)slot; (void)newdir; (void)olddir; return mc_finish(12, MC_NO_CARD); }
-int sceMcFormat(int port, int slot)                                 { (void)port; (void)slot; return mc_finish(16, MC_NO_CARD); }
-int sceMcDelete(int port, int slot, const char* name)               { (void)port; (void)slot; (void)name; return mc_finish(15, MC_NO_CARD); }
-
-int sceMcGetDir(int port, int slot, const char* name, unsigned int mode, int maxent, sceMcTblGetDir* table)
-{
-    (void)port; (void)slot; (void)name; (void)mode; (void)maxent; (void)table;
-    return mc_finish(13, MC_NO_CARD);
-}
-
-int sceMcSync(int mode, int* cmd, int* result)
-{
-    (void)mode;
-
-    if (cmd != NULL)    *cmd = mc_last_cmd;
-    if (result != NULL) *result = mc_last_result;
-
-    return 1;   /* finished */
-}
+/* libmc: pc_mc.c */
 
 int  sceSdRemoteInit(void)                      { return 0; }
 int  sceSSyn_SetOutputMode(int mode)            { (void)mode; return 0; }

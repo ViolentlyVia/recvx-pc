@@ -5,7 +5,7 @@ usage: python pc/tools/make_share.py
 Writes build_pc/share/recvx-cvx-pc/ and build_pc/share/recvx-cvx-pc.zip containing recvx.exe,
 SDL2.dll, the setup scripts and a README. Each recipient extracts their own disc image with
 setup\\setup_game.py. Deliberately left out: the ISO, extracted disc files (data/), converted
-movies, HD texture packs, recvx.ini (holds your local paths), logs and input recordings.
+movies, HD texture packs, recvx.ini (holds your local paths), saves, logs and input recordings.
 """
 import os
 import shutil
@@ -41,10 +41,14 @@ Controls (keyboard; game controllers work too)
   Arrows = move, Z = Cross, X = Square, C = Circle, V = Triangle, A/S = L1/R1, Q/W = L2/R2,
   Enter = Start, Backspace = Select. Hold Numpad 0 to fast-forward.
 
+Saving: use the typewriters as usual. Saves are kept in the "saves" folder next to
+recvx.exe (copy that folder to back them up or move them to another PC). To keep them
+somewhere else, add  saves=C:\\path\\to\\folder  to recvx.ini.
+
 Optional: HD textures from a PCSX2 texture pack - add  hd_textures=C:\\path\\to\\pack  to
 recvx.ini (create the file next to recvx.exe if needed).
 
-Not finished yet: memory card saves and sound reverb.
+Not finished yet: sound reverb.
 """
 
 

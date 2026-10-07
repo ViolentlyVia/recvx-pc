@@ -521,6 +521,11 @@ void ExecuteStateSysSaveErrFreeCapacity(SYSSAVE_SCREEN* pSysSave)
 // 100% matching!
 void SetStateSysSaveCheckWriteSysData(SYSSAVE_SCREEN* pSysSave)
 {
+#ifdef TARGET_PC
+    /* nothing to ask: create the save files and save */
+    SetStateSysSaveWriteSysData(pSysSave);
+    return;
+#endif
     pSysSave->ulState = 13;
     
     pSysSave->cMesFlag = 7;
