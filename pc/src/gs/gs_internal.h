@@ -80,4 +80,5 @@ void gsXferDone(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int
 void gsFlushLocalToLocal(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int x, unsigned int y, unsigned int w, unsigned int h);
 
 /* texture decoding for the renderer: fills rgba (w*h) from VRAM per TEX0/TEXA/TEXCLUT */
+u64 gsClutHash(u64 tex0);
 void gsDecodeTexture(u64 tex0, u64 texa, u64 texclut, int w, int h, unsigned int* rgba);

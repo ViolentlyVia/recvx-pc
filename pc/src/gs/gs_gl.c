@@ -394,14 +394,16 @@ static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h)
     unsigned int psm = GSF(tex0, 20, 6);
     unsigned int tbp = GSF(tex0, 0, 14);
     unsigned int tbw = GSF(tex0, 14, 6);
-    u64 key0 = tex0 & 0x1FFFFFFFFFFFFFFFULL & ~(0x3ULL << 35) & ~(1ULL << 34);   /* drop TCC/TFX */
+    u64 key0 = tex0 & 0x0000001FFFFFFFFFULL & ~(0x3ULL << 35) & ~(1ULL << 34);   /* TBP..TH, drop TCC/TFX and CLUT fields */
+    u64 cpsm_key = ((u64)GSF(tex0, 51, 4) << 37);
     u64 key1 = ((psm == GS_PSMCT24) || (gsPsmBits(psm) == 16) || (GSF(tex0, 51, 4) >= 2)) ? texa : 0;
-    u64 key2 = GSF(tex0, 55, 1) ? texclut : 0;
+    u64 key2 = gsClutHash(tex0);   /* palette contents (0-entry hash for direct color) */
     int pw, ph, i, slot = -1, oldest = 0;
     unsigned int page_lo, page_hi, clut_page, stride;
     unsigned long long gen;
     CachedTex* t;
 
+    key0 |= cpsm_key;
     psm_page_size(psm, &pw, &ph);
     stride = (tbw * 64 + pw - 1) / pw;
 
@@ -749,9 +751,9 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
         }
 
         pcLog("draw fb %u/%u psm %u msk %08x type %d n %d iip %d tme %d fst %d abe %d fge %d | tex0 %016llx tex1 %llx clamp %llx"
-              " | alpha %010llx test %05llx zbuf %llx sc %016llx | x %.1f..%.1f y %.1f..%.1f z %u..%u c0 %02x%02x%02x%02x q %g st %g,%g",
+              " | alpha %010llx test %05llx zbuf %llx sc %016llx texa %llx | x %.1f..%.1f y %.1f..%.1f z %u..%u c0 %02x%02x%02x%02x q %g st %g,%g",
               fbp, fbw, fpsm, fbmsk, st->type, nverts, st->iip, st->tme, st->fst, st->abe, st->fge,
-              st->tex0, st->tex1, st->clamp, st->alpha, st->test, st->zbuf, st->scissor,
+              st->tex0, st->tex1, st->clamp, st->alpha, st->test, st->zbuf, st->scissor, st->texa,
               x0, x1, y0, y1, z0, z1, v[0].r, v[0].g, v[0].b, v[0].a, v[0].q, v[0].s, v[0].t);
     }
 

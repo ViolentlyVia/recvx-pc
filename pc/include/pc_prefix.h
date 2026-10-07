@@ -31,6 +31,24 @@
 #endif
 #include "pc_vu0.h"
 
+/* The EE C library's rand() returns 0..0x7FFFFFFF (game code divides by 2^31); MSVC's stops
+ * at 32767. Same generator as the EE newlib. */
+static __inline int pc_rand_impl(int seed, int set)
+{
+    static unsigned long long next = 1;
+
+    if (set)
+    {
+        next = (unsigned int)seed;
+        return 0;
+    }
+
+    next = next * 6364136223846793005ULL + 1;
+    return (int)((next >> 32) & 0x7FFFFFFF);
+}
+#define rand() pc_rand_impl(0, 0)
+#define srand(s) ((void)pc_rand_impl((int)(s), 1))
+
 /* GCC's va_list name used by some CRI sources */
 #include <stdarg.h>
 typedef va_list __gnuc_va_list;

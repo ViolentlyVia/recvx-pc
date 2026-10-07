@@ -1,6 +1,7 @@
 """Build the PC executable (build_pc/recvx.exe) with 32-bit MSVC.
 
-usage: python pc/tools/build.py [--release] [--clean]
+usage: python pc/tools/build.py [--debug] [--clean]
+Optimised by default; --debug builds without optimisation (separate object directory).
 Compiles changed sources in parallel, links against SDL2 and copies SDL2.dll next to the exe.
 Failing compiles are listed; the link step still runs so missing symbols show up together.
 """
@@ -52,9 +53,13 @@ def compile_one(args):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--release", action="store_true")
+    ap.add_argument("--debug", action="store_true")
     ap.add_argument("--clean", action="store_true")
     opts = ap.parse_args()
+
+    global OBJ_DIR
+    if opts.debug:
+        OBJ_DIR = os.path.join(common.BUILD, "obj_debug")
 
     if opts.clean and os.path.isdir(OBJ_DIR):
         shutil.rmtree(OBJ_DIR)
@@ -65,7 +70,8 @@ def main():
 
     flags = common.CFLAGS + common.include_flags() + ["/I" + os.path.join(sdl, "include"),
                                                       "/Zi", "/FS", "/Fd" + os.path.join(common.BUILD, "recvx_c.pdb")]
-    flags += ["/O2", "/MD"] if opts.release else ["/Od", "/MDd", "/D_DEBUG"]
+    # /GF-: the game writes into string literals (gdFsInit uppercases file names in place)
+    flags += ["/O2", "/GF-", "/MD"] if not opts.debug else ["/Od", "/MDd", "/D_DEBUG"]
 
     sources = common.game_sources() + common.pc_sources()
     hdr = header_mtime_cache()

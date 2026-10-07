@@ -12,6 +12,8 @@
 #include "pc_os.h"
 #include "pc_gs.h"
 
+static unsigned int frames;   /* frames presented */
+
 #define PS2_WIDTH  640
 #define PS2_HEIGHT 480
 
@@ -187,7 +189,6 @@ int pcVideoPumpEvents(void)
 
 void pcVideoPresent(void)
 {
-    static unsigned int frames;
     static double last_report;
 
     if (!pcVideoPumpEvents())
@@ -356,6 +357,115 @@ void pcPadUpdate(void)
         {
             r[3] &= ~0x02;
             r[19] = 0xFF;
+        }
+    }
+
+    /* testing aid: RECVX_INPUT=<file> replays button presses. Each line: "<frame> <button>[+<button>...] [hold]"
+     * where <frame> is a frame number (only until the status screen first opens) or "status+<n>"
+     * (n frames after the status screen opens, each time);
+     * with buttons start select cross circle square triangle up down left right l1 r1 l2 r2;
+     * the buttons are held for <hold> frames (default 4) from that frame on. */
+    {
+        static struct { unsigned int frame, hold; unsigned short mask; int rel; } script[512];
+        static unsigned int status_frame = 0xFFFFFFFF;
+        static int in_status;
+        static int nscript = -1;
+        static const char* names[16] = { "select", "l3", "r3", "start", "up", "right", "down", "left",
+                                         "l2", "r2", "l1", "r1", "triangle", "circle", "cross", "square" };
+        int k;
+
+        if (nscript < 0)
+        {
+            const char* e = SDL_getenv("RECVX_INPUT");
+            FILE* f = (e != NULL) ? fopen(e, "r") : NULL;
+            char line[256];
+
+            nscript = 0;
+
+            while ((f != NULL) && (nscript < 512) && fgets(line, sizeof(line), f))
+            {
+                char btn[200];
+                unsigned int fr, hold = 4;
+                char* tok;
+                unsigned short mask = 0;
+
+                int rel = 0;
+
+                if (strncmp(line, "status+", 7) == 0)
+                {
+                    rel = 1;
+                    memmove(line, line + 7, strlen(line + 7) + 1);
+                }
+
+                if (sscanf(line, "%u %199s %u", &fr, btn, &hold) < 2)
+                {
+                    continue;
+                }
+
+                for (tok = strtok(btn, "+"); tok != NULL; tok = strtok(NULL, "+"))
+                {
+                    for (k = 0; k < 16; k++)
+                    {
+                        if (strcmp(tok, names[k]) == 0)
+                        {
+                            mask |= 1 << k;
+                        }
+                    }
+                }
+
+                script[nscript].frame = fr;
+                script[nscript].hold = hold;
+                script[nscript].mask = mask;
+                script[nscript].rel = rel;
+                nscript++;
+            }
+
+            if (f != NULL)
+            {
+                fclose(f);
+                pcLog("input script: %d entries", nscript);
+            }
+        }
+
+        {
+            extern int pcGameInStatusScreen(void);
+            int now = pcGameInStatusScreen();
+
+            if (now && !in_status)
+            {
+                status_frame = frames;
+            }
+
+            in_status = now;
+        }
+
+        for (k = 0; k < nscript; k++)
+        {
+            unsigned int at = script[k].rel ? status_frame + script[k].frame : script[k].frame;
+
+            /* relative entries wait for the status screen; absolute ones stop once it has opened */
+            if ((status_frame == 0xFFFFFFFF) == (script[k].rel != 0))
+            {
+                continue;
+            }
+
+            if ((frames >= at) && (frames < at + script[k].hold))
+            {
+                int b;
+
+                for (b = 0; b < 16; b++)
+                {
+                    if (script[k].mask & (1 << b))
+                    {
+                        r[2 + (b >> 3)] &= ~(1 << (b & 7));
+                    }
+                }
+
+                if (script[k].mask & 0x4000)
+                {
+                    r[14] = 0xFF;
+                }
+            }
         }
     }
 

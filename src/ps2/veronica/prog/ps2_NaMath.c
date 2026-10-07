@@ -89,6 +89,9 @@ Float	njSin(Angle n)
     " : "=r"(ret) : "r"(&n), "r"(SinTable) : 
     );
 #endif
+#ifdef TARGET_PC
+    return ret;
+#endif
 }
 
 // 100% matching!
@@ -176,6 +179,9 @@ Float	njCos(Angle n)
     .set reorder
     " : "=r"(ret) : "r"(&n), "r"(SinTable) : 
     );
+#endif
+#ifdef TARGET_PC
+    return ret;
 #endif
 }
 

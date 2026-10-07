@@ -39,6 +39,22 @@
 #define HSYNC_HZ  15734.0      /* NTSC */
 #define VBLANK_HZ 59.94
 
+/* testing aid: RECVX_SPEED=<n> runs the VBLANK clock n times faster (fast-forward) */
+static double vblank_period(void)
+{
+    static double period;
+
+    if (period == 0)
+    {
+        const char* e = getenv("RECVX_SPEED");
+        double speed = (e != NULL) ? atof(e) : 1.0;
+
+        period = 1.0 / (VBLANK_HZ * ((speed > 0) ? speed : 1.0));
+    }
+
+    return period;
+}
+
 typedef struct {
     int used;
     int dormant;
@@ -108,7 +124,7 @@ static void kernel_init(void)
     threads[1].fiber = pcOsFiberFromThread();
     cur_tid = 1;
 
-    next_vblank = pcOsTime() + 1.0 / VBLANK_HZ;
+    next_vblank = pcOsTime() + vblank_period();
 }
 
 static int is_ready(const PcThread* t)
@@ -161,7 +177,7 @@ static int run_interrupts(void)
 
     while (now >= next_vblank)
     {
-        next_vblank += 1.0 / VBLANK_HZ;
+        next_vblank += vblank_period();
         vblank_count++;
 
         if (intc_enabled[2])

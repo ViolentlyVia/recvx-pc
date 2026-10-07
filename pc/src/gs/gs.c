@@ -4,6 +4,7 @@
  * interprets them: register writes update GsRegs, vertex kicks assemble primitives which are
  * handed to the OpenGL renderer (gs_gl.c), IMAGE data goes to local memory (gs_mem.c).
  */
+#include <stdlib.h>
 #include <string.h>
 
 #include "gs_internal.h"
@@ -190,6 +191,8 @@ static void latch_vertex(u64 xyz, int has_f, int kick)
 /* ------------------------------------------------------------------------------------------- */
 /* registers */
 
+static void clut_load(u64 tex0);
+
 void gsWriteReg(int reg, u64 value)
 {
     switch (reg)
@@ -200,8 +203,8 @@ void gsWriteReg(int reg, u64 value)
     case 0x03: gsRegs.uv = value; break;
     case 0x04: latch_vertex(value, 1, 1); break;
     case 0x05: latch_vertex(value, 0, 1); break;
-    case 0x06: gsRegs.tex0[0] = value; break;
-    case 0x07: gsRegs.tex0[1] = value; break;
+    case 0x06: gsRegs.tex0[0] = value; clut_load(value); break;
+    case 0x07: gsRegs.tex0[1] = value; clut_load(value); break;
     case 0x08: gsRegs.clamp[0] = value; break;
     case 0x09: gsRegs.clamp[1] = value; break;
     case 0x0a: gsRegs.fog = value; break;
@@ -217,6 +220,7 @@ void gsWriteReg(int reg, u64 value)
 
         gsRegs.tex2[c] = value;
         gsRegs.tex0[c] = (gsRegs.tex0[c] & ~mask) | (value & mask);
+        clut_load(gsRegs.tex0[c] | (value & (7ULL << 61)));
         break;
     }
     case 0x18: gsRegs.xyoffset[0] = value; break;
@@ -555,17 +559,57 @@ static unsigned int expand24(unsigned int c, u64 texa)
     return (c & 0xFFFFFF) | (a << 24);
 }
 
-static void read_clut(u64 tex0, u64 texa, u64 texclut, int entries, unsigned int* clut)
+/* GS CLUT buffer: 512 16-bit halves. A CT32 entry e keeps its low half at e and its high half
+ * at e + 256; CT16 entries use one half each. Palettes are copied in from GS memory when TEX0
+ * or TEX2 is written (per CLD) and stay there until the next load, so a texture can use a
+ * palette loaded earlier at another CSA offset. */
+static unsigned short clut_buf[512];
+static unsigned int clut_cbp0, clut_cbp1;
+
+static int clut_entries(unsigned int psm)
 {
+    if ((psm == GS_PSMT8) || (psm == GS_PSMT8H)) return 256;
+    if ((psm == GS_PSMT4) || (psm == GS_PSMT4HL) || (psm == GS_PSMT4HH)) return 16;
+    return 0;
+}
+
+static void clut_load(u64 tex0)
+{
+    unsigned int psm = GSF(tex0, 20, 6);
     unsigned int cbp = GSF(tex0, 37, 14);
     unsigned int cpsm = GSF(tex0, 51, 4);
     unsigned int csm = GSF(tex0, 55, 1);
     unsigned int csa = GSF(tex0, 56, 5);
-    int i;
+    unsigned int cld = GSF(tex0, 61, 3);
+    int entries = clut_entries(psm);
+    int i, load;
+
+    if (entries == 0)
+    {
+        return;
+    }
+
+    switch (cld)
+    {
+    case 1: load = 1; break;
+    case 2: load = 1; clut_cbp0 = cbp; break;
+    case 3: load = 1; clut_cbp1 = cbp; break;
+    case 4: load = (cbp != clut_cbp0); clut_cbp0 = cbp; break;
+    case 5: load = (cbp != clut_cbp1); clut_cbp1 = cbp; break;
+    default: load = 0; break;
+    }
+
+    if (!load)
+    {
+        return;
+    }
+
+    /* primitives already queued use the old palette */
+    gsFlushPrims();
 
     for (i = 0; i < entries; i++)
     {
-        unsigned int x, y, bw = 1, c;
+        unsigned int x, y, bw = 1, e = ((entries == 16) ? csa * 16 : 0) + i;
 
         if (csm == 0)
         {
@@ -585,24 +629,68 @@ static void read_clut(u64 tex0, u64 texa, u64 texclut, int entries, unsigned int
         }
         else
         {
-            bw = GSF(texclut, 0, 6);
-            x = GSF(texclut, 6, 6) * 16 + i;
-            y = GSF(texclut, 12, 10);
+            bw = GSF(gsRegs.texclut, 0, 6);
+            x = GSF(gsRegs.texclut, 6, 6) * 16 + i;
+            y = GSF(gsRegs.texclut, 12, 10);
         }
 
         if ((cpsm == 0) || (cpsm == 1))
         {
-            c = gsMemRead(GS_PSMCT32, cbp, bw, x, y);
+            unsigned int c = gsMemRead(GS_PSMCT32, cbp, bw, x, y);
+
+            e &= 255;
+            clut_buf[e] = (unsigned short)c;
+            clut_buf[e + 256] = (unsigned short)(c >> 16);
+        }
+        else
+        {
+            clut_buf[e & 511] = (unsigned short)gsMemRead((cpsm == 10) ? GS_PSMCT16S : GS_PSMCT16, cbp, bw, x, y);
+        }
+    }
+}
+
+static void read_clut(u64 tex0, u64 texa, int entries, unsigned int* clut)
+{
+    unsigned int cpsm = GSF(tex0, 51, 4);
+    unsigned int base = (entries == 16) ? GSF(tex0, 56, 5) * 16 : 0;
+    int i;
+
+    for (i = 0; i < entries; i++)
+    {
+        unsigned int e = base + i;
+
+        if ((cpsm == 0) || (cpsm == 1))
+        {
+            unsigned int c;
+
+            e &= 255;
+            c = clut_buf[e] | ((unsigned int)clut_buf[e + 256] << 16);
             clut[i] = (cpsm == 1) ? expand24(c, texa) : c;
         }
         else
         {
-            c = gsMemRead((cpsm == 10) ? GS_PSMCT16S : GS_PSMCT16, cbp, bw, x, y);
-            clut[i] = expand16(c, texa);
+            clut[i] = expand16(clut_buf[e & 511], texa);
         }
     }
+}
 
-    (void)csa;
+/* hash of the palette entries a texture would use (texture cache key) */
+u64 gsClutHash(u64 tex0)
+{
+    int entries = clut_entries(GSF(tex0, 20, 6));
+    unsigned int base = (entries == 16) ? GSF(tex0, 56, 5) * 16 : 0;
+    u64 h = 1469598103934665603ULL;
+    int i;
+
+    for (i = 0; i < entries; i++)
+    {
+        unsigned int e = (base + i) & 511;
+
+        h = (h ^ clut_buf[e]) * 1099511628211ULL;
+        h = (h ^ clut_buf[(e + 256) & 511]) * 1099511628211ULL;
+    }
+
+    return h;
 }
 
 void gsDecodeTexture(u64 tex0, u64 texa, u64 texclut, int w, int h, unsigned int* rgba)
@@ -615,11 +703,11 @@ void gsDecodeTexture(u64 tex0, u64 texa, u64 texclut, int w, int h, unsigned int
 
     if ((psm == GS_PSMT8) || (psm == GS_PSMT8H))
     {
-        read_clut(tex0, texa, texclut, 256, clut);
+        read_clut(tex0, texa, 256, clut);
     }
     else if ((psm == GS_PSMT4) || (psm == GS_PSMT4HL) || (psm == GS_PSMT4HH))
     {
-        read_clut(tex0, texa, texclut, 16, clut);
+        read_clut(tex0, texa, 16, clut);
     }
 
     for (y = 0; y < h; y++)
