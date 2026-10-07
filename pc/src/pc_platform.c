@@ -336,8 +336,20 @@ static void pcPadRecordReplay(unsigned char* r)
 
             if (rec == NULL)
             {
+                char prev[1100];
+
+                /* scripted test runs are not worth recording */
+                if ((SDL_getenv("RECVX_INPUT") != NULL) || (SDL_getenv("RECVX_AUTOPRESS") != NULL))
+                {
+                    return;
+                }
+
+                /* keep the previous session's recording one more run */
                 pcPlatformExeDir(dir, sizeof(dir));
                 snprintf(path, sizeof(path), "%s/last_run_input.txt", dir);
+                snprintf(prev, sizeof(prev), "%s/last_run_input.prev.txt", dir);
+                remove(prev);
+                rename(path, prev);
                 rec = path;
             }
 
