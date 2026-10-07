@@ -41,3 +41,4 @@ typedef va_list __gnuc_va_list;
 #ifndef PC_NATIVE_LONG
 #define long long long
 #endif
+#include "pc_asm2c.h"

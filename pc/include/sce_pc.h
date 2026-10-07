@@ -257,3 +257,18 @@ int sceMcGetDir(int port, int slot, const char* name, unsigned int mode, int max
 int sceMcFormat(int port, int slot);
 int sceMcDelete(int port, int slot, const char* name);
 int sceMcSync(int mode, int* cmd, int* result);
+
+/* DMA channel registers (only used as channel identifiers on PC, see pc_libgraph.c) */
+#define D0_CHCR ((volatile u_int*)0x10008000)
+#define D1_CHCR ((volatile u_int*)0x10009000)
+#define D2_CHCR ((volatile u_int*)0x1000A000)
+#define D3_CHCR ((volatile u_int*)0x1000B000)
+#define D4_CHCR ((volatile u_int*)0x1000B400)
+
+/* VIF codes (only built, never executed on PC: the VU1 path is disabled) */
+#define SCE_VIF1_SET_NOP(irq)                   ((u_int)(irq) << 31)
+#define SCE_VIF1_SET_BASE(base, irq)            (((u_int)(irq) << 31) | (0x03u << 24) | (u_int)(base))
+#define SCE_VIF1_SET_OFFSET(offset, irq)        (((u_int)(irq) << 31) | (0x02u << 24) | (u_int)(offset))
+#define SCE_VIF1_SET_MSCAL(vuaddr, irq)         (((u_int)(irq) << 31) | (0x14u << 24) | (u_int)(vuaddr))
+#define SCE_VIF1_SET_UNPACK(vuaddr, num, cmd, irq) \
+    (((u_int)(irq) << 31) | ((0x60u | (u_int)(cmd)) << 24) | ((u_int)(num) << 16) | (u_int)(vuaddr))

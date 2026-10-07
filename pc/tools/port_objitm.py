@@ -54,17 +54,29 @@ blocks = [
 }
 """,
 # 1: let the waves settle: h = max(h - 0.2, 0) over whole 16-float blocks (the PS2 loop never
-#    stores the remainder, so neither do we)
+#    stores the remainder). The original binary reloads vf6 only after the loop (checked against
+#    SLUS_201.84), so every block's second quadword comes from the first block's.
 """
 {
     float* w = (float*)sys->wt_wvp;
-    int k, n = (sys->wt_nbpt >> 4) * 16;
+    int blocks = sys->wt_nbpt >> 4;
+    float q1[4];
+    int b, k;
 
-    for (k = 0; k < n; k++)
+    for (k = 0; k < 4; k++)
     {
-        float v = w[k] - 0.2f;
+        q1[k] = w[4 + k];
+    }
 
-        w[k] = (v > 0) ? v : 0;
+    for (b = 0; b < blocks; b++)
+    {
+        for (k = 0; k < 16; k++)
+        {
+            float v = ((k >= 4) && (k < 8)) ? q1[k - 4] : w[b * 16 + k];
+
+            v -= 0.2f;
+            w[b * 16 + k] = (v > 0) ? v : 0;
+        }
     }
 }
 """,

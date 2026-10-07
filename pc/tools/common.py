@@ -25,8 +25,6 @@ CFLAGS = ["/nologo", "/TC", "/std:c17", "/W3", "/wd4244", "/wd4305", "/wd4996", 
 # Upstream sources replaced by the PC platform layer (pc/src). Grows as pieces are ported.
 EXCLUDE = {
     # PS2 graphics: GS/VIF packet building and VU1 microcode drivers -> PC renderer
-    "src/ps2/veronica/prog/ps2_NinjaCnk.c",
-    "src/ps2/veronica/prog/ps2_Vu1Strip.c",
     # MPEG movie playback through the IPU -> PC movie player
     "src/ps2/veronica/prog/ps2_MovieFunc.c",
     # CRI ADX output to the IOP -> pc/src/pc_adx_rna.c
@@ -64,7 +62,7 @@ def game_sources():
 
 
 def pc_sources():
-    return sorted(glob.glob(os.path.join(ROOT, "pc/src/*.c")) + glob.glob(os.path.join(ROOT, "pc/src/gs/*.c")))
+    return sorted(glob.glob(os.path.join(ROOT, "pc/src/*.c")) + glob.glob(os.path.join(ROOT, "pc/src/gs/*.c")) + glob.glob(os.path.join(ROOT, "pc/src/vu/*.c")))
 
 
 # PC platform files that never include game headers: they talk to Windows/SDL and keep the

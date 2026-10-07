@@ -1518,14 +1518,27 @@ void bhObj005(O_WRK* op)
      
 #ifdef TARGET_PC
         {
+            /* As in the original binary (the reload of vf6 sits after the loop): every 16-float block
+             * gets its second quadword from the *first* block's. */
             float* w = (float*)sys->wt_wvp;
-            int k, n = (sys->wt_nbpt >> 4) * 16;
+            int blocks = sys->wt_nbpt >> 4;
+            float q1[4];
+            int b, k;
 
-            for (k = 0; k < n; k++)
+            for (k = 0; k < 4; k++)
             {
-                float v = w[k] - 0.2f;
+                q1[k] = w[4 + k];
+            }
 
-                w[k] = (v > 0) ? v : 0;
+            for (b = 0; b < blocks; b++)
+            {
+                for (k = 0; k < 16; k++)
+                {
+                    float v = ((k >= 4) && (k < 8)) ? q1[k - 4] : w[b * 16 + k];
+
+                    v -= 0.2f;
+                    w[b * 16 + k] = (v > 0) ? v : 0;
+                }
             }
         }
 #else
