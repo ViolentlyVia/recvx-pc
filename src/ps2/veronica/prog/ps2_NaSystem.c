@@ -127,6 +127,9 @@ int vsync_func(int)
     }
     
     ExitHandler(); 
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 } 
 
 #pragma optimization_level reset

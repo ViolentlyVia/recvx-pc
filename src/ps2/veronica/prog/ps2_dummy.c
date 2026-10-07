@@ -1607,6 +1607,9 @@ int Ps2GlobalIndexTexLoad(unsigned int index)
 	{
     	printf("Ps2GlobalIndexTexLoad ERROR!!! %08x\n", index);
 	}
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 97.17% matching
@@ -1811,6 +1814,9 @@ unsigned int Ps2AlphaIsHalf(unsigned int* cp, unsigned int num)
     {
         ((unsigned char*)cp)[3] = (((unsigned char*)cp)[3] + 1) >> 1;
     }
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!
@@ -1825,6 +1831,9 @@ unsigned int Ps2Alpha4to8(unsigned int* cp, unsigned int num)
         
         ((unsigned char*)cp)[3] = val | (val >> 4);
     }
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!

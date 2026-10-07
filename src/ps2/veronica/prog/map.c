@@ -1356,6 +1356,9 @@ static func_wrk_typ* MapFuncIns(func_wrk_typ* bsP, func_wrk_typ* fwP)
     
     bsP->nextP->prevP = fwP;
     bsP->nextP        = fwP;
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!

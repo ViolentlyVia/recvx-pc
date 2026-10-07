@@ -2827,6 +2827,9 @@ BH_PWORK* bhEne01_SetLinkEnemy(BH_PWORK* epw, int lkono, short id)
 	epp->mlwP = epw->mdl;
 	epp->mnwP = epw->mnwP;
 	epp->id = id;
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return epp;
+#endif
 }
 
 // 100% matching!
@@ -4856,6 +4859,9 @@ int bhEne01_ActionModeCheck(BH_PWORK *epw)
     }
 
     return;
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!

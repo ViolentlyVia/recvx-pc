@@ -20,7 +20,7 @@ INCLUDES = [
 ]
 
 CFLAGS = ["/nologo", "/TC", "/std:c17", "/W3", "/wd4244", "/wd4305", "/wd4996", "/wd4828",
-          "/wd4005", "/wd4068", "/wd4307", "/Zc:preprocessor", "/wd5105", "/DTARGET_PC", "/FIpc_prefix.h"]
+          "/wd4005", "/wd4068", "/we4716", "/wd4307", "/Zc:preprocessor", "/wd5105", "/DTARGET_PC", "/FIpc_prefix.h"]
 
 # Upstream sources replaced by the PC platform layer (pc/src). Grows as pieces are ported.
 EXCLUDE = {

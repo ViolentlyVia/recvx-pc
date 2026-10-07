@@ -334,6 +334,9 @@ int Send_1024_Clut_data(void* clt_adr, unsigned long send_clut_adr)
             pClut += 4;
         }
     } 
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 } 
 
 // 100% matching! 

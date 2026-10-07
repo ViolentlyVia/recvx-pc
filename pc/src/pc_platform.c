@@ -236,8 +236,10 @@ void pcVideoPresent(void)
         pcLog("frame %u", frames);
         {
             extern void pcGameStateLog(void);
+            extern void pcGsLogStats(void);
 
             pcGameStateLog();
+            pcGsLogStats();
         }
         last_report = SDL_GetTicks();
     }

@@ -85,6 +85,9 @@ int CalcIntersectionCone(float* ans, float* v0, float* v1)
     
     sceVu0ScaleVector(ans, tmp1, tmpf);
     sceVu0AddVector(ans, ans, v0);
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!

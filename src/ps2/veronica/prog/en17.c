@@ -451,6 +451,9 @@ int bhEne17_DmgChk(BH_PWORK* epw)
             }
         }
     }
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching
@@ -1661,6 +1664,9 @@ int bhEne17_PlayerDGCheck(BH_PWORK* epw, BH_PWORK* pl)
         i++;
         j += 12;
     }
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!
@@ -1686,6 +1692,9 @@ int bhEne17_CameraControl(BH_PWORK* epw)
         cam.ofz = 0.0f;
         ((unsigned int*)epw->exp0)[2] &= ~0x800;
     }
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!

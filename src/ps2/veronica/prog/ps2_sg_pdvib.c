@@ -86,6 +86,9 @@ Sint32 pdVibMxStart(Uint32 port, const PDS_VIBPARAM* param)
     {
         pPact->time = 4;
     }
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching! 

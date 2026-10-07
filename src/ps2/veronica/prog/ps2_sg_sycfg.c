@@ -6,6 +6,9 @@ int SoundMode;
 Sint32 syCfgExit( Void  )
 {
 
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching! 
@@ -24,10 +27,16 @@ Sint32 syCfgInit( Void* )
 #endif
 {
 
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching! 
 Sint32 syCfgSetSoundMode( Sint32 nMode )
 { 
     SoundMode = nMode; 
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }

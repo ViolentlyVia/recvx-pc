@@ -33,6 +33,9 @@ MWD_IF Ps2Func =
 Sint32 mwPlyCalcWorkSofdec(Sint32 ftype, Sint32 max_bps, Sint32 max_sx, Sint32 max_sy, Sint32 nfb)
 {
 
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!
@@ -164,6 +167,9 @@ void mwPlyFinishSofdec(void)
 Sint32 mwPlyGetBright(MWPLY mwply)
 {
 
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!
@@ -301,6 +307,9 @@ void ps2mwPlySetOutVol(MWPLY ply, Sint32 vol)
 Sint32 ps2mwPlyGetOutVol(MWPLY ply)
 {
 
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!

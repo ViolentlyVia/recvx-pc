@@ -62,6 +62,7 @@ static const char* fs_src =
     "noperspective in float vFog;\n"
     "uniform sampler2D uTex;\n"
     "uniform int uTme, uFst, uTfx, uTcc, uIip;\n"
+    "uniform vec3 uTexa;\n"                    /* TA0, TA1, AEM */
     "uniform int uTexRT;\n"                     /* 1: texture is a render target */
     "uniform vec2 uTexSize;\n"                  /* 2^TW, 2^TH */
     "uniform vec2 uRTSize;\n"                   /* render target logical size (RT textures) */
@@ -85,6 +86,12 @@ static const char* fs_src =
     "    return texelFetch(uTex, c, 0);\n"
     "}\n"
     "vec4 sampleTex(vec2 uv) {\n"
+    "    if (uTexRT == 2) {\n"
+    "        vec4 t = texture(uTex, uv / uRTSize);\n"
+    "        vec3 c = floor(t.rgb * 31.0 + 0.5) * 8.0;\n"
+    "        float a = (t.a * 128.0 >= 127.5) ? uTexa.y : ((uTexa.z != 0.0 && c == vec3(0.0)) ? 0.0 : uTexa.x);\n"
+    "        return vec4(c, a);\n"
+    "    }\n"
     "    if (uTexRT != 0) {\n"
     "        vec4 t = texture(uTex, uv / uRTSize);\n"
     "        return vec4(t.rgb * 255.0, t.a * 128.0);\n"
@@ -140,7 +147,7 @@ static GLuint vao, vbo;
 
 static struct {
     GLint target, tme, fst, tfx, tcc, iip, texrt, texsize, rtsize, wrap, region, linear;
-    GLint ate, atst, aref, atinv, fge, fogcol, tex;
+    GLint ate, atst, aref, atinv, fge, fogcol, tex, texa;
 } U;
 
 static GLuint compile(GLenum type, const char* src)
@@ -209,6 +216,8 @@ typedef struct {
     GLuint fbo, color;
     GLuint depth_attached;
     int vram_dirty;        /* GS memory was written inside this buffer */
+    int rendered;          /* drawn into since it last matched GS memory */
+    unsigned int psm;      /* FRAME.PSM last drawn with */
     unsigned int last_use;
 } RenderTarget;
 
@@ -226,6 +235,21 @@ static RenderTarget rts[MAX_RT];
 static DepthBuffer dbs[MAX_DB];
 static unsigned int frame_counter;
 static int dump_frame;
+
+/* per-interval statistics for the periodic log */
+static struct { unsigned int frames, draws, verts, rt_loads, rt_reads, tex_decodes, tex_texels; double t_load, t_read, t_decode; } stats;
+
+double pcOsTime(void);
+
+void pcGsLogStats(void)
+{
+    unsigned int f = stats.frames ? stats.frames : 1;
+
+    pcLog("gs/frame: %u draws, %u verts, %.1f rt loads (%.1f ms), %.1f rt reads (%.1f ms), %.1f tex decodes (%u texels, %.1f ms)",
+          stats.draws / f, stats.verts / f, (double)stats.rt_loads / f, stats.t_load * 1000 / f, (double)stats.rt_reads / f,
+          stats.t_read * 1000 / f, (double)stats.tex_decodes / f, stats.tex_texels / f, stats.t_decode * 1000 / f);
+    memset(&stats, 0, sizeof(stats));
+}
 
 static GLuint make_texture(int w, int h, GLint ifmt, GLenum fmt, GLenum type, GLint filter)
 {
@@ -360,7 +384,7 @@ typedef struct {
     unsigned int last_use;
 } CachedTex;
 
-#define MAX_TEX 512
+#define MAX_TEX 2048
 
 static CachedTex texcache[MAX_TEX];
 static unsigned int* decode_buf;
@@ -376,17 +400,48 @@ static void psm_page_size(int psm, int* pw, int* ph)
     }
 }
 
-static unsigned long long gen_sum(unsigned int lo, unsigned int hi, unsigned int clut_page)
+/* Content hash of GS memory pages (8 KB), recomputed only when a page's generation moves.
+ * Textures are cached by content: the game streams many textures through the same memory every
+ * frame, so the same bytes come back again and again at the same address. */
+static unsigned long long page_hash[GS_PAGES];
+static unsigned int page_hash_gen[GS_PAGES];
+static unsigned char page_hash_valid[GS_PAGES];
+
+static unsigned long long hash_page(unsigned int p)
+{
+    p &= GS_PAGES - 1;
+
+    if (!page_hash_valid[p] || (page_hash_gen[p] != gsPageGen[p]))
+    {
+        const unsigned long long* w = (const unsigned long long*)&gsVram[p * 8192];
+        unsigned long long h = 0x9E3779B97F4A7C15ULL ^ p;
+        int i;
+
+        for (i = 0; i < 8192 / 8; i++)
+        {
+            h = (h ^ w[i]) * 0x100000001B3ULL;
+            h ^= h >> 29;
+        }
+
+        page_hash[p] = h;
+        page_hash_gen[p] = gsPageGen[p];
+        page_hash_valid[p] = 1;
+    }
+
+    return page_hash[p];
+}
+
+static unsigned long long gen_sum(unsigned int lo, unsigned int hi)
 {
     unsigned long long s = 0;
     unsigned int p;
 
     for (p = lo; p <= hi; p++)
     {
-        s += (unsigned long long)gsPageGen[p & (GS_PAGES - 1)] * (p + 1);
+        s = (s * 0x100000001B3ULL) ^ hash_page(p);
     }
 
-    return s + gsPageGen[clut_page & (GS_PAGES - 1)] * 7919ull;
+    return s;
 }
 
 static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h)
@@ -415,24 +470,15 @@ static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h)
     page_lo = tbp >> 5;
     page_hi = page_lo + ((h + ph - 1) / ph - 1) * stride + (w + pw - 1) / pw;
     clut_page = GSF(tex0, 37, 14) >> 5;
-    gen = gen_sum(page_lo, page_hi, clut_page);
+    gen = gen_sum(page_lo, page_hi);
 
     for (i = 0; i < MAX_TEX; i++)
     {
         t = &texcache[i];
 
-        if (t->used && (t->key0 == key0) && (t->key1 == key1) && (t->key2 == key2) && (t->w == w) && (t->h == h))
+        if (t->used && (t->gen == gen) && (t->key0 == key0) && (t->key1 == key1) && (t->key2 == key2) && (t->w == w) && (t->h == h))
         {
             t->last_use = frame_counter;
-
-            if (t->gen != gen)
-            {
-                gsDecodeTexture(tex0, texa, texclut, w, h, decode_buf);
-                glBindTexture(GL_TEXTURE_2D, t->tex);
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, decode_buf);
-                t->gen = gen;
-            }
-
             return t->tex;
         }
 
@@ -467,7 +513,7 @@ static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h)
     t->last_use = frame_counter;
     t->tex = make_texture(w, h, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST);
 
-    gsDecodeTexture(tex0, texa, texclut, w, h, decode_buf);
+    { double t0 = pcOsTime(); gsDecodeTexture(tex0, texa, texclut, w, h, decode_buf); stats.tex_decodes++; stats.tex_texels += w * h; stats.t_decode += pcOsTime() - t0; }
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, decode_buf);
 
     return t->tex;
@@ -490,6 +536,7 @@ static int rt_overlaps(const RenderTarget* rt, unsigned int bp, unsigned int bw,
 
 static void rt_load_from_vram(RenderTarget* rt)
 {
+    double t0 = pcOsTime();
     int x, y, sx, sy;
     unsigned int* buf = malloc(rt->w * rt->h * 4 * pcGsScale * pcGsScale);
 
@@ -517,9 +564,12 @@ static void rt_load_from_vram(RenderTarget* rt)
     free(buf);
 
     rt->vram_dirty = 0;
+    rt->rendered = 0;
+    stats.rt_loads++;
+    stats.t_load += pcOsTime() - t0;
 }
 
-void gsXferDone(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int x, unsigned int y, unsigned int w, unsigned int h)
+void gsXferDone(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int x, unsigned int y, unsigned int w, unsigned int h, int changed)
 {
     int i;
 
@@ -527,7 +577,7 @@ void gsXferDone(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int
 
     for (i = 0; i < MAX_RT; i++)
     {
-        if (rts[i].used && rt_overlaps(&rts[i], bp, bw, psm, y, h))
+        if (rts[i].used && (changed || rts[i].rendered) && rt_overlaps(&rts[i], bp, bw, psm, y, h))
         {
             rts[i].vram_dirty = 1;
         }
@@ -550,6 +600,7 @@ void gsFlushLocalToLocal(unsigned int bp, unsigned int bw, unsigned int psm, uns
         {
             unsigned int* buf = malloc(rt->w * rt->h * 4 * pcGsScale * pcGsScale);
             int px, py;
+            double t0 = pcOsTime();
 
             glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
             glPixelStorei(GL_PACK_ALIGNMENT, 4);
@@ -568,6 +619,9 @@ void gsFlushLocalToLocal(unsigned int bp, unsigned int bw, unsigned int psm, uns
 
             free(buf);
             rt->vram_dirty = 0;
+            rt->rendered = 0;
+            stats.rt_reads++;
+            stats.t_read += pcOsTime() - t0;
         }
     }
 
@@ -592,7 +646,7 @@ void gsRendererInit(void)
     UL(target, "uTarget"); UL(tme, "uTme"); UL(fst, "uFst"); UL(tfx, "uTfx"); UL(tcc, "uTcc"); UL(iip, "uIip");
     UL(texrt, "uTexRT"); UL(texsize, "uTexSize"); UL(rtsize, "uRTSize"); UL(wrap, "uWrap"); UL(region, "uRegion");
     UL(linear, "uLinear"); UL(ate, "uAte"); UL(atst, "uAtst"); UL(aref, "uAref"); UL(atinv, "uAtestInvert");
-    UL(fge, "uFge"); UL(fogcol, "uFogCol"); UL(tex, "uTex");
+    UL(fge, "uFge"); UL(fogcol, "uFogCol"); UL(tex, "uTex"); UL(texa, "uTexa");
 #undef UL
 
     glGenVertexArrays(1, &vao);
@@ -734,6 +788,8 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
     int n = 0, i;
 
     rt->last_use = frame_counter;
+    stats.draws++;
+    stats.verts += nverts;
 
     if (dump_frame)
     {
@@ -759,8 +815,24 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
 
     if (rt->vram_dirty)
     {
-        rt_load_from_vram(rt);
+        /* a full-screen opaque untextured sprite overwrites everything anyway (the shadow
+         * buffer is cleared like this every frame after textures were streamed over it) */
+        int full_clear = (st->type == 6) && !st->tme && !st->abe && (fbmsk == 0) && (nverts == 2) &&
+                         (fminf(v[0].x, v[1].x) <= 0) && (fminf(v[0].y, v[1].y) <= 0) &&
+                         (fmaxf(v[0].x, v[1].x) >= 640) && (fmaxf(v[0].y, v[1].y) >= 480);
+
+        if (full_clear)
+        {
+            rt->vram_dirty = 0;
+        }
+        else
+        {
+            rt_load_from_vram(rt);
+        }
     }
+
+    rt->rendered = 1;
+    rt->psm = fpsm;
 
     /* build GL vertices */
     if (st->type == 6)
@@ -877,9 +949,16 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
         if (tw > 1024) tw = 1024;
         if (th > 1024) th = 1024;
 
-        if (((tbp & 31) == 0) && ((tpsm == GS_PSMCT32) || (tpsm == GS_PSMCT24)))
+        if ((tbp & 31) == 0)
         {
             src = find_rt(tbp >> 5);
+
+            /* a render target is sampled directly when the texture reads it in its own pixel size */
+            if ((src != NULL) && ((gsPsmBits(tpsm) != gsPsmBits(src->psm)) ||
+                                  ((tpsm != GS_PSMCT32) && (tpsm != GS_PSMCT24) && (tpsm != GS_PSMCT16) && (tpsm != GS_PSMCT16S))))
+            {
+                src = NULL;
+            }
         }
 
         glActiveTexture(GL_TEXTURE0);
@@ -895,8 +974,9 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
             glBindTexture(GL_TEXTURE_2D, src->color);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, linear ? GL_LINEAR : GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, linear ? GL_LINEAR : GL_NEAREST);
-            glUniform1i(U.texrt, 1);
+            glUniform1i(U.texrt, (gsPsmBits(tpsm) == 16) ? 2 : 1);
             glUniform2f(U.rtsize, (float)src->w, (float)src->h);
+            glUniform3f(U.texa, (float)GSF(st->texa, 0, 8), (float)GSF(st->texa, 32, 8), (float)GSF(st->texa, 15, 1));
         }
         else
         {
@@ -958,6 +1038,7 @@ void gsRendererPresent(unsigned int dispfb_fbp, unsigned int dispfb_fbw)
 
     gsRendererFlush();
     frame_counter++;
+    stats.frames++;
 
     /* debug: RECVX_GSDUMP=<frame> logs every draw of that frame (and the next one) */
     {

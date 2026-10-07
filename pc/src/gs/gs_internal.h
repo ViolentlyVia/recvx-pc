@@ -76,7 +76,8 @@ void gsRendererPresent(unsigned int dispfb_fbp, unsigned int dispfb_fbw);
 void gsRendererFlush(void);
 
 /* VRAM <-> render target coherency */
-void gsXferDone(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int x, unsigned int y, unsigned int w, unsigned int h);
+/* changed: the transfer altered GS memory (render targets that were drawn into are invalidated either way) */
+void gsXferDone(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int x, unsigned int y, unsigned int w, unsigned int h, int changed);
 void gsFlushLocalToLocal(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int x, unsigned int y, unsigned int w, unsigned int h);
 
 /* texture decoding for the renderer: fills rgba (w*h) from VRAM per TEX0/TEXA/TEXCLUT */

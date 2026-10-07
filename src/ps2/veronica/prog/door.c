@@ -2003,6 +2003,9 @@ static int CompareFloat(float val_a, int cmp_typ, float val_b)
         
         break;
     }
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 #pragma optimization_level 3

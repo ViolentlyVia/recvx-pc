@@ -2206,12 +2206,18 @@ void njScaleEx(NJS_VECTOR *v)
 Bool njPushMatrixEx( void )
 {
     njPushMatrix(NULL);
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!
 Bool njPopMatrixEx( void )
 {
     njPopMatrix(1);
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching! 

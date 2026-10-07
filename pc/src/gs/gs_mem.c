@@ -246,65 +246,150 @@ unsigned int gsMemRead(int psm, unsigned int bp, unsigned int bw, unsigned int x
     return 0;
 }
 
-void gsMemWrite(int psm, unsigned int bp, unsigned int bw, unsigned int x, unsigned int y, unsigned int v)
+/* Writes one pixel; returns nonzero if GS memory changed (the page generation and render
+ * target bookkeeping only move on real changes, so re-uploading identical textures is free). */
+static int mem_write(int psm, unsigned int bp, unsigned int bw, unsigned int x, unsigned int y, unsigned int v)
 {
-    unsigned int a;
+    unsigned int a, old;
 
     switch (psm)
     {
     case GS_PSMCT32:
     case GS_PSMZ32:
         a = addr32(bp, bw, x, y, (psm == GS_PSMZ32) ? blockTable32Z : blockTable32);
+        old = *(unsigned int*)&gsVram[a & ~3u];
         *(unsigned int*)&gsVram[a] = v;
+        if (*(unsigned int*)&gsVram[a & ~3u] == old)
+        {
+            return 0;
+        }
+
+        touch(a);
         break;
     case GS_PSMCT24:
     case GS_PSMZ24:
         a = addr32(bp, bw, x, y, (psm == GS_PSMZ24) ? blockTable32Z : blockTable32);
+        old = *(unsigned int*)&gsVram[a & ~3u];
         *(unsigned int*)&gsVram[a] = (*(unsigned int*)&gsVram[a] & 0xFF000000) | (v & 0xFFFFFF);
+        if (*(unsigned int*)&gsVram[a & ~3u] == old)
+        {
+            return 0;
+        }
+
+        touch(a);
         break;
     case GS_PSMCT16:
         a = addr16(bp, bw, x, y, blockTable16);
+        old = *(unsigned int*)&gsVram[a & ~3u];
         *(unsigned short*)&gsVram[a] = (unsigned short)v;
+        if (*(unsigned int*)&gsVram[a & ~3u] == old)
+        {
+            return 0;
+        }
+
+        touch(a);
         break;
     case GS_PSMCT16S:
         a = addr16(bp, bw, x, y, blockTable16S);
+        old = *(unsigned int*)&gsVram[a & ~3u];
         *(unsigned short*)&gsVram[a] = (unsigned short)v;
+        if (*(unsigned int*)&gsVram[a & ~3u] == old)
+        {
+            return 0;
+        }
+
+        touch(a);
         break;
     case GS_PSMZ16:
         a = addr16(bp, bw, x, y, blockTable16Z);
+        old = *(unsigned int*)&gsVram[a & ~3u];
         *(unsigned short*)&gsVram[a] = (unsigned short)v;
+        if (*(unsigned int*)&gsVram[a & ~3u] == old)
+        {
+            return 0;
+        }
+
+        touch(a);
         break;
     case GS_PSMZ16S:
         a = addr16(bp, bw, x, y, blockTable16SZ);
+        old = *(unsigned int*)&gsVram[a & ~3u];
         *(unsigned short*)&gsVram[a] = (unsigned short)v;
+        if (*(unsigned int*)&gsVram[a & ~3u] == old)
+        {
+            return 0;
+        }
+
+        touch(a);
         break;
     case GS_PSMT8:
         a = addr8(bp, bw, x, y);
+        old = *(unsigned int*)&gsVram[a & ~3u];
         gsVram[a] = (unsigned char)v;
+        if (*(unsigned int*)&gsVram[a & ~3u] == old)
+        {
+            return 0;
+        }
+
+        touch(a);
         break;
     case GS_PSMT4:
         a = addr4(bp, bw, x, y);
+        old = gsVram[a >> 1];
         gsVram[a >> 1] = (unsigned char)((gsVram[a >> 1] & (0xF0 >> ((a & 1) * 4))) | ((v & 15) << ((a & 1) * 4)));
+
+        if (gsVram[a >> 1] == old)
+        {
+            return 0;
+        }
+
         touch(a >> 1);
-        return;
+        return 1;
     case GS_PSMT8H:
         a = addr32(bp, bw, x, y, blockTable32) + 3;
+        old = *(unsigned int*)&gsVram[a & ~3u];
         gsVram[a] = (unsigned char)v;
+        if (*(unsigned int*)&gsVram[a & ~3u] == old)
+        {
+            return 0;
+        }
+
+        touch(a);
         break;
     case GS_PSMT4HL:
         a = addr32(bp, bw, x, y, blockTable32) + 3;
+        old = *(unsigned int*)&gsVram[a & ~3u];
         gsVram[a] = (unsigned char)((gsVram[a] & 0xF0) | (v & 15));
+        if (*(unsigned int*)&gsVram[a & ~3u] == old)
+        {
+            return 0;
+        }
+
+        touch(a);
         break;
     case GS_PSMT4HH:
         a = addr32(bp, bw, x, y, blockTable32) + 3;
+        old = *(unsigned int*)&gsVram[a & ~3u];
         gsVram[a] = (unsigned char)((gsVram[a] & 0x0F) | ((v & 15) << 4));
+        if (*(unsigned int*)&gsVram[a & ~3u] == old)
+        {
+            return 0;
+        }
+
+        touch(a);
         break;
     default:
-        return;
+        return 0;
     }
 
-    touch(a);
+    return 1;
 }
+
+void gsMemWrite(int psm, unsigned int bp, unsigned int bw, unsigned int x, unsigned int y, unsigned int v)
+{
+    mem_write(psm, bp, bw, x, y, v);
+}
+
 
 int gsPsmBits(int psm)
 {
@@ -332,6 +417,7 @@ static struct {
     unsigned int bp, bw, psm;
     unsigned int sx, sy, w, h;
     unsigned int x, y;
+    int changed;
 } xfer;
 
 static void advance(void)
@@ -343,7 +429,8 @@ static void advance(void)
         if (++xfer.y >= xfer.sy + xfer.h)
         {
             xfer.active = 0;
-            gsXferDone(xfer.bp, xfer.bw, xfer.psm, xfer.sx, xfer.sy, xfer.w, xfer.h);
+
+            gsXferDone(xfer.bp, xfer.bw, xfer.psm, xfer.sx, xfer.sy, xfer.w, xfer.h, xfer.changed);
         }
     }
 }
@@ -366,6 +453,7 @@ void gsMemStartTransfer(const GsRegs* r)
         xfer.x = xfer.sx;
         xfer.y = xfer.sy;
         xfer.active = (xfer.w != 0) && (xfer.h != 0);
+        xfer.changed = 0;
     }
     else if (dir == 2)     /* local -> local */
     {
@@ -394,7 +482,7 @@ void gsMemStartTransfer(const GsRegs* r)
         }
 
         xfer.active = 0;
-        gsXferDone(dbp, dbw, dpsm, dsx, dsy, w, h);
+        gsXferDone(dbp, dbw, dpsm, dsx, dsy, w, h, 1);
     }
     else                   /* local -> host: handled by gsMemReadImage */
     {
@@ -419,7 +507,7 @@ void gsMemTransferData(const unsigned char* data, int qwc)
     case GS_PSMZ32:
         for (i = 0; (i + 4 <= bytes) && xfer.active; i += 4)
         {
-            gsMemWrite(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, *(const unsigned int*)&data[i]);
+            xfer.changed |= mem_write(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, *(const unsigned int*)&data[i]);
             advance();
         }
         break;
@@ -427,7 +515,7 @@ void gsMemTransferData(const unsigned char* data, int qwc)
     case GS_PSMZ24:
         for (i = 0; (i + 3 <= bytes) && xfer.active; i += 3)
         {
-            gsMemWrite(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, data[i] | (data[i + 1] << 8) | (data[i + 2] << 16));
+            xfer.changed |= mem_write(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, data[i] | (data[i + 1] << 8) | (data[i + 2] << 16));
             advance();
         }
         break;
@@ -437,7 +525,7 @@ void gsMemTransferData(const unsigned char* data, int qwc)
     case GS_PSMZ16S:
         for (i = 0; (i + 2 <= bytes) && xfer.active; i += 2)
         {
-            gsMemWrite(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, *(const unsigned short*)&data[i]);
+            xfer.changed |= mem_write(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, *(const unsigned short*)&data[i]);
             advance();
         }
         break;
@@ -445,7 +533,7 @@ void gsMemTransferData(const unsigned char* data, int qwc)
     case GS_PSMT8H:
         for (i = 0; (i < bytes) && xfer.active; i++)
         {
-            gsMemWrite(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, data[i]);
+            xfer.changed |= mem_write(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, data[i]);
             advance();
         }
         break;
@@ -454,12 +542,12 @@ void gsMemTransferData(const unsigned char* data, int qwc)
     case GS_PSMT4HH:
         for (i = 0; (i < bytes) && xfer.active; i++)
         {
-            gsMemWrite(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, data[i] & 15);
+            xfer.changed |= mem_write(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, data[i] & 15);
             advance();
 
             if (xfer.active)
             {
-                gsMemWrite(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, data[i] >> 4);
+                xfer.changed |= mem_write(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, data[i] >> 4);
                 advance();
             }
         }

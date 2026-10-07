@@ -2574,6 +2574,9 @@ int bhEne09_DmgCheck(BH_PWORK* epw)
     }
 
     return flg;
+#ifdef TARGET_PC /* the PS2 build returned whatever was left in the return register */
+    return 0;
+#endif
 }
 
 // 100% matching!
