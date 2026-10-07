@@ -69,7 +69,7 @@ def pc_sources():
 # host's 32-bit "long" (game code is compiled with the EE's 64-bit one, see pc_prefix.h).
 NATIVE_LONG = {
     "pc/src/pc_os_win32.c", "pc/src/pc_platform.c", "pc/src/pc_audio.c", "pc/src/pc_kernel.c",
-    "pc/src/pc_cdvd.c", "pc/src/pc_iop.c", "pc/src/pc_iop_tsnddrv.c", "pc/src/pc_sce_misc.c",
+    "pc/src/pc_cdvd.c", "pc/src/pc_iop.c", "pc/src/pc_iop_tsnddrv.c", "pc/src/pc_sce_misc.c", "pc/src/pc_mpeg.c",
 }
 
 

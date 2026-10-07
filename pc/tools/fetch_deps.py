@@ -9,6 +9,23 @@ SDL2_URL = (f"https://github.com/libsdl-org/SDL/releases/download/release-{SDL2_
             f"SDL2-devel-{SDL2_VERSION}-VC.zip")
 
 
+# FFmpeg is only used by pc/tools/convert_movies.py (converting the disc's movies once at setup);
+# it is not linked into or shipped with the game.
+FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+
+
+def ffmpeg_exe():
+    """Path of ffmpeg.exe, downloaded on first use."""
+    for dirpath, _, files in os.walk(DEPS):
+        if "ffmpeg.exe" in files:
+            return os.path.join(dirpath, "ffmpeg.exe")
+    os.makedirs(DEPS, exist_ok=True)
+    print(f"downloading {FFMPEG_URL}")
+    data = urllib.request.urlopen(FFMPEG_URL).read()
+    zipfile.ZipFile(io.BytesIO(data)).extractall(os.path.join(DEPS, "ffmpeg"))
+    return ffmpeg_exe()
+
+
 def sdl2_dir():
     return os.path.join(DEPS, f"SDL2-{SDL2_VERSION}")
 

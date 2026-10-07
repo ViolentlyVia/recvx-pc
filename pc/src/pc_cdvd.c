@@ -3,8 +3,11 @@
  * The game locates files with sceCdSearchFile() (ISO9660 path -> start sector and size) and
  * reads whole 2048-byte sectors with sceCdRead(). Reads complete immediately on PC.
  *
- * The image is found through (in order): the RECVX_ISO environment variable, an "iso=" line in
- * recvx.ini next to the executable, or the first *.iso file next to the executable.
+ * The disc comes from either
+ *  - an extracted data folder (pc/tools/extract_iso.py): RECVX_DATA, a "data=" line in recvx.ini
+ *    or a "data" folder next to the executable, holding the disc's files and files.idx (start
+ *    sector, size, path of each file); sector reads are served from those files, or
+ *  - the ISO image: RECVX_ISO, an "iso=" line in recvx.ini or the first *.iso next to the exe.
  */
 #include <ctype.h>
 #include <stdio.h>
@@ -25,8 +28,227 @@ static int last_error;
 static u_int st_lsn;
 static int st_active;
 
+/* ---- extracted data folder ---- */
+
+typedef struct {
+    u_int lsn, size, sectors;
+    char path[200];
+    FILE* f;
+} DataFile;
+
+static DataFile* data_files;
+static int data_count;
+static char data_dir[1024];
+
+static DataFile* data_file_at(u_int lsn)
+{
+    int lo = 0, hi = data_count - 1;
+
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) / 2;
+        DataFile* d = &data_files[mid];
+
+        if (lsn < d->lsn)
+        {
+            hi = mid - 1;
+        }
+        else if (lsn >= d->lsn + d->sectors)
+        {
+            lo = mid + 1;
+        }
+        else
+        {
+            return d;
+        }
+    }
+
+    return NULL;
+}
+
+static int data_read_sectors(u_int lsn, u_int count, unsigned char* buf)
+{
+    while (count > 0)
+    {
+        DataFile* d = data_file_at(lsn);
+        u_int n, off, avail;
+
+        if (d == NULL)
+        {
+            /* outside every file (directory records, padding): zeros */
+            memset(buf, 0, SECTOR);
+            lsn++;
+            count--;
+            buf += SECTOR;
+            continue;
+        }
+
+        if (d->f == NULL)
+        {
+            char path[1300];
+
+            snprintf(path, sizeof(path), "%s/%s", data_dir, d->path);
+
+            if ((d->f = fopen(path, "rb")) == NULL)
+            {
+                pcLog("disc: cannot open %s", path);
+                return 0;
+            }
+        }
+
+        n = d->lsn + d->sectors - lsn;
+
+        if (n > count)
+        {
+            n = count;
+        }
+
+        off = (lsn - d->lsn) * SECTOR;
+        avail = (off < d->size) ? d->size - off : 0;
+
+        if (avail > n * SECTOR)
+        {
+            avail = n * SECTOR;
+        }
+
+        memset(buf + avail, 0, n * SECTOR - avail);
+
+        if ((avail > 0) && ((_fseeki64(d->f, off, SEEK_SET) != 0) || (fread(buf, 1, avail, d->f) != avail)))
+        {
+            return 0;
+        }
+
+        lsn += n;
+        count -= n;
+        buf += n * SECTOR;
+    }
+
+    return 1;
+}
+
+static int data_open(void)
+{
+    const char* env = getenv("RECVX_DATA");
+    char dir[1024], ini[1100], line[1300], idx[1100];
+    FILE* f;
+    int cap = 0;
+
+    data_dir[0] = 0;
+    pcPlatformExeDir(dir, sizeof(dir));
+
+    if ((env != NULL) && (env[0] != 0))
+    {
+        snprintf(data_dir, sizeof(data_dir), "%s", env);
+    }
+    else
+    {
+        snprintf(ini, sizeof(ini), "%s/recvx.ini", dir);
+
+        if ((f = fopen(ini, "r")) != NULL)
+        {
+            while (fgets(line, sizeof(line), f) != NULL)
+            {
+                if (_strnicmp(line, "data=", 5) == 0)
+                {
+                    line[5 + strcspn(line + 5, "\r\n")] = 0;
+                    snprintf(data_dir, sizeof(data_dir), "%s", line + 5);
+                }
+            }
+
+            fclose(f);
+        }
+
+        if (data_dir[0] == 0)
+        {
+            snprintf(data_dir, sizeof(data_dir), "%s/data", dir);
+        }
+    }
+
+    snprintf(idx, sizeof(idx), "%s/files.idx", data_dir);
+
+    if ((f = fopen(idx, "r")) == NULL)
+    {
+        return 0;
+    }
+
+    while (fgets(line, sizeof(line), f) != NULL)
+    {
+        DataFile d;
+
+        memset(&d, 0, sizeof(d));
+
+        if ((line[0] == '#') || (sscanf(line, "%u %u %199[^\r\n]", &d.lsn, &d.size, d.path) != 3))
+        {
+            continue;
+        }
+
+        d.sectors = (d.size + SECTOR - 1) / SECTOR;
+
+        if (d.sectors == 0)
+        {
+            d.sectors = 1;
+        }
+
+        if (data_count == cap)
+        {
+            cap = cap ? cap * 2 : 64;
+            data_files = realloc(data_files, cap * sizeof(*data_files));
+        }
+
+        data_files[data_count++] = d;
+    }
+
+    fclose(f);
+
+    pcLog("disc: using extracted files in %s (%d files)", data_dir, data_count);
+
+    return data_count > 0;
+}
+
+/* path as the game passes it ("cdrom0:\MOVIE\MV_000.PSS;1") -> file index entry */
+static DataFile* data_find(const char* path)
+{
+    char norm[200];
+    size_t n = 0;
+    int i;
+
+    if (strchr(path, ':') != NULL)
+    {
+        path = strchr(path, ':') + 1;
+    }
+
+    while ((*path == '\\') || (*path == '/'))
+    {
+        path++;
+    }
+
+    for (; (*path != 0) && (*path != ';') && (n < sizeof(norm) - 1); path++)
+    {
+        norm[n++] = (*path == '\\') ? '/' : *path;
+    }
+
+    norm[n] = 0;
+
+    for (i = 0; i < data_count; i++)
+    {
+        if (_stricmp(data_files[i].path, norm) == 0)
+        {
+            return &data_files[i];
+        }
+    }
+
+    return NULL;
+}
+
+/* ---- ISO image ---- */
+
 static int read_sectors(u_int lsn, u_int count, void* buf)
 {
+    if (data_count > 0)
+    {
+        return data_read_sectors(lsn, count, (unsigned char*)buf);
+    }
+
     if ((iso == NULL) || (_fseeki64(iso, (long long)lsn * SECTOR, SEEK_SET) != 0))
     {
         return 0;
@@ -78,7 +300,12 @@ int pcCdOpen(void)
 {
     unsigned char pvd[SECTOR];
 
-    if (iso != NULL)
+    if ((iso != NULL) || (data_count > 0))
+    {
+        return 1;
+    }
+
+    if (data_open())
     {
         return 1;
     }
@@ -164,7 +391,26 @@ static int search_file(const char* path, u_int* lsn, u_int* size)
     int is_dir = 1;
     const char* p = path;
 
-    if (!pcCdOpen() || !read_sectors(16, 1, pvd))
+    if (!pcCdOpen())
+    {
+        return 0;
+    }
+
+    if (data_count > 0)
+    {
+        DataFile* d = data_find(path);
+
+        if (d == NULL)
+        {
+            return 0;
+        }
+
+        *lsn = d->lsn;
+        *size = d->size;
+        return 1;
+    }
+
+    if (!read_sectors(16, 1, pvd))
     {
         return 0;
     }
@@ -420,4 +666,10 @@ int sceCdStPause(void)
 int sceCdStResume(void)
 {
     return 1;
+}
+
+/* extracted data folder in use, or NULL when reading the ISO */
+const char* pcCdDataDir(void)
+{
+    return (data_count > 0) ? data_dir : NULL;
 }

@@ -254,6 +254,14 @@ void ps2mwPlyStartFname(MWPLY ply, Sint8 *fname)
         *dest++ = *src++;
     }
 
+#ifdef TARGET_PC
+    {
+        extern void pcMovieStart(const char* name);
+
+        pcMovieStart(nameBuf);
+    }
+#endif
+
     if (strcmp(nameBuf, "MV_016.PSS") == 0) 
     {
         rmi.MVCancelButton = 0x800;
