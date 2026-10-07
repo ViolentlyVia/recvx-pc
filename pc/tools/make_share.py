@@ -44,7 +44,7 @@ Controls (keyboard; game controllers work too)
 Optional: HD textures from a PCSX2 texture pack - add  hd_textures=C:\\path\\to\\pack  to
 recvx.ini (create the file next to recvx.exe if needed).
 
-Not finished yet: sound effects (music and voices work) and memory card saves.
+Not finished yet: memory card saves and sound reverb.
 """
 
 
