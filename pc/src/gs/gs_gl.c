@@ -707,12 +707,44 @@ static GLenum one_minus(GLenum f)
     }
 }
 
-/* GS blending: ((A - B) * C >> 7) + D with A, B, D in {Cs, Cd, 0}, C in {As, Ad, FIX} */
+/* GS blending: ((A - B) * C >> 7) + D with A, B, D in {Cs, Cd, 0}, C in {As, Ad, FIX}.
+ * Expanded, the result is Cs * ks + Cd * kd where each k is a combination 1 * k1 + C * kc with
+ * k1, kc in {-1, 0, 1}; those map onto GL blend factors and the add/subtract equations.
+ * Only k = 1 + C (A = Cs, D = Cs or A = Cd, D = Cd) has no GL factor and is approximated by 1. */
+typedef struct { int k1, kc; } BlendCoef;
+
+static BlendCoef blend_coef(int A, int B, int D, int which)
+{
+    BlendCoef k;
+
+    k.k1 = (D == which);
+    k.kc = (A == which) - (B == which);
+    return k;
+}
+
+static GLenum coef_factor(BlendCoef k, GLenum f)
+{
+    if ((k.k1 == 0) && (k.kc == 0)) return GL_ZERO;
+    if ((k.k1 == 0) && (k.kc != 0)) return f;                 /* +-C */
+    if ((k.kc == 0)) return GL_ONE;                            /* +-1 */
+    if (k.k1 != k.kc) return one_minus(f);                     /* +-(1 - C) */
+    return GL_ONE;                                             /* 1 + C: approximation */
+}
+
+static int coef_negative(BlendCoef k)
+{
+    /* sign of the coefficient for C in 0..1 (0 counts as positive) */
+    if (k.k1 != 0) return k.k1 < 0;
+    return k.kc < 0;
+}
+
 static void setup_blend(const GsDrawState* st)
 {
     int A = GSF(st->alpha, 0, 2), B = GSF(st->alpha, 2, 2), C = GSF(st->alpha, 4, 2), D = GSF(st->alpha, 6, 2);
     GLenum f = blend_factor(C, 1);
-    GLenum src = GL_ZERO, dst = GL_ZERO, eq = GL_FUNC_ADD;
+    BlendCoef ks, kd;
+    GLenum src, dst, eq;
+    int ns, nd;
 
     if (!st->abe)
     {
@@ -734,46 +766,39 @@ static void setup_blend(const GsDrawState* st)
         }
     }
 
-    if (A == B)
+    /* A or B = 3 is reserved; treat as 0 */
+    if (A == 3) A = 2;
+    if (B == 3) B = 2;
+    if (D == 3) D = 2;
+
+    ks = blend_coef(A, B, D, 0);
+    kd = blend_coef(A, B, D, 1);
+    ns = coef_negative(ks);
+    nd = coef_negative(kd);
+
+    if (ns) { ks.k1 = -ks.k1; ks.kc = -ks.kc; }
+    if (nd) { kd.k1 = -kd.k1; kd.kc = -kd.kc; }
+
+    src = coef_factor(ks, f);
+    dst = coef_factor(kd, f);
+
+    if (!ns && !nd)
     {
-        /* result is D */
-        src = (D == 0) ? GL_ONE : GL_ZERO;
-        dst = (D == 1) ? GL_ONE : GL_ZERO;
+        eq = GL_FUNC_ADD;
     }
-    else if ((A == 0) && (B == 1))          /* (Cs - Cd) * C + D */
+    else if (!ns && nd)
     {
-        if (D == 1)      { src = f; dst = one_minus(f); }
-        else if (D == 0) { src = GL_ONE; dst = GL_ZERO; /* approx: Cs + (Cs - Cd)C */ src = f; dst = one_minus(f); }
-        else             { src = f; dst = f; eq = GL_FUNC_SUBTRACT; }
+        eq = GL_FUNC_SUBTRACT;          /* Cs*ks - Cd*|kd| */
     }
-    else if ((A == 1) && (B == 0))          /* (Cd - Cs) * C + D */
+    else if (ns && !nd)
     {
-        if (D == 0)      { src = one_minus(f); dst = f; }
-        else if (D == 1) { src = f; dst = GL_ONE; eq = GL_FUNC_REVERSE_SUBTRACT; /* approx: Cd - Cs*C */ }
-        else             { src = f; dst = f; eq = GL_FUNC_REVERSE_SUBTRACT; }
+        eq = GL_FUNC_REVERSE_SUBTRACT;  /* Cd*kd - Cs*|ks| */
     }
-    else if ((A == 0) && (B == 2))          /* Cs * C + D */
+    else
     {
-        src = f;
-        dst = (D == 1) ? GL_ONE : GL_ZERO;
-        if (D == 0) { src = f; dst = GL_ZERO; /* Cs*C + Cs approx */ }
-    }
-    else if ((A == 1) && (B == 2))          /* Cd * C + D */
-    {
-        dst = f;
-        src = (D == 0) ? GL_ONE : GL_ZERO;
-    }
-    else if ((A == 2) && (B == 0))          /* -Cs * C + D */
-    {
-        src = f;
-        dst = (D == 1) ? GL_ONE : GL_ZERO;
-        eq = GL_FUNC_REVERSE_SUBTRACT;
-    }
-    else                                     /* (0 - Cd) * C + D */
-    {
-        dst = f;
-        src = (D == 0) ? GL_ONE : GL_ZERO;
-        eq = GL_FUNC_SUBTRACT;
+        eq = GL_FUNC_ADD;               /* both negative: clamps to 0 */
+        src = GL_ZERO;
+        dst = GL_ZERO;
     }
 
     /* the written alpha is As (never blended) */

@@ -304,7 +304,7 @@ static unsigned char axis_to_byte(Sint16 v)
     return (unsigned char)((v + 32768) >> 8);
 }
 
-/* Testing aid: RECVX_RECORD=<file> writes the controller state of every frame where it changed
+/* Testing aid: RECVX_RECORD=<file> (default last_run_input.txt) writes the controller state of every frame where it changed
  * ("<frame> <buttons hex> <rx> <ry> <lx> <ly>"); RECVX_REPLAY=<file> plays such a file back
  * instead of the keyboard/controller. */
 static void pcPadRecordReplay(unsigned char* r)
@@ -329,10 +329,23 @@ static void pcPadRecordReplay(unsigned char* r)
             mode = 2;
             pcLog("input: replaying %s", rep);
         }
-        else if ((rec != NULL) && ((f = fopen(rec, "w")) != NULL))
+        else
         {
-            mode = 1;
-            pcLog("input: recording to %s", rec);
+            /* every session is recorded (to last_run_input.txt by default) so a problem can be replayed */
+            char path[1100], dir[1024];
+
+            if (rec == NULL)
+            {
+                pcPlatformExeDir(dir, sizeof(dir));
+                snprintf(path, sizeof(path), "%s/last_run_input.txt", dir);
+                rec = path;
+            }
+
+            if ((f = fopen(rec, "w")) != NULL)
+            {
+                mode = 1;
+                pcLog("input: recording to %s", rec);
+            }
         }
     }
 
