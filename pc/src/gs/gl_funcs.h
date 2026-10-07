@@ -45,6 +45,17 @@
 #define GL_RGBA8 0x8058
 #endif
 
+#ifndef GL_NUM_EXTENSIONS
+#define GL_NUM_EXTENSIONS 0x821D
+#endif
+#ifndef GL_TEXTURE_MAX_LEVEL
+#define GL_TEXTURE_MAX_LEVEL 0x813D
+#endif
+#define PC_GL_COMPRESSED_RGBA_S3TC_DXT1 0x83F1
+#define PC_GL_COMPRESSED_RGBA_S3TC_DXT3 0x83F2
+#define PC_GL_COMPRESSED_RGBA_S3TC_DXT5 0x83F3
+#define PC_GL_COMPRESSED_RGBA_BPTC_UNORM 0x8E8C
+
 typedef char GLchar;
 typedef ptrdiff_t GLsizeiptr;
 typedef ptrdiff_t GLintptr;
@@ -106,7 +117,7 @@ typedef ptrdiff_t GLintptr;
     X(void, glDrawArrays, (GLenum mode, GLint first, GLsizei count)) \
     X(void, glReadPixels, (GLint x, GLint y, GLsizei w, GLsizei h, GLenum fmt, GLenum type, void* data)) \
     X(void, glPixelStorei, (GLenum p, GLint v)) \
-    X(GLenum, glGetError, (void))
+    X(GLenum, glGetError, (void))     X(void, glCompressedTexImage2D, (GLenum target, GLint level, GLenum ifmt, GLsizei w, GLsizei h, GLint border, GLsizei size, const void* data))     X(const GLubyte*, glGetStringi, (GLenum name, GLuint index))     X(void, glGetIntegerv, (GLenum pname, GLint* data))
 
 #define PC_GL_DECLARE(ret, name, args) typedef ret (APIENTRY* PFN_pc_##name) args; extern PFN_pc_##name pc_##name;
 PC_GL_FUNCS(PC_GL_DECLARE)
@@ -170,5 +181,8 @@ PC_GL_FUNCS(PC_GL_DECLARE)
 #define glReadPixels pc_glReadPixels
 #define glPixelStorei pc_glPixelStorei
 #define glGetError pc_glGetError
+#define glCompressedTexImage2D pc_glCompressedTexImage2D
+#define glGetStringi pc_glGetStringi
+#define glGetIntegerv pc_glGetIntegerv
 
 int pcGlLoad(void);

@@ -60,6 +60,7 @@ void gsMemInit(void);
 unsigned int gsMemRead(int psm, unsigned int bp, unsigned int bw, unsigned int x, unsigned int y);
 void gsMemWrite(int psm, unsigned int bp, unsigned int bw, unsigned int x, unsigned int y, unsigned int v);
 int  gsPsmBits(int psm);
+int  gsBlockNumber(int psm, unsigned int bp, unsigned int bw, unsigned int x, unsigned int y);
 void gsMemStartTransfer(const GsRegs* r);
 void gsMemTransferData(const unsigned char* data, int qwc);
 void gsMemReadImage(const GsRegs* r, unsigned char* out);
@@ -82,4 +83,5 @@ void gsFlushLocalToLocal(unsigned int bp, unsigned int bw, unsigned int psm, uns
 
 /* texture decoding for the renderer: fills rgba (w*h) from VRAM per TEX0/TEXA/TEXCLUT */
 u64 gsClutHash(u64 tex0);
+void gsReadClut32(u64 tex0, u64 texa, int entries, unsigned int* clut);   /* palette as the texture sees it */
 void gsDecodeTexture(u64 tex0, u64 texa, u64 texclut, int w, int h, unsigned int* rgba);

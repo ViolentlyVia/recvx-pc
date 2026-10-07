@@ -205,6 +205,33 @@ static unsigned int addr4(unsigned int bp, unsigned int bw, unsigned int x, unsi
     return (block * 512 + columnTable4[y & 15][x & 31]) & (GS_VRAM_SIZE * 2 - 1);
 }
 
+/* GS block (256 bytes) holding pixel (x, y) of a buffer, for the texture formats the HD texture
+ * replacement hashes (block order as PCSX2 walks it); -1 for other formats. */
+int gsBlockNumber(int psm, unsigned int bp, unsigned int bw, unsigned int x, unsigned int y)
+{
+    unsigned int page, block;
+
+    switch (psm)
+    {
+    case GS_PSMCT32:
+        page = (y >> 5) * bw + (x >> 6);
+        block = bp + page * 32 + blockTable32[(y >> 3) & 3][(x >> 3) & 7];
+        break;
+    case GS_PSMT8:
+        page = (y >> 6) * (bw >> 1) + (x >> 7);
+        block = bp + page * 32 + blockTable8[(y >> 4) & 3][(x >> 4) & 7];
+        break;
+    case GS_PSMT4:
+        page = (y >> 7) * (bw >> 1) + (x >> 7);
+        block = bp + page * 32 + blockTable4[(y >> 4) & 7][(x >> 5) & 3];
+        break;
+    default:
+        return -1;
+    }
+
+    return (int)(block & 0x3FFF);
+}
+
 static void touch(unsigned int byte_addr)
 {
     gsPageGen[(byte_addr >> 13) & (GS_PAGES - 1)]++;

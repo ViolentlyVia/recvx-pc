@@ -674,6 +674,11 @@ static void read_clut(u64 tex0, u64 texa, int entries, unsigned int* clut)
     }
 }
 
+void gsReadClut32(u64 tex0, u64 texa, int entries, unsigned int* clut)
+{
+    read_clut(tex0, texa, entries, clut);
+}
+
 /* hash of the palette entries a texture would use (texture cache key) */
 u64 gsClutHash(u64 tex0)
 {

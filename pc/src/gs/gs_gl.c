@@ -63,6 +63,7 @@ static const char* fs_src =
     "uniform sampler2D uTex;\n"
     "uniform int uTme, uFst, uTfx, uTcc, uIip;\n"
     "uniform vec3 uTexa;\n"                    /* TA0, TA1, AEM */
+    "uniform int uHD;\n"                      /* replaced (HD) texture: filtered, any size */
     "uniform int uTexRT;\n"                     /* 1: texture is a render target */
     "uniform vec2 uTexSize;\n"                  /* 2^TW, 2^TH */
     "uniform vec2 uRTSize;\n"                   /* render target logical size (RT textures) */
@@ -86,6 +87,9 @@ static const char* fs_src =
     "    return texelFetch(uTex, c, 0);\n"
     "}\n"
     "vec4 sampleTex(vec2 uv) {\n"
+    "    if (uHD != 0) {\n"
+    "        return texture(uTex, uv / uTexSize) * 255.0;\n"
+    "    }\n"
     "    if (uTexRT == 2) {\n"
     "        vec4 t = texture(uTex, uv / uRTSize);\n"
     "        vec3 c = floor(t.rgb * 31.0 + 0.5) * 8.0;\n"
@@ -147,7 +151,7 @@ static GLuint vao, vbo;
 
 static struct {
     GLint target, tme, fst, tfx, tcc, iip, texrt, texsize, rtsize, wrap, region, linear;
-    GLint ate, atst, aref, atinv, fge, fogcol, tex, texa;
+    GLint ate, atst, aref, atinv, fge, fogcol, tex, texa, hd;
 } U;
 
 static GLuint compile(GLenum type, const char* src)
@@ -381,6 +385,7 @@ typedef struct {
     unsigned int page_lo, page_hi, clut_page;
     unsigned long long gen;
     GLuint tex;
+    int hd;              /* tex is an HD replacement (owned by gs_replace.c) */
     unsigned int last_use;
 } CachedTex;
 
@@ -444,7 +449,7 @@ static unsigned long long gen_sum(unsigned int lo, unsigned int hi)
     return s;
 }
 
-static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h)
+static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h, int* hd)
 {
     unsigned int psm = GSF(tex0, 20, 6);
     unsigned int tbp = GSF(tex0, 0, 14);
@@ -479,6 +484,7 @@ static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h)
         if (t->used && (t->gen == gen) && (t->key0 == key0) && (t->key1 == key1) && (t->key2 == key2) && (t->w == w) && (t->h == h))
         {
             t->last_use = frame_counter;
+            *hd = t->hd;
             return t->tex;
         }
 
@@ -496,7 +502,11 @@ static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h)
     if (slot < 0)
     {
         slot = oldest;
-        glDeleteTextures(1, &texcache[slot].tex);
+
+        if (!texcache[slot].hd)
+        {
+            glDeleteTextures(1, &texcache[slot].tex);
+        }
     }
 
     t = &texcache[slot];
@@ -511,6 +521,22 @@ static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h)
     t->clut_page = clut_page;
     t->gen = gen;
     t->last_use = frame_counter;
+    t->hd = 0;
+
+    {
+        extern GLuint gsReplaceLookup(u64 tex0, u64 texa);
+        GLuint r = gsReplaceLookup(tex0, texa);
+
+        if (r != 0)
+        {
+            t->tex = r;
+            t->hd = 1;
+            *hd = 1;
+            return r;
+        }
+    }
+
+    *hd = 0;
     t->tex = make_texture(w, h, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST);
 
     { double t0 = pcOsTime(); gsDecodeTexture(tex0, texa, texclut, w, h, decode_buf); stats.tex_decodes++; stats.tex_texels += w * h; stats.t_decode += pcOsTime() - t0; }
@@ -646,7 +672,7 @@ void gsRendererInit(void)
     UL(target, "uTarget"); UL(tme, "uTme"); UL(fst, "uFst"); UL(tfx, "uTfx"); UL(tcc, "uTcc"); UL(iip, "uIip");
     UL(texrt, "uTexRT"); UL(texsize, "uTexSize"); UL(rtsize, "uRTSize"); UL(wrap, "uWrap"); UL(region, "uRegion");
     UL(linear, "uLinear"); UL(ate, "uAte"); UL(atst, "uAtst"); UL(aref, "uAref"); UL(atinv, "uAtestInvert");
-    UL(fge, "uFge"); UL(fogcol, "uFogCol"); UL(tex, "uTex"); UL(texa, "uTexa");
+    UL(fge, "uFge"); UL(fogcol, "uFogCol"); UL(tex, "uTex"); UL(texa, "uTexa"); UL(hd, "uHD");
 #undef UL
 
     glGenVertexArrays(1, &vao);
@@ -663,6 +689,12 @@ void gsRendererInit(void)
     for (int i = 0; i < 5; i++)
     {
         glEnableVertexAttribArray(i);
+    }
+
+    {
+        extern void gsReplaceInit(void);
+
+        gsReplaceInit();
     }
 
     pcLog("gs: renderer ready (internal resolution x%d)", pcGsScale);
@@ -1011,13 +1043,24 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, linear ? GL_LINEAR : GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, linear ? GL_LINEAR : GL_NEAREST);
             glUniform1i(U.texrt, (gsPsmBits(tpsm) == 16) ? 2 : 1);
+            glUniform1i(U.hd, 0);
             glUniform2f(U.rtsize, (float)src->w, (float)src->h);
             glUniform3f(U.texa, (float)GSF(st->texa, 0, 8), (float)GSF(st->texa, 32, 8), (float)GSF(st->texa, 15, 1));
         }
         else
         {
-            glBindTexture(GL_TEXTURE_2D, get_texture(st->tex0, st->texa, st->texclut, tw, th));
+            int hd = 0;
+            GLuint gt = get_texture(st->tex0, st->texa, st->texclut, tw, th, &hd);
+
+            glBindTexture(GL_TEXTURE_2D, gt);
             glUniform1i(U.texrt, 0);
+            glUniform1i(U.hd, hd);
+
+            if (hd)
+            {
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, (GSF(st->clamp, 0, 2) == 0) ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, (GSF(st->clamp, 2, 2) == 0) ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+            }
         }
 
         glUniform2f(U.texsize, (float)tw, (float)th);
