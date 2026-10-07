@@ -304,6 +304,100 @@ static unsigned char axis_to_byte(Sint16 v)
     return (unsigned char)((v + 32768) >> 8);
 }
 
+/* Testing aid: RECVX_RECORD=<file> writes the controller state of every frame where it changed
+ * ("<frame> <buttons hex> <rx> <ry> <lx> <ly>"); RECVX_REPLAY=<file> plays such a file back
+ * instead of the keyboard/controller. */
+static void pcPadRecordReplay(unsigned char* r)
+{
+    static int mode = -1;
+    static FILE* f;
+    static unsigned int last_buttons = 0xFFFFFFFF, last_axes;
+    static struct { unsigned int frame, buttons, axes; } next;
+    static int have_next;
+    static unsigned int cur_buttons = 0xFFFF, cur_axes = 0x80808080;
+    size_t i;
+
+    if (mode < 0)
+    {
+        const char* rec = SDL_getenv("RECVX_RECORD");
+        const char* rep = SDL_getenv("RECVX_REPLAY");
+
+        mode = 0;
+
+        if ((rep != NULL) && ((f = fopen(rep, "r")) != NULL))
+        {
+            mode = 2;
+            pcLog("input: replaying %s", rep);
+        }
+        else if ((rec != NULL) && ((f = fopen(rec, "w")) != NULL))
+        {
+            mode = 1;
+            pcLog("input: recording to %s", rec);
+        }
+    }
+
+    if (mode == 1)
+    {
+        unsigned int buttons = r[2] | (r[3] << 8);
+        unsigned int axes = r[4] | (r[5] << 8) | (r[6] << 16) | ((unsigned int)r[7] << 24);
+
+        if ((buttons != last_buttons) || (axes != last_axes))
+        {
+            fprintf(f, "%u %04x %u %u %u %u\n", frames, buttons, r[4], r[5], r[6], r[7]);
+            fflush(f);
+            last_buttons = buttons;
+            last_axes = axes;
+        }
+    }
+    else if (mode == 2)
+    {
+        for (;;)
+        {
+            if (!have_next)
+            {
+                unsigned int a, b, c, d;
+
+                if (fscanf(f, "%u %x %u %u %u %u", &next.frame, &next.buttons, &a, &b, &c, &d) != 6)
+                {
+                    break;
+                }
+
+                next.axes = a | (b << 8) | (c << 16) | (d << 24);
+                have_next = 1;
+            }
+
+            if (next.frame > frames)
+            {
+                break;
+            }
+
+            cur_buttons = next.buttons;
+            cur_axes = next.axes;
+            have_next = 0;
+        }
+
+        r[2] = (unsigned char)cur_buttons;
+        r[3] = (unsigned char)(cur_buttons >> 8);
+        r[4] = (unsigned char)cur_axes;
+        r[5] = (unsigned char)(cur_axes >> 8);
+        r[6] = (unsigned char)(cur_axes >> 16);
+        r[7] = (unsigned char)(cur_axes >> 24);
+
+        for (i = 8; i < 20; i++)
+        {
+            r[i] = 0;
+        }
+
+        for (i = 0; i < sizeof(pad_map) / sizeof(pad_map[0]); i++)
+        {
+            if ((pad_map[i].pressure >= 0) && !(r[pad_map[i].byte] & (1 << pad_map[i].bit)))
+            {
+                r[pad_map[i].pressure] = 0xFF;
+            }
+        }
+    }
+}
+
 void pcPadUpdate(void)
 {
     const Uint8* keys = SDL_GetKeyboardState(NULL);
@@ -317,6 +411,20 @@ void pcPadUpdate(void)
     r[2] = 0xFF;
     r[3] = 0xFF;
     r[4] = r[5] = r[6] = r[7] = 0x80;
+
+    /* hold Numpad 0 to fast-forward */
+    {
+        extern int pcFastForward;
+        static int shown;
+
+        pcFastForward = keys[SDL_SCANCODE_KP_0] != 0;
+
+        if (pcFastForward != shown)
+        {
+            SDL_SetWindowTitle(window, pcFastForward ? "Resident Evil Code: Veronica X  [FAST FORWARD]" : "Resident Evil Code: Veronica X");
+            shown = pcFastForward;
+        }
+    }
 
     for (i = 0; i < sizeof(pad_map) / sizeof(pad_map[0]); i++)
     {
@@ -503,6 +611,8 @@ void pcPadUpdate(void)
         r[6] = axis_to_byte(SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX));
         r[7] = axis_to_byte(SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY));
     }
+
+    pcPadRecordReplay(r);
 }
 
 void pcPadGetState(int port, unsigned char* rdata)

@@ -723,6 +723,17 @@ static void setup_blend(const GsDrawState* st)
     glEnable(GL_BLEND);
     glBlendColor(0, 0, 0, GSF(st->alpha, 32, 8) / 128.0f);
 
+    {
+        static unsigned char seen[256];
+        int m = A | (B << 2) | (C << 4) | (D << 6);
+
+        if (!seen[m])
+        {
+            seen[m] = 1;
+            pcLog("gs: blend mode (%c%c)*%c+%c fix %u", "sdz?"[A], "sdz?"[B], "sdf?"[C], "sdz?"[D], GSF(st->alpha, 32, 8));
+        }
+    }
+
     if (A == B)
     {
         /* result is D */

@@ -39,20 +39,23 @@
 #define HSYNC_HZ  15734.0      /* NTSC */
 #define VBLANK_HZ 59.94
 
-/* testing aid: RECVX_SPEED=<n> runs the VBLANK clock n times faster (fast-forward) */
+/* Fast-forward: RECVX_SPEED=<n> runs the VBLANK clock n times faster for the whole run; holding
+ * the fast-forward key (pcFastForward, set by the platform layer) runs it 4 times faster. */
+int pcFastForward;
+
 static double vblank_period(void)
 {
-    static double period;
+    static double base;
 
-    if (period == 0)
+    if (base == 0)
     {
         const char* e = getenv("RECVX_SPEED");
         double speed = (e != NULL) ? atof(e) : 1.0;
 
-        period = 1.0 / (VBLANK_HZ * ((speed > 0) ? speed : 1.0));
+        base = 1.0 / (VBLANK_HZ * ((speed > 0) ? speed : 1.0));
     }
 
-    return period;
+    return pcFastForward ? base / 4.0 : base;
 }
 
 typedef struct {
