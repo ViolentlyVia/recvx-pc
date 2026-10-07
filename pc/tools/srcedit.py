@@ -38,7 +38,7 @@ class Source:
                     i += 1
                 i += 1
                 continue
-            if re.search(r"\basm\s+volatile\b|\basm\s*\(", line) and not line.lstrip().startswith("//"):
+            if re.search(r"\basm\s+(volatile|__volatile__)\b|\basm\s*\(", line) and not line.lstrip().startswith("//"):
                 j = i
                 # brace form:  asm volatile { ... }     paren form:  asm volatile ( ... );
                 while "{" not in self.lines[j] and "(" not in self.lines[j]:

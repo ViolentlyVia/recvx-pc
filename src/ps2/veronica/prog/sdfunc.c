@@ -656,7 +656,11 @@ int LoadSoundPackFile(char* SpqFile)
         }
         else 
         {
+#ifdef TARGET_PC
+            memcpy(&Room_SoundEnv, &pSdReadBuf[pSpqHeader->Offset], sizeof(RM_SNDENV));
+#else
             memcpy(Room_SoundEnv, &pSdReadBuf[pSpqHeader->Offset], sizeof(RM_SNDENV)); 
+#endif
             
             FxLevelTimer = 16;
             

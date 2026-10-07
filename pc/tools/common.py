@@ -20,18 +20,13 @@ INCLUDES = [
 ]
 
 CFLAGS = ["/nologo", "/TC", "/std:c17", "/W3", "/wd4244", "/wd4305", "/wd4996", "/wd4828",
-          "/wd4005", "/wd4068", "/wd4307", "/DTARGET_PC", "/FIpc_prefix.h"]
+          "/wd4005", "/wd4068", "/wd4307", "/Zc:preprocessor", "/wd5105", "/DTARGET_PC", "/FIpc_prefix.h"]
 
 # Upstream sources replaced by the PC platform layer (pc/src). Grows as pieces are ported.
 EXCLUDE = {
     # PS2 graphics: GS/VIF packet building and VU1 microcode drivers -> PC renderer
-    "src/ps2/veronica/prog/ps2_NaDraw2D.c",
-    "src/ps2/veronica/prog/ps2_NaSprite.c",
-    "src/ps2/veronica/prog/ps2_NaSystem.c",
     "src/ps2/veronica/prog/ps2_NinjaCnk.c",
     "src/ps2/veronica/prog/ps2_Vu1Strip.c",
-    "src/ps2/veronica/prog/ps2_dummy.c",
-    "src/ps2/veronica/prog/ps2_loadtim2.c",
     # MPEG movie playback through the IPU -> PC movie player
     "src/ps2/veronica/prog/ps2_MovieFunc.c",
     # CRI ADX output to the IOP -> pc/src/pc_adx_rna.c
@@ -69,7 +64,22 @@ def game_sources():
 
 
 def pc_sources():
-    return sorted(glob.glob(os.path.join(ROOT, "pc/src/*.c")))
+    return sorted(glob.glob(os.path.join(ROOT, "pc/src/*.c")) + glob.glob(os.path.join(ROOT, "pc/src/gs/*.c")))
+
+
+# PC platform files that never include game headers: they talk to Windows/SDL and keep the
+# host's 32-bit "long" (game code is compiled with the EE's 64-bit one, see pc_prefix.h).
+NATIVE_LONG = {
+    "pc/src/pc_os_win32.c", "pc/src/pc_platform.c", "pc/src/pc_audio.c", "pc/src/pc_kernel.c",
+    "pc/src/pc_cdvd.c", "pc/src/pc_iop.c", "pc/src/pc_iop_tsnddrv.c", "pc/src/pc_sce_misc.c",
+}
+
+
+def extra_flags(path):
+    r = rel(path)
+    if r in NATIVE_LONG or r.startswith("pc/src/gs/"):
+        return ["/DPC_NATIVE_LONG"]
+    return []
 
 
 def rel(path):

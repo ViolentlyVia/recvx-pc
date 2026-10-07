@@ -184,11 +184,7 @@ void sceVu0ITOF4Vector(sceVu0FVECTOR v0, sceVu0IVECTOR v1)
     for (i = 0; i < 4; i++) v0[i] = v1[i] / 16.0f;
 }
 
-void sceVu0ITOF12Vector(sceVu0FVECTOR v0, sceVu0IVECTOR v1)
-{
-    int i;
-    for (i = 0; i < 4; i++) v0[i] = v1[i] / 4096.0f;
-}
+
 
 void sceVu0FTOI0Vector(sceVu0IVECTOR v0, sceVu0FVECTOR v1)
 {
@@ -215,8 +211,4 @@ char* index(const char* s, int c)
     return strchr(s, c);
 }
 
-int sceGsSyncPath(int mode, unsigned short timeout)
-{
-    (void)mode; (void)timeout;
-    return 0;
-}
+

@@ -67,12 +67,15 @@ extern int ps2_vu0sub0 __attribute__((section(".vudata")));
 extern int ps2_vu1sub0 __attribute__((section(".vudata")));
 extern int ps2_vu1sub1 __attribute__((section(".vudata")));
 
+#ifndef TARGET_PC /* pc/src/pc_system.c */
 // 100% matching!
 void _builtin_set_imask(int mask) 
 {
 
 }
+#endif
 
+#ifndef TARGET_PC /* pc/src/pc_system.c */
 // 100% matching! 
 void Ps2Init() 
 { 
@@ -196,7 +199,9 @@ void Ps2Init()
     Ps2Vu1ProgSend(0); 
     Ps2Vu1ProgSend(1); 
 }
+#endif
 
+#ifndef TARGET_PC /* pc/src/pc_system.c */
 // 100% matching!
 void Ps2LoadModule(char* p)
 {
@@ -207,25 +212,33 @@ void Ps2LoadModule(char* p)
         exit(0); 
     }
 }
+#endif
 
+#ifndef TARGET_PC /* pc/src/pc_system.c */
 // 100% matching! 
 void Snd_init()
 {
 
 }
+#endif
 
+#ifndef TARGET_PC /* pc/src/pc_system.c */
 // 100% matching! 
 void Cd_init()
 {
 
 }
+#endif
 
+#ifndef TARGET_PC /* pc/src/pc_system.c */
 // 100% matching! 
 void Card_init()
 {
 
 }
+#endif
 
+#ifndef TARGET_PC /* pc/src/pc_system.c */
 // 100% matching!
 void PS2_jikken()
 { 
@@ -233,6 +246,7 @@ void PS2_jikken()
     
     Ps2SwapDBuff(); 
 } 
+#endif
 
 // 99.92% matching 
 void PS2_swap()
@@ -546,6 +560,9 @@ void Ps2AddPrim3D(unsigned long prim, void* dp, unsigned int num)
     *p++ = (SCE_GIF_SET_TAG(0, 1, SCE_GIF_REGLIST, 0, 0, 3) | prim) | num;
     *p++ = GIF_REGLIST(SCE_GS_ST, SCE_GS_RGBAQ, SCE_GS_XYZF2);
     
+#ifdef TARGET_PC
+    pcPs2Prim3DCore(dp, p, num, 0);
+#else
     asm volatile
     ("
     .set noreorder
@@ -637,6 +654,7 @@ void Ps2AddPrim3D(unsigned long prim, void* dp, unsigned int num)
     .set reorder
     " : : "r"(clip_vec), "r"(near_far_vec), "r"(zclip_ab_vec), "r"(zbuff_ab_vec), "r"(dp), "r"(p), "r"(num) : 
     );
+#endif
 
     if ((prim & 0x20000000000000)) 
     {
@@ -717,6 +735,9 @@ void Ps2AddPrim3DEx(unsigned long prim, void* dp, unsigned int num)
     *p++ = (SCE_GIF_SET_TAG(0, 1, SCE_GIF_REGLIST, 0, 0, 3) | prim) | num;
     *p++ = GIF_REGLIST(SCE_GS_ST, SCE_GS_RGBAQ, SCE_GS_XYZF2);
     
+#ifdef TARGET_PC
+    pcPs2Prim3DCore(dp, p, num, 1);
+#else
     asm volatile
     ("
     .set noreorder
@@ -810,6 +831,7 @@ void Ps2AddPrim3DEx(unsigned long prim, void* dp, unsigned int num)
     .set reorder
     " : : "r"(clip_vec), "r"(near_far_vec), "r"(zclip_ab_vec), "r"(zbuff_ab_vec), "r"(dp), "r"(p), "r"(num) : 
     );
+#endif
 
     if ((prim & 0x20000000000000)) 
     {
@@ -898,6 +920,9 @@ void Ps2AddPrim3DEx1P(unsigned long prim, void* dp, unsigned int num)
     *p++ = (SCE_GIF_SET_TAG(0, 1, SCE_GIF_REGLIST, 0, 0, 3) | prim) | num;
     *p++ = GIF_REGLIST(SCE_GS_ST, SCE_GS_RGBAQ, SCE_GS_XYZF2);
     
+#ifdef TARGET_PC
+    pcPs2Prim3DCore(dp, p, num, 1);
+#else
     asm volatile
     ("
     .set noreorder
@@ -991,6 +1016,7 @@ void Ps2AddPrim3DEx1P(unsigned long prim, void* dp, unsigned int num)
     .set reorder
     " : : "r"(clip_vec), "r"(near_far_vec), "r"(zclip_ab_vec), "r"(zbuff_ab_vec), "r"(dp), "r"(p), "r"(num) : 
     );
+#endif
 
     if ((Ps2_albinoid_flag == 0) && ((prim & 0x20000000000000))) 
     {
@@ -1041,6 +1067,9 @@ void Ps2AddPrim3DMod(unsigned long prim, void* dp, unsigned int num)
     *p++ = (SCE_GIF_SET_TAG(0, 1, SCE_GIF_REGLIST, 0, 0, 3) | prim) | num;
     *p++ = GIF_REGLIST(SCE_GS_ST, SCE_GS_RGBAQ, SCE_GS_XYZF2);
     
+#ifdef TARGET_PC
+    pcPs2Prim3DCore(dp, p, num, 1);
+#else
     asm volatile
     ("
     .set noreorder
@@ -1134,6 +1163,7 @@ void Ps2AddPrim3DMod(unsigned long prim, void* dp, unsigned int num)
     .set reorder
     " : : "r"(clip_vec), "r"(near_far_vec), "r"(zclip_ab_vec), "r"(zbuff_ab_vec), "r"(dp), "r"(p), "r"(num) : 
     );
+#endif
 
     SyncPath();
     
@@ -1152,7 +1182,11 @@ void Ps2ClearOT()
     
     Ps2_ot_list_no = 0;
     
+#ifdef TARGET_PC
+    Ps2_PP = (void*)Ps2_PBUFF;
+#else
     Ps2_PP = (void*)((int)&Ps2_PBUFF | 0x30000000); 
+#endif
     
     for (i = 0; i < 4096; i++) 
     {
@@ -1174,23 +1208,47 @@ void Ps2AddOT(void* p, unsigned int num, float z, unsigned long prim)
         
         if (((id >= 26510) && (id <= 26614)) || (id == 107170)) 
         { 
+#ifdef TARGET_PC
+            otz = (unsigned int)(int)z;
+#else
             asm volatile (cvt.w.s f12, f12); 
+#endif
+#ifdef TARGET_PC
+            /* (mfc1) */
+#else
             asm volatile (mfc1      otz, f12); 
+#endif
             
             otz >>= 12;
         } 
         else 
         { 
+#ifdef TARGET_PC
+            otz = (unsigned int)(int)z;
+#else
             asm volatile (cvt.w.s f12, f12); 
+#endif
+#ifdef TARGET_PC
+            /* (mfc1) */
+#else
             asm volatile (mfc1      otz, f12); 
+#endif
             
             otz >>= 4;
         }
     } 
     else 
     { 
+#ifdef TARGET_PC
+        otz = (unsigned int)(int)z;
+#else
         asm volatile (cvt.w.s f12, f12); 
+#endif
+#ifdef TARGET_PC
+        /* (mfc1) */
+#else
         asm volatile (mfc1      otz, f12); 
+#endif
         
         otz >>= 4; 
     }
@@ -1306,7 +1364,11 @@ int Ps2DrawOTagSub(int start_no)
     
     for (i = 0; i < 64; i++) 
     { 
+#ifdef TARGET_PC
+        memset(&ps2_tp_cache[i], 0, 16);
+#else
         *(u_long128*)&ps2_tp_cache[i] = 0; 
+#endif
     } 
     
     for (i = start_no; i < 4096; i++) 
@@ -1315,7 +1377,11 @@ int Ps2DrawOTagSub(int start_no)
         { 
             if (old_p != NULL) 
             { 
+#ifdef TARGET_PC
+                ((long*)old_p->p)[2] |= ((unsigned long)p->p & 0x7FFFFFFF) << 32; /* PC: full address */
+#else
                 ((long*)old_p->p)[2] |= ((unsigned long)p->p & 0xFFFFFFF) << 32; 
+#endif
             }
             else
             { 
@@ -1454,7 +1520,11 @@ int Ps2DrawOTagSub(int start_no)
         
         SyncPath();
         
+#ifdef TARGET_PC
+        loadImage(start_addr); /* PC: full address */
+#else
         loadImage((void*)((int)start_addr & 0xFFFFFF));
+#endif
         
         SyncPath(); 
         
@@ -1470,6 +1540,25 @@ int Ps2DrawOTagSub(int start_no)
 // 100% matching!
 unsigned int Ps2BitCount(register unsigned int value)
 {
+#ifdef TARGET_PC
+    {
+        unsigned int v = value - 1;
+        unsigned int n = 0;
+
+        if (value == 0)
+        {
+            return 0;
+        }
+
+        while (v != 0)
+        {
+            n++;
+            v >>= 1;
+        }
+
+        return n;
+    }
+#else
     asm volatile
     {
         
@@ -1483,6 +1572,7 @@ unsigned int Ps2BitCount(register unsigned int value)
         nop
             
     }
+#endif
 }
 
 // 100% matching!
@@ -2356,6 +2446,9 @@ void Ps2AddPrim3DExI(unsigned long prim, void* dp, unsigned int num)
     *p++ = (SCE_GIF_SET_TAG(0, 1, SCE_GIF_REGLIST, 0, 0, 3) | prim) | num;
     *p++ = GIF_REGLIST(SCE_GS_ST, SCE_GS_RGBAQ, SCE_GS_XYZF2);
     
+#ifdef TARGET_PC
+    pcPs2Prim3DCore(dp, p, num, 1);
+#else
     asm volatile
     ("
     .set noreorder
@@ -2445,6 +2538,7 @@ void Ps2AddPrim3DExI(unsigned long prim, void* dp, unsigned int num)
     .set reorder
     " : : "r"(clip_vec), "r"(near_far_vec), "r"(zclip_ab_vec), "r"(zbuff_ab_vec), "r"(dp), "r"(p), "r"(num), "r"(clip_flag), "r"(st_clip_flag), "r"(clut_flag)  : "v0", "memory" 
     );
+#endif
 
     if ((prim & 0x20000000000000)) 
     {

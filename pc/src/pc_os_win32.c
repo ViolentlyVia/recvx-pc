@@ -52,6 +52,15 @@ void pcOsFiberDelete(void* fiber)
     DeleteFiber(fiber);
 }
 
+/* The PS2 scratchpad (16 KB at 0x70000000) is addressed with literal constants by the game
+ * (WORKBASE, DMA tags), so it is placed at that very address. */
+void* pcOsAllocScratchpad(void)
+{
+    void* p = VirtualAlloc((void*)0x70000000, 0x4000, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+    return p;
+}
+
 double pcOsTime(void)
 {
     static LARGE_INTEGER freq;

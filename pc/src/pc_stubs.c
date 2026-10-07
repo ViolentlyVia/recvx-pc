@@ -15,122 +15,7 @@
 
 #define PC_STUB() do { static int once; if (!once) { once = 1; pcLog("stub: %s", __func__); } } while (0)
 
-void CalcPs2ZbuffAB(void)
-{
-    PC_STUB();
-}
-
-void PS2_Render_Tex_Sub(void)
-{
-    PC_STUB();
-}
-
-void Ps2AddPrim2D(unsigned long prim, void* dp, unsigned int num)
-{
-    PC_STUB();
-}
-
-void Ps2AddPrim3D(unsigned long prim, void* dp, unsigned int num)
-{
-    PC_STUB();
-}
-
-int Ps2CheckTextureAlpha(void* pp)
-{
-    PC_STUB();
-    return 0;
-}
-
-void Ps2ClearOT(void)
-{
-    PC_STUB();
-}
-
-void Ps2DrawOTag(void)
-{
-    PC_STUB();
-}
-
-int Ps2DrawOTagSub(int start_no)
-{
-    PC_STUB();
-    return 0;
-}
-
-int Ps2GlobalIndexTexLoad(unsigned int index)
-{
-    PC_STUB();
-    return 0;
-}
-
-void Ps2SetFogColor(void)
-{
-    PC_STUB();
-}
-
-void Ps2SetFogColorSys(unsigned int r, unsigned int g, unsigned int b)
-{
-    PC_STUB();
-}
-
-void Ps2ShadowDraw(void)
-{
-    PC_STUB();
-}
-
-void Ps2ShadowEnd(void)
-{
-    PC_STUB();
-}
-
-void Ps2ShadowMain0(void)
-{
-    PC_STUB();
-}
-
-void Ps2ShadowMain1(void)
-{
-    PC_STUB();
-}
-
-void Ps2ShadowStart(void)
-{
-    PC_STUB();
-}
-
-int Ps2TexLoad(NJS_TEXMEMLIST* addr)
-{
-    PC_STUB();
-    return 0;
-}
-
-void Ps2ZbuffOff2(void)
-{
-    PC_STUB();
-}
-
 void Ps2ZbuffOffI(void)
-{
-    PC_STUB();
-}
-
-void Ps2ZbuffOn(void)
-{
-    PC_STUB();
-}
-
-int Send_1024_Clut_data(void* clt_adr, unsigned long send_clut_adr)
-{
-    PC_STUB();
-    return 0;
-}
-
-void StoreRenderTex(void* tex_adr)
-{
-    PC_STUB();
-}
-
-void SyncPath(void)
 {
     PC_STUB();
 }
@@ -141,6 +26,10 @@ int _Clip_Screen(float* clip)
     return 0;
 }
 
+float fNaCnkConstantA;
+float fNaCnkConstantB;
+float fNaCnkConstantG;
+float fNaCnkConstantR;
 float fVu1Projection;
 int lCnkModClipFace;
 void njCnkEasyDrawModel(NJS_CNK_MODEL *model)
@@ -298,27 +187,7 @@ void njControl3D(Uint32 flag)
     PC_STUB();
 }
 
-void njDrawLine2D(NJS_POINT2COL *p, Int n, Float pri, Uint32 attr)
-{
-    PC_STUB();
-}
-
 void njDrawModel(NJS_MODEL *model)
-{
-    PC_STUB();
-}
-
-void njDrawPolygon2D(NJS_POINT2COL *p, Int n, Float pri, Uint32 attr)
-{
-    PC_STUB();
-}
-
-void njDrawPolygon2DM(NJS_POINT2COL* p, int n, float pri, unsigned int attr)
-{
-    PC_STUB();
-}
-
-void njDrawSprite2D(NJS_SPRITE *sp, Int n, Float pri, Uint32 attr)
 {
     PC_STUB();
 }

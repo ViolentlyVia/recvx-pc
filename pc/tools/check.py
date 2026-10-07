@@ -16,7 +16,7 @@ CFLAGS = ["/c", "/Zs"] + common.CFLAGS
 def check(src):
     rel = os.path.relpath(src, ROOT).replace("\\", "/")
     log = os.path.join(BUILD, "logs", rel.replace("/", "_") + ".log")
-    args = ["cl"] + CFLAGS + common.include_flags() + [src]
+    args = ["cl"] + CFLAGS + common.include_flags() + common.extra_flags(src) + [src]
     r = msvc.run(args, capture_output=True, text=True, errors="replace", cwd=ROOT)
     out = r.stdout + r.stderr
     with open(log, "w", encoding="utf-8") as f:

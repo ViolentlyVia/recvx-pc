@@ -32,7 +32,7 @@ def obj_path(src):
 def compile_one(args):
     src, flags = args
     obj = obj_path(src)
-    r = msvc.run(["cl"] + flags + ["/c", "/Fo" + obj, src], capture_output=True, text=True,
+    r = msvc.run(["cl"] + flags + common.extra_flags(src) + ["/c", "/Fo" + obj, src], capture_output=True, text=True,
                  errors="replace", cwd=common.ROOT)
     out = (r.stdout + r.stderr).splitlines()
     errs = [l for l in out if re.search(r"\b(error|fatal error) [CD]\d+", l)]

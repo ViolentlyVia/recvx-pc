@@ -268,7 +268,11 @@ int LoadToVram(unsigned long tbp, u_long128* addr, int tbw, int psm, int pos, in
 // 100% matching!
 void *UncAddr(void *val)
 {
+#ifdef TARGET_PC
+    return val;
+#else
     return (void*)(((u_int)val & UNCMASK)|UNCBASE);
+#endif
 }
 
 // 99.83% matching
@@ -544,6 +548,7 @@ void Ps2PxlconvCheck(void* timadr)
     }
 }
 
+#ifndef TARGET_PC /* pc/src/pc_libgraph.c */
 // 100% matching! 
 void SyncPath()
 {
@@ -594,7 +599,9 @@ label_0f2:
     
     while (DGET_GIF_STAT() & 0xC00); 
 } 
+#endif
 
+#ifndef TARGET_PC /* pc/src/pc_libgraph.c */
 // 100% matching! 
 void D2_SyncTag()
 {
@@ -619,7 +626,9 @@ void D2_SyncTag()
 label_0f:
     DPUT_D_PCR(DGET_D_PCR() | tmp); 
 }
+#endif
 
+#ifndef TARGET_PC /* pc/src/pc_libgraph.c */
 // 100% matching! 
 void loadImage(void* tags)
 {
@@ -639,6 +648,7 @@ label_0f:
     DPUT_D2_TADR((int)tags); 
     DPUT_D2_CHCR(261); 
 } 
+#endif
 
 // 100% matching!
 void ClearVram()

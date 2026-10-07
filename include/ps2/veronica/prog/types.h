@@ -2463,7 +2463,11 @@ typedef struct {
 #define DISP_HEIGHT 480
 
 #define UNCACHED_BASE 0x20000000
+#ifdef TARGET_PC
+#define UNCACHED(x) ((u_int)(x)) /* PC: no uncached mirror */
+#else
 #define UNCACHED(x) ((u_int)(x)|UNCACHED_BASE)
+#endif
 
 // TODO: include the following define from cpureg.h
 #define	SR_CU0		0x10000000	/* Coprocessor 0 usable */

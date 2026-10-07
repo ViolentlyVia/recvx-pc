@@ -11,3 +11,5 @@ void   pcOsSleep(double seconds);
 
 void pcOsInstallDiagnostics(void);   /* crash handler + hang watchdog (stack traces to the log) */
 void pcOsHeartbeat(void);            /* call once per presented frame */
+
+void* pcOsAllocScratchpad(void);    /* 16 KB at 0x70000000, or NULL */

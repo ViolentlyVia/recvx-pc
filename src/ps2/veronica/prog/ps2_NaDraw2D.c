@@ -16,11 +16,22 @@ void CalcPs2ZbuffAB()
 // 100% matching! 
 void sceVu0ITOF12Vector(sceVu0FVECTOR v0, sceVu0IVECTOR v1)
 {
+#ifdef TARGET_PC
+	{
+	    int k;
+
+	    for (k = 0; k < 4; k++)
+	    {
+	        v0[k] = v1[k] / 4096.0f;
+	    }
+	}
+#else
 	asm __volatile__("
 	lqc2    vf4,0x0(%1)
 	vitof12.xyzw vf5,vf4
 	sqc2    vf5,0x0(%0)
 	": : "r" (v0) , "r" (v1));
+#endif
 }
 
 // 100% matching! 

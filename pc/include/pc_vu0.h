@@ -84,3 +84,9 @@ static __inline void pcRotRows(float* a, float* b, float s, float c)
         b[i] = av * -s + bv * c;
     }
 }
+
+/* Core of Ps2AddPrim3D* (ps2_dummy.c, was VU0 assembly; implemented in pc/src/pc_ps2gfx.c).
+ * Converts num vertices (ST/Q, RGBA, XYZW: 3 qwords each) from src to a GIF PACKED stream at
+ * dst: depth from Q through Ps2_zbuff_a/b, clip flags -> ADC bit (no drawing kick), and stores
+ * the average depth after the last vertex. ftoi_color: RGBA arrives as floats. */
+void pcPs2Prim3DCore(const void* src, void* dst, unsigned int num, int ftoi_color);

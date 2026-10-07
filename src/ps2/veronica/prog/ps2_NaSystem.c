@@ -18,7 +18,11 @@ void	njSetVertexBuffer(Uint32 *buffer,Sint32 size)
 }
 
 // 100% matching!
+#ifdef TARGET_PC
+void	njInitSystem( Int mode, Int frame, Int count )
+#else
 void	njInitSystem( Int, Int, Int )
+#endif
 {
     Ps2Init();
 }
@@ -77,8 +81,16 @@ void Ps2SwapDBuff()
     
     while (Ps2_vcount < 2) 
     { 
+#ifdef TARGET_PC
+        pcKernelBusyWait();
+#else
         asm("nop");
+#endif
+#ifdef TARGET_PC
+
+#else
         asm("nop");
+#endif
     } 
     
     PS2_swap(); 
@@ -89,15 +101,23 @@ void Ps2SwapDBuff()
     
     Ps2_vcount = 0; 
 
+#ifdef TARGET_PC
+    /* PC: no COP0 tick counter */
+#else
     printf("TICK = %d\n", *(volatile unsigned int*)SR_CU0); 
     
     *(volatile unsigned int*)SR_CU0 = 0; 
+#endif
     
     VsyncFunc(); 
 } 
 
 // 100% matching! 
+#ifdef TARGET_PC
+int vsync_func(int cause)
+#else
 int vsync_func(int) 
+#endif
 {
     Ps2_vcount++; 
     

@@ -10,12 +10,13 @@
 
 #include "pc_platform.h"
 #include "pc_os.h"
+#include "pc_gs.h"
 
 #define PS2_WIDTH  640
-#define PS2_HEIGHT 448
+#define PS2_HEIGHT 480
 
 static SDL_Window* window;
-static SDL_Renderer* renderer;
+static SDL_GLContext gl_context;
 static FILE* log_file;
 
 /* ------------------------------------------------------------------------------------------- */
@@ -125,22 +126,38 @@ void pcVideoInit(void)
         pcPlatformFatal("SDL_Init failed: %s", SDL_GetError());
     }
 
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
     window = SDL_CreateWindow("Resident Evil Code: Veronica X", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                              PS2_WIDTH * 2, PS2_HEIGHT * 2, SDL_WINDOW_RESIZABLE);
+                              PS2_WIDTH * 2, PS2_HEIGHT * 2, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
 
     if (window == NULL)
     {
         pcPlatformFatal("Could not create the window: %s", SDL_GetError());
     }
 
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    gl_context = SDL_GL_CreateContext(window);
 
-    if (renderer == NULL)
+    if (gl_context == NULL)
     {
-        renderer = SDL_CreateRenderer(window, -1, 0);
+        pcPlatformFatal("Could not create an OpenGL 3.3 context: %s", SDL_GetError());
     }
 
-    SDL_RenderSetLogicalSize(renderer, PS2_WIDTH, PS2_HEIGHT);
+    SDL_GL_SetSwapInterval(0);   /* frame pacing comes from the emulated VBLANK */
+
+    {
+        unsigned char* spr = pcOsAllocScratchpad();
+
+        if (spr == NULL)
+        {
+            pcPlatformFatal("Could not reserve the PS2 scratchpad address range (0x70000000).");
+        }
+
+        pcGsInit(spr);
+    }
 
     pcPadInit();
 
@@ -182,9 +199,34 @@ void pcVideoPresent(void)
     pcPadUpdate();
     pcOsHeartbeat();
 
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
-    SDL_RenderPresent(renderer);
+    pcGsPresent();
+
+    /* testing aid: RECVX_SHOTS=<seconds> saves the display buffer to shots/ periodically */
+    {
+        static int interval = -1;
+        static unsigned int last;
+
+        if (interval < 0)
+        {
+            const char* e = SDL_getenv("RECVX_SHOTS");
+
+            interval = (e != NULL) ? atoi(e) * 1000 : 0;
+        }
+
+        if ((interval > 0) && (SDL_GetTicks() - last >= (unsigned int)interval))
+        {
+            extern void pcGsScreenshot(const char* path, unsigned int fbp);
+            extern unsigned int pcGsDisplayFbp(void);
+            char path[1100], dir[1024];
+
+            last = SDL_GetTicks();
+            pcPlatformExeDir(dir, sizeof(dir));
+            snprintf(path, sizeof(path), "%s/shots/shot_%05u.png", dir, frames);
+            pcGsScreenshot(path, pcGsDisplayFbp());
+        }
+    }
+
+    SDL_GL_SwapWindow(window);
 
     frames++;
 

@@ -5,13 +5,13 @@
 typedef unsigned char      u_char;
 typedef unsigned short     u_short;
 typedef unsigned int       u_int;
-typedef unsigned long long u_long;   /* "long" is 64-bit on the EE */
+typedef uint64_t u_long;            /* "long" is 64-bit on the EE */
 
 typedef struct { unsigned int w[4]; } u_long128;
 typedef struct { unsigned int w[4]; } u_int128;
 typedef u_long128 long128;
 #define __int128 u_long128
-typedef unsigned long long u_long64;
+typedef uint64_t u_long64;
 
 /* ---- libvu0 ---- */
 typedef float sceVu0FVECTOR[4];
@@ -49,7 +49,7 @@ typedef struct { u_int lsn; u_int size; char name[16]; u_char date[8]; } sceCdlF
 
 /* ---- libipu / libmpeg (movie playback is reimplemented on PC) ---- */
 typedef struct { u_int d3madr, d3tadr, d3qwc, d3chcr, d4madr, d4tadr, d4qwc, d4chcr, ipuctrl; } sceIpuDmaEnv;
-typedef struct { int width, height, frameCount; long long pts, dts; int flags; long long pts2nd, dts2nd;
+typedef struct { int width, height, frameCount; int64_t pts, dts; int flags; int64_t pts2nd, dts2nd;
                  int flags2nd; void *sys; } sceMpeg;
 typedef enum { sceMpegCbError, sceMpegCbNodata, sceMpegCbStopDMA, sceMpegCbRestartDMA,
                sceMpegCbBackground, sceMpegCbTimeStamp, sceMpegCbStr } sceMpegCbType;
@@ -57,8 +57,8 @@ typedef enum { sceMpegStrM2V = 0, sceMpegStrIPU = 1, sceMpegStrPCM = 2, sceMpegS
                sceMpegStrDATA = 4 } sceMpegStrType;
 typedef struct { sceMpegCbType type; } sceMpegCbDataCommon;
 typedef struct { sceMpegCbType type; char *errMessage; } sceMpegCbDataError;
-typedef struct { sceMpegCbType type; long long pts, dts; } sceMpegCbDataTimeStamp;
-typedef struct { sceMpegCbType type; u_char *header; u_char *data; u_int len; long long pts, dts; } sceMpegCbDataStr;
+typedef struct { sceMpegCbType type; int64_t pts, dts; } sceMpegCbDataTimeStamp;
+typedef struct { sceMpegCbType type; u_char *header; u_char *data; u_int len; int64_t pts, dts; } sceMpegCbDataStr;
 typedef union {
     sceMpegCbType type;
     sceMpegCbDataError error;
@@ -92,14 +92,7 @@ typedef void (*sceSifEndFunc)(void* data);
 typedef struct { void* paddr; u_int pid; int tid; u_int mode; } sceSifRpcData;
 typedef struct { sceSifRpcData rpcd; u_int command; void* buff; void* cbuff; sceSifEndFunc func; void* para; void* serve; } sceSifClientData;
 
-/* ---- libgraph double buffering (rendering is replaced on PC; kept for type compatibility) ---- */
-typedef struct { u_long64 data[20]; } sceGsDispEnv;
-typedef struct { u_long64 data[40]; } sceGsDrawEnv1;
-typedef struct { sceGsDispEnv disp[2]; u_long64 giftag0[2]; sceGsDrawEnv1 draw0; u_long64 giftag1[2]; sceGsDrawEnv1 draw1; } sceGsDBuff;
-typedef struct { sceGsDispEnv disp[2]; u_long64 giftag0[2]; sceGsDrawEnv1 draw01; sceGsDrawEnv1 draw02;
-                 u_long64 giftag1[2]; sceGsDrawEnv1 draw11; sceGsDrawEnv1 draw12; } sceGsDBuffDc;
-typedef struct { u_long64 data[14]; } sceGsLoadImage;
-typedef struct { u_long64 data[14]; } sceGsStoreImage;
+
 
 /* ---- EE kernel (threads, semaphores) ---- */
 struct ThreadParam {
