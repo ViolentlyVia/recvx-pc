@@ -10,6 +10,8 @@
 #include "../../include/pc_platform.h"
 
 GsRegs gsRegs;
+int gsDumpFrame;
+static int kicks;
 
 /* ------------------------------------------------------------------------------------------- */
 /* vertex queue and kicks */
@@ -133,6 +135,8 @@ static void latch_vertex(u64 xyz, int has_f, int kick)
     {
         return;
     }
+
+    kicks++;
 
     switch (type)
     {
@@ -437,6 +441,8 @@ static const void* dma_ptr(unsigned int addr, int spr)
 
 void gsDmaChain(const void* tag_ptr)
 {
+    int ntags = 0, nqwc = 0, k0 = kicks;
+
     unsigned int tag_addr = (unsigned int)(size_t)tag_ptr;
     unsigned int stack[2];
     int sp = 0;
@@ -505,8 +511,16 @@ void gsDmaChain(const void* tag_ptr)
             break;
         }
 
+        ntags++;
+        nqwc += qwc;
+
         if (end)
         {
+            if (gsDumpFrame)
+            {
+                pcLog("dma chain %08x: %d tags, %d qwc, %d kicks, last id %u", (unsigned int)(size_t)tag_ptr, ntags, nqwc, kicks - k0, id);
+            }
+
             return;
         }
 

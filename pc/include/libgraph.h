@@ -244,7 +244,8 @@ typedef struct {
 
 /* ---- register structures (bit layouts as in libgraph) ---- */
 typedef struct { u_long64_t PRIM:3, IIP:1, TME:1, FGE:1, ABE:1, AA1:1, FST:1, CTXT:1, FIX:1, pad11:53; } sceGsPrim;
-typedef struct { u_long64_t R:8, G:8, B:8, A:8; float Q; } sceGsRgbaq;
+/* Q is the float's bit pattern: a float member after the bitfields would start a new 8-byte unit on MSVC */
+typedef struct { u_long64_t R:8, G:8, B:8, A:8, Q:32; } sceGsRgbaq;
 typedef struct { u_long64_t X:16, Y:16, Z:32; } sceGsXyz;
 typedef struct { u_long64_t X:16, Y:16, Z:24, F:8; } sceGsXyzf;
 typedef struct { u_long64_t FBP:9, pad09:7, FBW:6, pad22:2, PSM:6, pad30:2, FBMSK:32; } sceGsFrame;
@@ -271,6 +272,34 @@ typedef struct { u_long64_t INT:1, FFMD:1, DPMS:2, pad04:60; } sceGsSmode2;
 typedef struct { u_long64_t FBP:9, FBW:6, PSM:5, pad20:12, DBX:11, DBY:11, pad54:10; } sceGsDispfb;
 typedef struct { u_long64_t DX:12, DY:11, MAGH:4, MAGV:2, pad29:3, DW:12, DH:11, pad55:9; } sceGsDisplay;
 typedef struct { u_long64_t R:8, G:8, B:8, pad24:40; } sceGsBgcolor;
+
+/* every GS register image is one 64-bit word */
+typedef char pc_size_check_sceGsPrim[(sizeof(sceGsPrim) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsRgbaq[(sizeof(sceGsRgbaq) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsXyz[(sizeof(sceGsXyz) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsXyzf[(sizeof(sceGsXyzf) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsFrame[(sizeof(sceGsFrame) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsZbuf[(sizeof(sceGsZbuf) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsXyoffset[(sizeof(sceGsXyoffset) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsScissor[(sizeof(sceGsScissor) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsPrmodecont[(sizeof(sceGsPrmodecont) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsColclamp[(sizeof(sceGsColclamp) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsDthe[(sizeof(sceGsDthe) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsTest[(sizeof(sceGsTest) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsAlpha[(sizeof(sceGsAlpha) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsClamp[(sizeof(sceGsClamp) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsTexa[(sizeof(sceGsTexa) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsBitbltbuf[(sizeof(sceGsBitbltbuf) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsTrxpos[(sizeof(sceGsTrxpos) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsTrxreg[(sizeof(sceGsTrxreg) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsTrxdir[(sizeof(sceGsTrxdir) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsTexflush[(sizeof(sceGsTexflush) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsFinish[(sizeof(sceGsFinish) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsPmode[(sizeof(sceGsPmode) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsSmode2[(sizeof(sceGsSmode2) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsDispfb[(sizeof(sceGsDispfb) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsDisplay[(sizeof(sceGsDisplay) == 8) ? 1 : -1];
+typedef char pc_size_check_sceGsBgcolor[(sizeof(sceGsBgcolor) == 8) ? 1 : -1];
 
 /* ---- libgraph environments ---- */
 typedef struct {

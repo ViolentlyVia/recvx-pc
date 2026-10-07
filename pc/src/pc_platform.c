@@ -233,6 +233,11 @@ void pcVideoPresent(void)
     if (SDL_GetTicks() - last_report >= 5000)
     {
         pcLog("frame %u", frames);
+        {
+            extern void pcGameStateLog(void);
+
+            pcGameStateLog();
+        }
         last_report = SDL_GetTicks();
     }
 }
@@ -354,19 +359,26 @@ void pcPadUpdate(void)
         }
     }
 
-    /* testing aid: RECVX_AUTOPRESS=1 taps START and CROSS every two seconds */
+    /* testing aid: RECVX_AUTOPRESS=1 taps START and CROSS every two seconds;
+     * RECVX_AUTOPRESS=2 stops pressing START after the title (stays out of the status screen) */
     {
         static int autopress = -1;
         static unsigned int count;
 
         if (autopress < 0)
         {
-            autopress = (SDL_getenv("RECVX_AUTOPRESS") != NULL);
+            const char* e = SDL_getenv("RECVX_AUTOPRESS");
+
+            autopress = (e != NULL) ? atoi(e) : 0;
         }
 
         if (autopress && ((++count % 60) < 3))
         {
-            r[2] &= ~0x08;
+            if ((autopress != 2) || (count < 1200))
+            {
+                r[2] &= ~0x08;
+            }
+
             r[3] &= ~0x40;
             r[14] = 0xFF;
         }

@@ -3,13 +3,7 @@
 #include "../../../ps2/veronica/prog/ps2_NaView.h"
 #include "../../../ps2/veronica/prog/main.h"
 
-#ifdef TARGET_PC
 int lNaMatIsUnitMatrix;
-float pcVu0CN[16];
-float pcVu0Last[4];
-#else
-int lNaMatIsUnitMatrix;
-#endif
 int lNaMatMatrixStuckMax;
 int lNaMatMatrixStuckCnt;
 NJS_MATRIX* pNaMatMatrixStuckPtr;
@@ -36,8 +30,26 @@ void	njInitMatrix(NJS_MATRIX *m, Sint32 n, Int flag)
     pi = 3.141592f;
     
 #ifdef TARGET_PC
-    /* PC: VU0 constants are folded into the C code that used them */
-    (void)pi;
+    /* PC: the VU0 constant registers the microcode and the translated assembly rely on */
+    {
+        static const VuVec one = { { 1.0f, 1.0f, 1.0f, 1.0f } };
+        static const VuVec c2 = { { 3.0f, 4.0f, 5.0f, 1.0f } };
+
+        pcVu0.vf[1] = one;
+        pcVu0.vf[2] = c2;
+        pcVu0.vf[3].f[0] = 128.0f;
+        pcVu0.vf[3].f[1] = 256.0f;
+        pcVu0.vf[3].f[2] = 65536.0f;
+        pcVu0.vf[3].f[3] = pi;
+        pcVu0.vf[9].f[0] = 256.0f;
+        pcVu0.vf[10].f[0] = 65536.0f;
+        pcVu0.vf[11].f[0] = pi;
+        pcVu0.vf[4].f[0] = pcVu0.vf[4].f[1] = pcVu0.vf[4].f[2] = 4095.0f;
+        pcVu0.vf[16].f[2] = 4095.0f;
+        vu_set_q_now(&pcVu0, 1.0f);
+
+        pcVu0Micro(365); /* VU0_INIT_CALC_PROCESS */
+    }
 #else
     asm volatile 
     {

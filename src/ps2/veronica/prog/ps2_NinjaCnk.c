@@ -1356,17 +1356,17 @@ CHUNK_HEAD* njCnkCvVnPs2(CHUNK_HEAD* pCnk)
         uint64_t lo_ = 0; int fcc_ = 0;
         g_op0.d[0] = A2C_SX32((uint32_t)(uintptr_t)(v));
         g_v1.d[0] = g_op0.d[0];
-        memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_v1.w[0] + (0))) & ~15u), 16);
-        memcpy(&pcVu0.vf[5], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x10))) & ~15u), 16);
-        memcpy(&pcVu0.vf[6], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x20))) & ~15u), 16);
-        memcpy(&pcVu0.vf[7], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x30))) & ~15u), 16);
-        memcpy(&pcVu0.vf[8], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x40))) & ~15u), 16);
-        memcpy(&pcVu0.vf[9], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x50))) & ~15u), 16);
-        memcpy(&pcVu0.vf[10], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x60))) & ~15u), 16);
-        memcpy(&pcVu0.vf[11], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x70))) & ~15u), 16);
-        memcpy(&pcVu0.vf[12], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x80))) & ~15u), 16);
-        memcpy(&pcVu0.vf[13], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x90))) & ~15u), 16);
-        memcpy(&pcVu0.vf[14], A2C_PTR(((uint32_t)(g_v1.w[0] + (0xA0))) & ~15u), 16);
+        memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_v1.w[0] + (0)))), 16);
+        memcpy(&pcVu0.vf[5], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x10)))), 16);
+        memcpy(&pcVu0.vf[6], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x20)))), 16);
+        memcpy(&pcVu0.vf[7], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x30)))), 16);
+        memcpy(&pcVu0.vf[8], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x40)))), 16);
+        memcpy(&pcVu0.vf[9], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x50)))), 16);
+        memcpy(&pcVu0.vf[10], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x60)))), 16);
+        memcpy(&pcVu0.vf[11], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x70)))), 16);
+        memcpy(&pcVu0.vf[12], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x80)))), 16);
+        memcpy(&pcVu0.vf[13], A2C_PTR(((uint32_t)(g_v1.w[0] + (0x90)))), 16);
+        memcpy(&pcVu0.vf[14], A2C_PTR(((uint32_t)(g_v1.w[0] + (0xA0)))), 16);
         (void)g_zero; (void)lo_; (void)fcc_;
     }
 #else
@@ -1424,15 +1424,15 @@ CHUNK_HEAD* njCnkCvVnPs2(CHUNK_HEAD* pCnk)
         g_op1.d[0] = A2C_SX32((uint32_t)(uintptr_t)(pBuffer));
         g_op2.d[0] = A2C_SX32((uint32_t)(uintptr_t)(fpCnk));
         pcVu0Micro(7); /* VU0_CALCPOINT_INIT */
-        memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_op2.w[0] + (0))) & ~15u), 16);
-        memcpy(&pcVu0.vf[5], A2C_PTR(((uint32_t)(g_op2.w[0] + (0x10))) & ~15u), 16);
+        memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_op2.w[0] + (0)))), 16);
+        memcpy(&pcVu0.vf[5], A2C_PTR(((uint32_t)(g_op2.w[0] + (0x10)))), 16);
         pcVu0Micro(49); /* VU0_CALCPOINT */
         memcpy(&g_t0, &pcVu0.vf[7], 16);
         memcpy(&g_t1, &pcVu0.vf[18], 16);
         memcpy(&g_t2, &pcVu0.vf[6], 16);
-        memcpy(A2C_PTR(((uint32_t)(g_op1.w[0] + (0x10))) & ~15u), &g_t0, 16);
-        memcpy(A2C_PTR(((uint32_t)(g_op1.w[0] + (0x20))) & ~15u), &g_t1, 16);
-        memcpy(A2C_PTR(((uint32_t)(g_op1.w[0] + (0x30))) & ~15u), &g_t2, 16);
+        memcpy(A2C_PTR(((uint32_t)(g_op1.w[0] + (0x10)))), &g_t0, 16);
+        memcpy(A2C_PTR(((uint32_t)(g_op1.w[0] + (0x20)))), &g_t1, 16);
+        memcpy(A2C_PTR(((uint32_t)(g_op1.w[0] + (0x30)))), &g_t2, 16);
         memcpy(&g_t3, &pcVu0.vf[11], 16);
         fr_op0.u = g_t3.w[0];
         fog = fr_op0.f;
@@ -1479,8 +1479,8 @@ CHUNK_HEAD* njCnkCvVnPs2(CHUNK_HEAD* pCnk)
             PcGpr g_zero = { 0 };
             uint64_t lo_ = 0; int fcc_ = 0;
             g_op0.d[0] = A2C_SX32((uint32_t)(uintptr_t)(fpCnk));
-            memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_op0.w[0] + (0))) & ~15u), 16);
-            memcpy(&pcVu0.vf[5], A2C_PTR(((uint32_t)(g_op0.w[0] + (0x10))) & ~15u), 16);
+            memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_op0.w[0] + (0)))), 16);
+            memcpy(&pcVu0.vf[5], A2C_PTR(((uint32_t)(g_op0.w[0] + (0x10)))), 16);
             pcVu0Micro(49); /* VU0_CALCPOINT */
             (void)g_zero; (void)lo_; (void)fcc_;
         }
@@ -1517,9 +1517,9 @@ CHUNK_HEAD* njCnkCvVnPs2(CHUNK_HEAD* pCnk)
             memcpy(&g_t0, &pcVu0.vf[7], 16);
             memcpy(&g_t1, &pcVu0.vf[18], 16);
             memcpy(&g_t2, &pcVu0.vf[6], 16);
-            memcpy(A2C_PTR(((uint32_t)(g_op2.w[0] + (0x10))) & ~15u), &g_t0, 16);
-            memcpy(A2C_PTR(((uint32_t)(g_op2.w[0] + (0x20))) & ~15u), &g_t1, 16);
-            memcpy(A2C_PTR(((uint32_t)(g_op2.w[0] + (0x30))) & ~15u), &g_t2, 16);
+            memcpy(A2C_PTR(((uint32_t)(g_op2.w[0] + (0x10)))), &g_t0, 16);
+            memcpy(A2C_PTR(((uint32_t)(g_op2.w[0] + (0x20)))), &g_t1, 16);
+            memcpy(A2C_PTR(((uint32_t)(g_op2.w[0] + (0x30)))), &g_t2, 16);
             memcpy(&g_t3, &pcVu0.vf[11], 16);
             fr_op0.u = g_t3.w[0];
             g_t0.d[0] = A2C_SX32(a2c_cfc2(11));
@@ -2185,7 +2185,7 @@ CHUNK_HEAD* njCnkCsUvh(CHUNK_HEAD* pCnk)
                     g_t0.d[0] = A2C_SX32(g_t0.w[0] << (6));
                     g_op2.d[0] = A2C_SX32(g_op2.w[0] + (uint32_t)((int32_t)(-1)));
                     g_t0.d[0] = A2C_SX32(g_op3.w[0] + (uint32_t)(g_t0.w[0]));
-                    memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t0.w[0] + (0x20))) & ~15u), 16);
+                    memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t0.w[0] + (0x20)))), 16);
                     { VuVec r_ = pcVu0.vf[0]; r_.f[0] = vu_f(pcVu0.vf[24].f[0] * pcVu0.vf[4].f[0]); r_.f[1] = vu_f(pcVu0.vf[24].f[1] * pcVu0.vf[4].f[0]); r_.f[2] = vu_f(pcVu0.vf[24].f[2] * pcVu0.vf[4].f[0]); r_.f[3] = vu_f(pcVu0.vf[24].f[3] * pcVu0.vf[4].f[0]); pcVu0.acc.f[0] = r_.f[0]; pcVu0.acc.f[1] = r_.f[1]; pcVu0.acc.f[2] = r_.f[2]; pcVu0.acc.f[3] = r_.f[3]; vu_set_mac(&pcVu0, &r_, 15); }
                     { VuVec r_ = pcVu0.vf[0]; r_.f[0] = vu_f(pcVu0.acc.f[0] + pcVu0.vf[25].f[0] * pcVu0.vf[4].f[1]); r_.f[1] = vu_f(pcVu0.acc.f[1] + pcVu0.vf[25].f[1] * pcVu0.vf[4].f[1]); r_.f[2] = vu_f(pcVu0.acc.f[2] + pcVu0.vf[25].f[2] * pcVu0.vf[4].f[1]); r_.f[3] = vu_f(pcVu0.acc.f[3] + pcVu0.vf[25].f[3] * pcVu0.vf[4].f[1]); pcVu0.acc.f[0] = r_.f[0]; pcVu0.acc.f[1] = r_.f[1]; pcVu0.acc.f[2] = r_.f[2]; pcVu0.acc.f[3] = r_.f[3]; vu_set_mac(&pcVu0, &r_, 15); }
                     { VuVec r_ = pcVu0.vf[0]; r_.f[0] = vu_f(pcVu0.acc.f[0] + pcVu0.vf[26].f[0] * pcVu0.vf[4].f[2]); r_.f[1] = vu_f(pcVu0.acc.f[1] + pcVu0.vf[26].f[1] * pcVu0.vf[4].f[2]); r_.f[2] = vu_f(pcVu0.acc.f[2] + pcVu0.vf[26].f[2] * pcVu0.vf[4].f[2]); r_.f[3] = vu_f(pcVu0.acc.f[3] + pcVu0.vf[26].f[3] * pcVu0.vf[4].f[2]); pcVu0.acc.f[0] = r_.f[0]; pcVu0.acc.f[1] = r_.f[1]; pcVu0.acc.f[2] = r_.f[2]; pcVu0.acc.f[3] = r_.f[3]; vu_set_mac(&pcVu0, &r_, 15); }
@@ -2196,7 +2196,7 @@ CHUNK_HEAD* njCnkCsUvh(CHUNK_HEAD* pCnk)
                     g_op2.d[0] = A2C_SX32(g_op2.w[0] + (uint32_t)((int32_t)(-1)));
                     g_t0.d[0] = A2C_SX32(g_t0.w[0] << (6));
                     { int c_ = (g_op0.d[0] == 0); g_t0.d[0] = A2C_SX32(g_op3.w[0] + (uint32_t)(g_t0.w[0])); if (c_) { *(uint32_t*)&(coflag) = g_op0.w[0]; goto label; } }
-                    memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t0.w[0] + (0x20))) & ~15u), 16);
+                    memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t0.w[0] + (0x20)))), 16);
                     vu_clip(&pcVu0, &pcVu0.vf[5], pcVu0.vf[5].f[3]);
                     { VuVec r_ = pcVu0.vf[0]; r_.f[0] = vu_f(pcVu0.vf[24].f[0] * pcVu0.vf[4].f[0]); r_.f[1] = vu_f(pcVu0.vf[24].f[1] * pcVu0.vf[4].f[0]); r_.f[2] = vu_f(pcVu0.vf[24].f[2] * pcVu0.vf[4].f[0]); r_.f[3] = vu_f(pcVu0.vf[24].f[3] * pcVu0.vf[4].f[0]); pcVu0.acc.f[0] = r_.f[0]; pcVu0.acc.f[1] = r_.f[1]; pcVu0.acc.f[2] = r_.f[2]; pcVu0.acc.f[3] = r_.f[3]; vu_set_mac(&pcVu0, &r_, 15); }
                     { VuVec r_ = pcVu0.vf[0]; r_.f[0] = vu_f(pcVu0.acc.f[0] + pcVu0.vf[25].f[0] * pcVu0.vf[4].f[1]); r_.f[1] = vu_f(pcVu0.acc.f[1] + pcVu0.vf[25].f[1] * pcVu0.vf[4].f[1]); r_.f[2] = vu_f(pcVu0.acc.f[2] + pcVu0.vf[25].f[2] * pcVu0.vf[4].f[1]); r_.f[3] = vu_f(pcVu0.acc.f[3] + pcVu0.vf[25].f[3] * pcVu0.vf[4].f[1]); pcVu0.acc.f[0] = r_.f[0]; pcVu0.acc.f[1] = r_.f[1]; pcVu0.acc.f[2] = r_.f[2]; pcVu0.acc.f[3] = r_.f[3]; vu_set_mac(&pcVu0, &r_, 15); }
@@ -2293,7 +2293,7 @@ CHUNK_HEAD* njCnkCsUvh(CHUNK_HEAD* pCnk)
                         PcGpr g_zero = { 0 };
                         uint64_t lo_ = 0; int fcc_ = 0;
                         g_op0.d[0] = A2C_SX32((uint32_t)(uintptr_t)(zbuff));
-                        memcpy(&pcVu0.vf[8], A2C_PTR(((uint32_t)(g_op0.w[0] + (0))) & ~15u), 16);
+                        memcpy(&pcVu0.vf[8], A2C_PTR(((uint32_t)(g_op0.w[0] + (0)))), 16);
                         (void)g_zero; (void)lo_; (void)fcc_;
                     }
 #else
@@ -2336,10 +2336,10 @@ CHUNK_HEAD* njCnkCsUvh(CHUNK_HEAD* pCnk)
                         g_t1.d[0] = A2C_SX32(g_t1.w[0] << (6));
                         g_t2.d[0] = A2C_SX32(g_op2.w[0] + (uint32_t)(g_t1.w[0]));
                         NinjaCnk_a7_l_002D2B38:;
-                        memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t2.w[0] + (0))) & ~15u), 16);
-                        memcpy(&pcVu0.vf[5], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x10))) & ~15u), 16);
-                        memcpy(&pcVu0.vf[6], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x20))) & ~15u), 16);
-                        memcpy(&pcVu0.vf[7], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x30))) & ~15u), 16);
+                        memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t2.w[0] + (0)))), 16);
+                        memcpy(&pcVu0.vf[5], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x10)))), 16);
+                        memcpy(&pcVu0.vf[6], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x20)))), 16);
+                        memcpy(&pcVu0.vf[7], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x30)))), 16);
                         { PcGpr r_; int k_; for (k_ = 0; k_ < 4; k_++) { r_.h[k_ * 2] = g_t0.h[k_]; r_.h[k_ * 2 + 1] = g_zero.h[k_]; } g_t0 = r_; }
                         memcpy(&pcVu0.vf[4], &g_t0, 16);
                         { VuVec r_ = pcVu0.vf[0]; r_.f[0] = (float)pcVu0.vf[4].i[0] / 1.0f; r_.f[1] = (float)pcVu0.vf[4].i[1] / 1.0f; pcVu0.vf[4].f[0] = r_.f[0]; pcVu0.vf[4].f[1] = r_.f[1]; }
@@ -2359,10 +2359,10 @@ CHUNK_HEAD* njCnkCsUvh(CHUNK_HEAD* pCnk)
                         { VuVec r_ = pcVu0.vf[0]; r_.f[2] = vu_f(fminf(pcVu0.vf[7].f[2], pcVu0.vf[8].f[3])); pcVu0.vf[7].f[2] = r_.f[2]; }
                         { VuVec r_ = pcVu0.vf[0]; r_.u[3] = pcVu0.vf[6].u[3]; pcVu0.vf[7].f[3] = r_.f[3]; }
                         g_op3.d[0] = A2C_SX32(g_op3.w[0] + (uint32_t)((int32_t)(-1)));
-                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0))) & ~15u), &pcVu0.vf[4], 16);
-                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x10))) & ~15u), &pcVu0.vf[5], 16);
-                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x20))) & ~15u), &pcVu0.vf[6], 16);
-                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x30))) & ~15u), &pcVu0.vf[7], 16);
+                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0)))), &pcVu0.vf[4], 16);
+                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x10)))), &pcVu0.vf[5], 16);
+                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x20)))), &pcVu0.vf[6], 16);
+                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x30)))), &pcVu0.vf[7], 16);
                         *(uint32_t*)A2C_PTR(((uint32_t)(g_op0.w[0] + (offsetof(VU1_STRIP_BUF, fPad1))))) = (uint32_t)g_op4.d[0];
                         { int c_ = (g_op3.d[0] != 0); g_t3.d[0] = A2C_SX32(g_t3.w[0] + (uint32_t)((int32_t)(64))); if (c_) goto NinjaCnk_a7_l_002D2B38; }
                         (void)g_zero; (void)lo_; (void)fcc_;
@@ -2743,7 +2743,7 @@ CHUNK_HEAD* njCnkCsUvn(CHUNK_HEAD* pCnk)
                     g_t0.d[0] = A2C_SX32(g_t0.w[0] << (6));
                     g_op2.d[0] = A2C_SX32(g_op2.w[0] + (uint32_t)((int32_t)(-1)));
                     g_t0.d[0] = A2C_SX32(g_op3.w[0] + (uint32_t)(g_t0.w[0]));
-                    memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t0.w[0] + (0x20))) & ~15u), 16);
+                    memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t0.w[0] + (0x20)))), 16);
                     { VuVec r_ = pcVu0.vf[0]; r_.f[0] = vu_f(pcVu0.vf[24].f[0] * pcVu0.vf[4].f[0]); r_.f[1] = vu_f(pcVu0.vf[24].f[1] * pcVu0.vf[4].f[0]); r_.f[2] = vu_f(pcVu0.vf[24].f[2] * pcVu0.vf[4].f[0]); r_.f[3] = vu_f(pcVu0.vf[24].f[3] * pcVu0.vf[4].f[0]); pcVu0.acc.f[0] = r_.f[0]; pcVu0.acc.f[1] = r_.f[1]; pcVu0.acc.f[2] = r_.f[2]; pcVu0.acc.f[3] = r_.f[3]; vu_set_mac(&pcVu0, &r_, 15); }
                     { VuVec r_ = pcVu0.vf[0]; r_.f[0] = vu_f(pcVu0.acc.f[0] + pcVu0.vf[25].f[0] * pcVu0.vf[4].f[1]); r_.f[1] = vu_f(pcVu0.acc.f[1] + pcVu0.vf[25].f[1] * pcVu0.vf[4].f[1]); r_.f[2] = vu_f(pcVu0.acc.f[2] + pcVu0.vf[25].f[2] * pcVu0.vf[4].f[1]); r_.f[3] = vu_f(pcVu0.acc.f[3] + pcVu0.vf[25].f[3] * pcVu0.vf[4].f[1]); pcVu0.acc.f[0] = r_.f[0]; pcVu0.acc.f[1] = r_.f[1]; pcVu0.acc.f[2] = r_.f[2]; pcVu0.acc.f[3] = r_.f[3]; vu_set_mac(&pcVu0, &r_, 15); }
                     { VuVec r_ = pcVu0.vf[0]; r_.f[0] = vu_f(pcVu0.acc.f[0] + pcVu0.vf[26].f[0] * pcVu0.vf[4].f[2]); r_.f[1] = vu_f(pcVu0.acc.f[1] + pcVu0.vf[26].f[1] * pcVu0.vf[4].f[2]); r_.f[2] = vu_f(pcVu0.acc.f[2] + pcVu0.vf[26].f[2] * pcVu0.vf[4].f[2]); r_.f[3] = vu_f(pcVu0.acc.f[3] + pcVu0.vf[26].f[3] * pcVu0.vf[4].f[2]); pcVu0.acc.f[0] = r_.f[0]; pcVu0.acc.f[1] = r_.f[1]; pcVu0.acc.f[2] = r_.f[2]; pcVu0.acc.f[3] = r_.f[3]; vu_set_mac(&pcVu0, &r_, 15); }
@@ -2754,7 +2754,7 @@ CHUNK_HEAD* njCnkCsUvn(CHUNK_HEAD* pCnk)
                     g_op2.d[0] = A2C_SX32(g_op2.w[0] + (uint32_t)((int32_t)(-1)));
                     g_t0.d[0] = A2C_SX32(g_t0.w[0] << (6));
                     { int c_ = (g_op0.d[0] == 0); g_t0.d[0] = A2C_SX32(g_op3.w[0] + (uint32_t)(g_t0.w[0])); if (c_) { *(uint32_t*)&(coflag) = g_op0.w[0]; goto label; } }
-                    memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t0.w[0] + (0x20))) & ~15u), 16);
+                    memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t0.w[0] + (0x20)))), 16);
                     vu_clip(&pcVu0, &pcVu0.vf[5], pcVu0.vf[5].f[3]);
                     { VuVec r_ = pcVu0.vf[0]; r_.f[0] = vu_f(pcVu0.vf[24].f[0] * pcVu0.vf[4].f[0]); r_.f[1] = vu_f(pcVu0.vf[24].f[1] * pcVu0.vf[4].f[0]); r_.f[2] = vu_f(pcVu0.vf[24].f[2] * pcVu0.vf[4].f[0]); r_.f[3] = vu_f(pcVu0.vf[24].f[3] * pcVu0.vf[4].f[0]); pcVu0.acc.f[0] = r_.f[0]; pcVu0.acc.f[1] = r_.f[1]; pcVu0.acc.f[2] = r_.f[2]; pcVu0.acc.f[3] = r_.f[3]; vu_set_mac(&pcVu0, &r_, 15); }
                     { VuVec r_ = pcVu0.vf[0]; r_.f[0] = vu_f(pcVu0.acc.f[0] + pcVu0.vf[25].f[0] * pcVu0.vf[4].f[1]); r_.f[1] = vu_f(pcVu0.acc.f[1] + pcVu0.vf[25].f[1] * pcVu0.vf[4].f[1]); r_.f[2] = vu_f(pcVu0.acc.f[2] + pcVu0.vf[25].f[2] * pcVu0.vf[4].f[1]); r_.f[3] = vu_f(pcVu0.acc.f[3] + pcVu0.vf[25].f[3] * pcVu0.vf[4].f[1]); pcVu0.acc.f[0] = r_.f[0]; pcVu0.acc.f[1] = r_.f[1]; pcVu0.acc.f[2] = r_.f[2]; pcVu0.acc.f[3] = r_.f[3]; vu_set_mac(&pcVu0, &r_, 15); }
@@ -2851,7 +2851,7 @@ CHUNK_HEAD* njCnkCsUvn(CHUNK_HEAD* pCnk)
                         PcGpr g_zero = { 0 };
                         uint64_t lo_ = 0; int fcc_ = 0;
                         g_op0.d[0] = A2C_SX32((uint32_t)(uintptr_t)(zbuff));
-                        memcpy(&pcVu0.vf[8], A2C_PTR(((uint32_t)(g_op0.w[0] + (0))) & ~15u), 16);
+                        memcpy(&pcVu0.vf[8], A2C_PTR(((uint32_t)(g_op0.w[0] + (0)))), 16);
                         (void)g_zero; (void)lo_; (void)fcc_;
                     }
 #else
@@ -2894,10 +2894,10 @@ CHUNK_HEAD* njCnkCsUvn(CHUNK_HEAD* pCnk)
                         g_t1.d[0] = A2C_SX32(g_t1.w[0] << (6));
                         g_t2.d[0] = A2C_SX32(g_op2.w[0] + (uint32_t)(g_t1.w[0]));
                         NinjaCnk_a10_l_002D2B38:;
-                        memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t2.w[0] + (0))) & ~15u), 16);
-                        memcpy(&pcVu0.vf[5], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x10))) & ~15u), 16);
-                        memcpy(&pcVu0.vf[6], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x20))) & ~15u), 16);
-                        memcpy(&pcVu0.vf[7], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x30))) & ~15u), 16);
+                        memcpy(&pcVu0.vf[4], A2C_PTR(((uint32_t)(g_t2.w[0] + (0)))), 16);
+                        memcpy(&pcVu0.vf[5], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x10)))), 16);
+                        memcpy(&pcVu0.vf[6], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x20)))), 16);
+                        memcpy(&pcVu0.vf[7], A2C_PTR(((uint32_t)(g_t2.w[0] + (0x30)))), 16);
                         { PcGpr r_; int k_; for (k_ = 0; k_ < 4; k_++) { r_.h[k_ * 2] = g_t0.h[k_]; r_.h[k_ * 2 + 1] = g_zero.h[k_]; } g_t0 = r_; }
                         memcpy(&pcVu0.vf[4], &g_t0, 16);
                         { VuVec r_ = pcVu0.vf[0]; r_.f[0] = (float)pcVu0.vf[4].i[0] / 1.0f; r_.f[1] = (float)pcVu0.vf[4].i[1] / 1.0f; pcVu0.vf[4].f[0] = r_.f[0]; pcVu0.vf[4].f[1] = r_.f[1]; }
@@ -2917,10 +2917,10 @@ CHUNK_HEAD* njCnkCsUvn(CHUNK_HEAD* pCnk)
                         { VuVec r_ = pcVu0.vf[0]; r_.f[2] = vu_f(fminf(pcVu0.vf[7].f[2], pcVu0.vf[8].f[3])); pcVu0.vf[7].f[2] = r_.f[2]; }
                         { VuVec r_ = pcVu0.vf[0]; r_.u[3] = pcVu0.vf[6].u[3]; pcVu0.vf[7].f[3] = r_.f[3]; }
                         g_op3.d[0] = A2C_SX32(g_op3.w[0] + (uint32_t)((int32_t)(-1)));
-                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0))) & ~15u), &pcVu0.vf[4], 16);
-                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x10))) & ~15u), &pcVu0.vf[5], 16);
-                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x20))) & ~15u), &pcVu0.vf[6], 16);
-                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x30))) & ~15u), &pcVu0.vf[7], 16);
+                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0)))), &pcVu0.vf[4], 16);
+                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x10)))), &pcVu0.vf[5], 16);
+                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x20)))), &pcVu0.vf[6], 16);
+                        memcpy(A2C_PTR(((uint32_t)(g_t3.w[0] + (0x30)))), &pcVu0.vf[7], 16);
                         *(uint32_t*)A2C_PTR(((uint32_t)(g_op0.w[0] + (offsetof(VU1_STRIP_BUF, fPad1))))) = (uint32_t)g_op4.d[0];
                         { int c_ = (g_op3.d[0] != 0); g_t3.d[0] = A2C_SX32(g_t3.w[0] + (uint32_t)((int32_t)(64))); if (c_) goto NinjaCnk_a10_l_002D2B38; }
                         (void)g_zero; (void)lo_; (void)fcc_;

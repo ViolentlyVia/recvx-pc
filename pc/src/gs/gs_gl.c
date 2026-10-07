@@ -225,6 +225,7 @@ typedef struct {
 static RenderTarget rts[MAX_RT];
 static DepthBuffer dbs[MAX_DB];
 static unsigned int frame_counter;
+static int dump_frame;
 
 static GLuint make_texture(int w, int h, GLint ifmt, GLenum fmt, GLenum type, GLint filter)
 {
@@ -732,6 +733,28 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
 
     rt->last_use = frame_counter;
 
+    if (dump_frame)
+    {
+        float x0 = 1e9f, x1 = -1e9f, y0 = 1e9f, y1 = -1e9f;
+        unsigned int z0 = 0xFFFFFFFF, z1 = 0;
+
+        for (i = 0; i < nverts; i++)
+        {
+            if (v[i].x < x0) x0 = v[i].x;
+            if (v[i].x > x1) x1 = v[i].x;
+            if (v[i].y < y0) y0 = v[i].y;
+            if (v[i].y > y1) y1 = v[i].y;
+            if (v[i].z < z0) z0 = v[i].z;
+            if (v[i].z > z1) z1 = v[i].z;
+        }
+
+        pcLog("draw fb %u/%u psm %u msk %08x type %d n %d iip %d tme %d fst %d abe %d fge %d | tex0 %016llx tex1 %llx clamp %llx"
+              " | alpha %010llx test %05llx zbuf %llx sc %016llx | x %.1f..%.1f y %.1f..%.1f z %u..%u c0 %02x%02x%02x%02x q %g st %g,%g",
+              fbp, fbw, fpsm, fbmsk, st->type, nverts, st->iip, st->tme, st->fst, st->abe, st->fge,
+              st->tex0, st->tex1, st->clamp, st->alpha, st->test, st->zbuf, st->scissor,
+              x0, x1, y0, y1, z0, z1, v[0].r, v[0].g, v[0].b, v[0].a, v[0].q, v[0].s, v[0].t);
+    }
+
     if (rt->vram_dirty)
     {
         rt_load_from_vram(rt);
@@ -933,6 +956,34 @@ void gsRendererPresent(unsigned int dispfb_fbp, unsigned int dispfb_fbw)
 
     gsRendererFlush();
     frame_counter++;
+
+    /* debug: RECVX_GSDUMP=<frame> logs every draw of that frame (and the next one) */
+    {
+        static int dump_at = -2;
+
+        if (dump_at == -2)
+        {
+            const char* e = SDL_getenv("RECVX_GSDUMP");
+
+            dump_at = (e != NULL) ? atoi(e) : -1;
+        }
+
+        if (dump_frame)
+        {
+            extern void pcGsScreenshot(const char* path, unsigned int fbp);
+
+            pcLog("present fbp %u fbw %u", dispfb_fbp, dispfb_fbw);
+            pcGsScreenshot("gsdump.png", dispfb_fbp);
+        }
+
+        {
+            extern int gsDumpFrame;
+
+            gsDumpFrame = (dump_at >= 0) && ((frame_counter == (unsigned int)dump_at) || (frame_counter == (unsigned int)dump_at + 1));
+        }
+
+        dump_frame = (dump_at >= 0) && ((frame_counter == (unsigned int)dump_at) || (frame_counter == (unsigned int)dump_at + 1));
+    }
 
     SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &ww, &wh);
 

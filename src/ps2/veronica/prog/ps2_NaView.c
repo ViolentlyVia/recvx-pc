@@ -264,8 +264,7 @@ void _Make_ClipMatrix(sceVu0FMATRIX sc, float scr, float near, float far)
     mp2 = &ClipMatrix2[0]; 
     
 #ifdef TARGET_PC
-    /* PC: ClipMatrix2 is read directly by the renderer (was loaded into vf24-vf27) */
-    (void)mp2;
+    memcpy(&pcVu0.vf[24], mp2, 64); /* vf24-vf27 */
 #else
     asm volatile 
     { 

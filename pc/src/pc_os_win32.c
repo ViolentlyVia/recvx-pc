@@ -236,3 +236,12 @@ void pcOsHeartbeat(void)
     InterlockedIncrement(&heartbeat);
     watchdog_reported = 0;
 }
+
+/* debug: log the current call stack */
+void pcOsLogStack(const char* why)
+{
+    CONTEXT ctx;
+
+    RtlCaptureContext(&ctx);
+    print_stack(GetCurrentThread(), &ctx, why);
+}

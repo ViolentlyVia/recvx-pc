@@ -114,3 +114,12 @@ void PS2_jikken()
 
     Ps2SwapDBuff();
 }
+
+/* debug: one line of game state for the periodic log */
+void pcGameStateLog(void)
+{
+    extern SYS_WORK* sys;
+
+    pcLog("state tk %06x ts %06x gm %08x st %08x stg %d rom %d gm_mode %d", sys->tk_flg, sys->ts_flg, sys->gm_flg,
+          sys->st_flg, sys->stg_no, sys->rom_no, sys->gm_mode);
+}

@@ -1510,7 +1510,9 @@ int Ps2DrawOTagSub(int start_no)
         ((long*)old_p->p)[2] = (((long*)(temp = old_p)->p)[2] & 0xFFFFFFF) | 0x70000000; 
         ((long*)old_p->p)[8] = ((long*)old_p->p)[8] | 0x8000; 
         
+#ifndef TARGET_PC /* debug print every frame */
         printf("TEX %05d:%05d]", 0x3F80 - tex_addr, 0x3FCC - clt_addr); 
+#endif
         
         save_alpha[0] = Ps2_gs_save.mode_bk[0]; 
         save_alpha[1] = Ps2_gs_save.mode_bk[1]; 

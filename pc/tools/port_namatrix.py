@@ -10,9 +10,7 @@ from srcedit import Source
 
 src = Source("src/ps2/veronica/prog/ps2_NaMatrix.c")
 
-src.port_lines("int lNaMatIsUnitMatrix;", """int lNaMatIsUnitMatrix;
-float pcVu0CN[16];
-float pcVu0Last[4];""")
+# pcVu0CN / pcVu0Last are VU0 registers vf28-vf31 / vf18 (pc_vu0.h)
 
 COPY_MATRIX = "pcCopyMatrix((float*){dst}, (const float*){src});"
 

@@ -9,10 +9,13 @@
 #include <float.h>
 #include <math.h>
 
+#include "pc_vu.h"
+
 /* VU0 registers that the Ninja matrix library keeps state in between calls:
- * vf28-vf31 hold the "CN" (combined) matrix, vf18 the last transformed point. */
-extern float pcVu0CN[16];
-extern float pcVu0Last[4];
+ * vf28-vf31 hold the "CN" (combined) matrix, vf18 the last transformed point. They are the
+ * same registers the translated assembly (pc_asm2c.h) and the VU0 microcode use. */
+#define pcVu0CN   (pcVu0.vf[28].f)
+#define pcVu0Last (pcVu0.vf[18].f)
 
 static __inline void pcVu0XformPoint(const float* m, const float* v, float* out)
 {

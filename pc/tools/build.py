@@ -25,6 +25,17 @@ def header_mtime_cache():
     return newest
 
 
+def source_mtime(src):
+    """mtime of a source including any .c files it #includes (ps2_Vu1Strip.c includes ps2_Vu1Scissor2.c)."""
+    t = os.path.getmtime(src)
+    with open(src, encoding="utf-8", errors="replace") as f:
+        for name in re.findall(r'^\s*#\s*include\s+"([^"]+\.c)"', f.read(), re.M):
+            inc = os.path.join(os.path.dirname(src), name)
+            if os.path.exists(inc):
+                t = max(t, os.path.getmtime(inc))
+    return t
+
+
 def obj_path(src):
     return os.path.join(OBJ_DIR, common.rel(src).replace("/", "_")[:-2] + ".obj")
 
@@ -59,7 +70,7 @@ def main():
     sources = common.game_sources() + common.pc_sources()
     hdr = header_mtime_cache()
     stale = [s for s in sources if not os.path.exists(obj_path(s)) or
-             os.path.getmtime(obj_path(s)) < max(os.path.getmtime(s), hdr)]
+             os.path.getmtime(obj_path(s)) < max(source_mtime(s), hdr)]
     print(f"compiling {len(stale)}/{len(sources)} files")
     failed = []
     with ThreadPoolExecutor(os.cpu_count()) as ex:

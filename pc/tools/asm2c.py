@@ -436,12 +436,14 @@ class Block:
                  "ld": "a2c_ld64({a})"}.get(mn)
             if mn == "lq":
                 r = g(ops[0])
-                return "memcpy(&%s, A2C_PTR(%s & ~15u), 16);" % (r, a)
+                # LQ/SQ ignore the low 4 address bits on the EE; the PS2 data is always 16-byte
+                # aligned, but MSVC drops the alignment attributes, so use the exact address.
+                return "memcpy(&%s, A2C_PTR(%s), 16);" % (r, a)
             return S(ops[0], e.format(a=a))
         if mn in ("sw", "sh", "sb", "sd", "sq"):
             a = self.addr(ops[1])
             if mn == "sq":
-                return "memcpy(A2C_PTR(%s & ~15u), &%s, 16);" % (a, g(ops[0]) or "g_zero")
+                return "memcpy(A2C_PTR(%s), &%s, 16);" % (a, g(ops[0]) or "g_zero")
             t = {"sw": "uint32_t", "sh": "uint16_t", "sb": "uint8_t", "sd": "uint64_t"}[mn]
             if mn == "sd":
                 return "a2c_sd64(%s, %s);" % (a, gv(ops[0]))
@@ -520,8 +522,8 @@ class Block:
             v, _ = self.vfreg(ops[0])
             a = self.addr(ops[1])
             if mn == "lqc2":
-                return "" if v == 0 else "memcpy(&pcVu0.vf[%d], A2C_PTR(%s & ~15u), 16);" % (v, a)
-            return "memcpy(A2C_PTR(%s & ~15u), &pcVu0.vf[%d], 16);" % (a, v)
+                return "" if v == 0 else "memcpy(&pcVu0.vf[%d], A2C_PTR(%s), 16);" % (v, a)
+            return "memcpy(A2C_PTR(%s), &pcVu0.vf[%d], 16);" % (a, v)
         if mn.startswith("v"):
             return self.vu_op(mn, ops)
         raise TranslateError("instruction " + mn)
