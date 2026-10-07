@@ -17,7 +17,11 @@ Sint32 syCfgGetSoundMode( Sint32* pnMode )
 }
 
 // 100% matching! 
+#ifdef TARGET_PC
+Sint32 syCfgInit( Void* p )
+#else
 Sint32 syCfgInit( Void* )
+#endif
 {
 
 }

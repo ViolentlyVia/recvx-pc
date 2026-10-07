@@ -1988,9 +1988,25 @@ void CpEEWait(int val)
 {
     while (val-- > 0) 
     {
+#ifdef TARGET_PC
+        /* PC: no delay padding */
+#else
         asm("nop");
+#endif
+#ifdef TARGET_PC
+        /* PC: no delay padding */
+#else
         asm("nop");
+#endif
+#ifdef TARGET_PC
+        /* PC: no delay padding */
+#else
         asm("nop");
+#endif
+#ifdef TARGET_PC
+        /* PC: no delay padding */
+#else
         asm("nop");
+#endif
     }
 }

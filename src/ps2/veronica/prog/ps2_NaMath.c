@@ -19,6 +19,19 @@ Float	njSin(Angle n)
 {
     float ret;
     
+#ifdef TARGET_PC
+    {
+        int a = n;
+        int i = a & 16383;
+
+        ret = (a & 0x4000) ? SinTable[16383 - i] : SinTable[i];
+
+        if (a & 0x8000)
+        {
+            ret = -ret;
+        }
+    }
+#else
     asm volatile 
     ("
     .set noreorder
@@ -75,6 +88,7 @@ Float	njSin(Angle n)
     .set reorder
     " : "=r"(ret) : "r"(&n), "r"(SinTable) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -82,6 +96,31 @@ Float	njCos(Angle n)
 {
 	float ret;
 
+#ifdef TARGET_PC
+	{
+	    int a = n;
+	    int i = a & 16383;
+
+	    if (a & 0x4000)
+	    {
+	        ret = SinTable[i];
+
+	        if (!(a & 0x8000))
+	        {
+	            ret = -ret;
+	        }
+	    }
+	    else
+	    {
+	        ret = SinTable[16383 - i];
+
+	        if (a & 0x8000)
+	        {
+	            ret = -ret;
+	        }
+	    }
+	}
+#else
 	asm volatile 
     ("
     .set noreorder
@@ -137,11 +176,48 @@ Float	njCos(Angle n)
     .set reorder
     " : "=r"(ret) : "r"(&n), "r"(SinTable) : 
     );
+#endif
 }
 
 // 100% matching!
 void njSinCos(int lAngle, float* sin, float* cos)
 {
+#ifdef TARGET_PC
+    {
+        int a = lAngle;
+        int i = a & 16383;
+        float s, c;
+
+        if (a & 0x4000)
+        {
+            s = SinTable[16383 - i];
+            c = SinTable[i];
+
+            if (a & 0x8000)
+            {
+                s = -s;
+            }
+            else
+            {
+                c = -c;
+            }
+        }
+        else
+        {
+            s = SinTable[i];
+            c = SinTable[16383 - i];
+
+            if (a & 0x8000)
+            {
+                s = -s;
+                c = -c;
+            }
+        }
+
+        *sin = s;
+        *cos = c;
+    }
+#else
     asm volatile 
     ("
     .set noreorder
@@ -218,6 +294,7 @@ void njSinCos(int lAngle, float* sin, float* cos)
     .set reorder
     " : : "r"(&lAngle), "r"(sin), "r"(cos), "r"(SinTable) : 
     );
+#endif
 }
 
 // 100% matching! 
@@ -233,6 +310,9 @@ Float	njSqrt(Float n)
 
 	ret = 0;
     
+#ifdef TARGET_PC
+    ret = sqrtf(fabsf(n));
+#else
     asm volatile
     ("
         mfc1    t0, f12
@@ -250,6 +330,7 @@ Float	njSqrt(Float n)
         mtc1    v0, %0
     " : "=f"(ret) : : 
     );
+#endif
 
     return ret;
 }
@@ -261,6 +342,9 @@ Float	njInvertSqrt(Float n)
 
     ret = 0;
     
+#ifdef TARGET_PC
+    ret = pcVu0Rsqrt(n);
+#else
     asm volatile
     ("
         mfc1    t0, f12
@@ -278,6 +362,7 @@ Float	njInvertSqrt(Float n)
         mtc1    v0, %0
     " : "=f"(ret) : : 
     );
+#endif
 
     return ret;
 }
@@ -285,6 +370,11 @@ Float	njInvertSqrt(Float n)
 // 100% matching! 
 void	njLinear(Float *idata, Float *odata, NJS_SPLINE *attr, Float frame)
 {
+#ifdef TARGET_PC
+	odata[0] = (idata[3] - idata[0]) * frame + idata[0];
+	odata[1] = (idata[4] - idata[1]) * frame + idata[1];
+	odata[2] = (idata[5] - idata[2]) * frame + idata[2];
+#else
 	asm volatile
     ("
 	    addi      a4, %0, 12
@@ -324,6 +414,7 @@ void	njLinear(Float *idata, Float *odata, NJS_SPLINE *attr, Float frame)
         sw        a7,   8(%1) 
     " : : "r"(idata), "r"(odata), "r"(attr), "f"(frame) : 
     );
+#endif
 }
 
 // 100% matching! 
@@ -333,6 +424,23 @@ void	njOverhauserSpline(Float *idata, Float *odata, NJS_SPLINE *attr, Float fram
 
 	ftmp = 0.5f;
 
+#ifdef TARGET_PC
+	{
+	    float t = frame;
+	    float t2 = t * t;
+	    float t3 = t2 * t;
+	    float w0 = ((t2 + t2) - t3) - t;
+	    float w1 = ((t3 * 3.0f) - (t2 * 5.0f)) + 2.0f;
+	    float w2 = ((t2 * 4.0f) + t) + (t3 * -3.0f);
+	    float w3 = t3 - t2;
+	    int k;
+
+	    for (k = 0; k < 3; k++)
+	    {
+	        odata[k] = (((idata[k] * w0 + idata[3 + k] * w1) + idata[6 + k] * w2) + idata[9 + k] * w3) * ftmp;
+	    }
+	}
+#else
 	asm volatile
     ("
 		mfc1      a4, %3
@@ -423,6 +531,7 @@ void	njOverhauserSpline(Float *idata, Float *odata, NJS_SPLINE *attr, Float fram
         sw        a7,   8(%1) 
     " : : "r"(idata), "r"(odata), "r"(attr), "f"(frame), "f"(ftmp) : 
     );
+#endif
 }
 
 // 100% matching! 

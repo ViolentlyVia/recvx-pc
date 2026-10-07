@@ -15,3 +15,7 @@
 #define inline __inline
 #endif
 #include "pc_vu0.h"
+
+/* GCC's va_list name used by some CRI sources */
+#include <stdarg.h>
+typedef va_list __gnuc_va_list;

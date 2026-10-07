@@ -1,0 +1,13 @@
+/* PC port: thin OS layer (kept free of game headers so windows.h never meets them). */
+#pragma once
+
+void* pcOsFiberFromThread(void);
+void* pcOsFiberCreate(unsigned int stack_size, void (*entry)(void*), void* arg);
+void  pcOsFiberSwitch(void* fiber);
+void  pcOsFiberDelete(void* fiber);
+
+double pcOsTime(void);          /* seconds, monotonic */
+void   pcOsSleep(double seconds);
+
+void pcOsInstallDiagnostics(void);   /* crash handler + hang watchdog (stack traces to the log) */
+void pcOsHeartbeat(void);            /* call once per presented frame */

@@ -240,10 +240,26 @@ Sint32  gdFsInit(Sint32 max_open, void *gdfs_work, Sint32 max_dirent, void *dirb
             
             for (loop = 0; loop < 20; loop++) 
             {
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
             }
             
             printf("found_serach %s\n", read_f_name);
@@ -271,10 +287,26 @@ Sint32  gdFsInit(Sint32 max_open, void *gdfs_work, Sint32 max_dirent, void *dirb
                     
                     for (loop = 0; loop < 20; loop++) 
                     {
+#ifdef TARGET_PC
+                        /* PC: no delay padding */
+#else
                         asm("nop");
+#endif
+#ifdef TARGET_PC
+                        /* PC: no delay padding */
+#else
                         asm("nop");
+#endif
+#ifdef TARGET_PC
+                        /* PC: no delay padding */
+#else
                         asm("nop");
+#endif
+#ifdef TARGET_PC
+                        /* PC: no delay padding */
+#else
                         asm("nop");
+#endif
                     }
                 }
                 
@@ -411,10 +443,26 @@ Sint32  gdFsRead(GDFS gdfs, Sint32 nsct, void *buf)
         {
             for (loop = 0; loop < 20; loop++) 
             {
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
             }
         }
         

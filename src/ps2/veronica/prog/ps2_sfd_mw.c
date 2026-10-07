@@ -68,10 +68,26 @@ MWPLY ps2mwPlyCreateSofdec(MWS_PLY_CPRM_SFD* cprm, char* fname)
         {
             for (loop = 0; loop < 100000; loop++)
             {
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
+#ifdef TARGET_PC
+                /* PC: no delay padding */
+#else
                 asm("nop");
+#endif
             }
         }
 
@@ -79,10 +95,26 @@ MWPLY ps2mwPlyCreateSofdec(MWS_PLY_CPRM_SFD* cprm, char* fname)
 
         for (loop = 0; loop < 100000; loop++)
         {
+#ifdef TARGET_PC
+            /* PC: no delay padding */
+#else
             asm("nop");
+#endif
+#ifdef TARGET_PC
+            /* PC: no delay padding */
+#else
             asm("nop");
+#endif
+#ifdef TARGET_PC
+            /* PC: no delay padding */
+#else
             asm("nop");
+#endif
+#ifdef TARGET_PC
+            /* PC: no delay padding */
+#else
             asm("nop");
+#endif
         }
     }
     

@@ -1,0 +1,423 @@
+/* PC port: libcdvd replacement reading straight from the game's ISO image.
+ *
+ * The game locates files with sceCdSearchFile() (ISO9660 path -> start sector and size) and
+ * reads whole 2048-byte sectors with sceCdRead(). Reads complete immediately on PC.
+ *
+ * The image is found through (in order): the RECVX_ISO environment variable, an "iso=" line in
+ * recvx.ini next to the executable, or the first *.iso file next to the executable.
+ */
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include "sce_pc.h"
+#include "pc_platform.h"
+
+#define SECTOR 2048
+
+static FILE* iso;
+static char iso_path[1024];
+static int last_error;
+
+/* streaming (sceCdSt*) state */
+static u_int st_lsn;
+static int st_active;
+
+static int read_sectors(u_int lsn, u_int count, void* buf)
+{
+    if ((iso == NULL) || (_fseeki64(iso, (long long)lsn * SECTOR, SEEK_SET) != 0))
+    {
+        return 0;
+    }
+
+    return fread(buf, SECTOR, count, iso) == count;
+}
+
+static int find_iso(void)
+{
+    const char* env = getenv("RECVX_ISO");
+    char dir[1024], ini[1024], line[1100];
+    FILE* f;
+
+    if ((env != NULL) && (env[0] != '\0'))
+    {
+        strncpy(iso_path, env, sizeof(iso_path) - 1);
+        return 1;
+    }
+
+    pcPlatformExeDir(dir, sizeof(dir));
+
+    snprintf(ini, sizeof(ini), "%s/recvx.ini", dir);
+    f = fopen(ini, "r");
+
+    if (f != NULL)
+    {
+        while (fgets(line, sizeof(line), f) != NULL)
+        {
+            if (_strnicmp(line, "iso=", 4) == 0)
+            {
+                char* p = line + 4;
+                size_t n = strcspn(p, "\r\n");
+
+                p[n] = '\0';
+                strncpy(iso_path, p, sizeof(iso_path) - 1);
+                fclose(f);
+                return 1;
+            }
+        }
+
+        fclose(f);
+    }
+
+    return pcPlatformFindFile(dir, ".iso", iso_path, sizeof(iso_path));
+}
+
+int pcCdOpen(void)
+{
+    unsigned char pvd[SECTOR];
+
+    if (iso != NULL)
+    {
+        return 1;
+    }
+
+    if (!find_iso())
+    {
+        pcPlatformFatal("Could not find the game disc image.\n\n"
+                        "Put your Resident Evil Code: Veronica X (USA, SLUS-20184) .iso next to "
+                        "recvx.exe, or set its path in recvx.ini (iso=C:\\path\\to\\game.iso).");
+        return 0;
+    }
+
+    iso = fopen(iso_path, "rb");
+
+    if ((iso == NULL) || !read_sectors(16, 1, pvd) || (memcmp(pvd + 1, "CD001", 5) != 0))
+    {
+        pcPlatformFatal("Could not read the disc image:\n%s", iso_path);
+        return 0;
+    }
+
+    pcLog("disc image: %s", iso_path);
+
+    return 1;
+}
+
+/* Find one path component in the directory at (lsn, size). */
+static int find_in_dir(u_int lsn, u_int size, const char* name, size_t name_len,
+                       u_int* out_lsn, u_int* out_size, int* out_is_dir)
+{
+    unsigned char sec[SECTOR];
+    u_int off, s;
+
+    for (s = 0; s < (size + SECTOR - 1) / SECTOR; s++)
+    {
+        if (!read_sectors(lsn + s, 1, sec))
+        {
+            return 0;
+        }
+
+        for (off = 0; off < SECTOR; )
+        {
+            unsigned char len = sec[off];
+            unsigned char nlen;
+            const char* rname;
+            size_t cmp_len;
+
+            if (len == 0)
+            {
+                break;   /* records never cross sectors; rest of this sector is padding */
+            }
+
+            nlen = sec[off + 32];
+            rname = (const char*)&sec[off + 33];
+
+            /* compare ignoring case and the ";1" version suffix on either side */
+            cmp_len = nlen;
+
+            if ((cmp_len > 2) && (rname[cmp_len - 2] == ';'))
+            {
+                cmp_len -= 2;
+            }
+
+            if ((cmp_len == name_len) && (_strnicmp(rname, name, name_len) == 0))
+            {
+                *out_lsn = sec[off + 2] | (sec[off + 3] << 8) | (sec[off + 4] << 16) | (sec[off + 5] << 24);
+                *out_size = sec[off + 10] | (sec[off + 11] << 8) | (sec[off + 12] << 16) | (sec[off + 13] << 24);
+                *out_is_dir = (sec[off + 25] & 2) != 0;
+
+                return 1;
+            }
+
+            off += len;
+        }
+    }
+
+    return 0;
+}
+
+static int search_file(const char* path, u_int* lsn, u_int* size)
+{
+    unsigned char pvd[SECTOR];
+    u_int cur_lsn, cur_size;
+    int is_dir = 1;
+    const char* p = path;
+
+    if (!pcCdOpen() || !read_sectors(16, 1, pvd))
+    {
+        return 0;
+    }
+
+    /* root directory record lives at offset 156 of the primary volume descriptor */
+    cur_lsn = pvd[156 + 2] | (pvd[156 + 3] << 8) | (pvd[156 + 4] << 16) | (pvd[156 + 5] << 24);
+    cur_size = pvd[156 + 10] | (pvd[156 + 11] << 8) | (pvd[156 + 12] << 16) | (pvd[156 + 13] << 24);
+
+    /* skip a device prefix such as "cdrom0:" */
+    if (strchr(p, ':') != NULL)
+    {
+        p = strchr(p, ':') + 1;
+    }
+
+    for (;;)
+    {
+        size_t len;
+
+        while ((*p == '\\') || (*p == '/'))
+        {
+            p++;
+        }
+
+        if (*p == '\0')
+        {
+            break;
+        }
+
+        len = strcspn(p, "\\/;");
+
+        if (!is_dir || !find_in_dir(cur_lsn, cur_size, p, len, &cur_lsn, &cur_size, &is_dir))
+        {
+            return 0;
+        }
+
+        p += len;
+
+        if (*p == ';')
+        {
+            break;
+        }
+    }
+
+    *lsn = cur_lsn;
+    *size = cur_size;
+
+    return !is_dir;
+}
+
+/* Used by the PC layer to read files from the disc by name. Returns malloc'd data. */
+void* pcCdLoadFile(const char* path, u_int* size_out)
+{
+    u_int lsn, size;
+    void* buf;
+
+    if (!search_file(path, &lsn, &size))
+    {
+        return NULL;
+    }
+
+    buf = malloc(((size + SECTOR - 1) / SECTOR) * SECTOR);
+
+    if (!read_sectors(lsn, (size + SECTOR - 1) / SECTOR, buf))
+    {
+        free(buf);
+        return NULL;
+    }
+
+    if (size_out != NULL)
+    {
+        *size_out = size;
+    }
+
+    return buf;
+}
+
+int sceCdInit(int mode)
+{
+    if (mode == SCECdEXIT)
+    {
+        return 1;
+    }
+
+    return pcCdOpen();
+}
+
+int sceCdMmode(int media)
+{
+    (void)media;
+    return 1;
+}
+
+int sceCdSearchFile(sceCdlFILE* fp, const char* name)
+{
+    u_int lsn, size;
+    const char* base;
+
+    if (!search_file(name, &lsn, &size))
+    {
+        pcLog("sceCdSearchFile: not found: %s", name);
+        last_error = SCECdErREAD;
+        return 0;
+    }
+
+    fp->lsn = lsn;
+    fp->size = size;
+
+    pcLog("disc: %s (%u bytes)", name, size);
+
+    base = strrchr(name, '\\');
+    base = (base != NULL) ? base + 1 : name;
+    strncpy(fp->name, base, sizeof(fp->name) - 1);
+    fp->name[sizeof(fp->name) - 1] = '\0';
+    memset(fp->date, 0, sizeof(fp->date));
+
+    return 1;
+}
+
+int sceCdRead(u_int lsn, u_int sectors, void* buf, sceCdRMode* mode)
+{
+    (void)mode;
+
+    if (!read_sectors(lsn, sectors, buf))
+    {
+        pcLog("sceCdRead failed: lsn %u, %u sectors", lsn, sectors);
+        last_error = SCECdErREAD;
+        return 0;
+    }
+
+    last_error = SCECdErNO;
+
+    return 1;
+}
+
+/* All commands complete immediately: 0 = done (blocking or not). */
+int sceCdSync(int mode)
+{
+    (void)mode;
+    pcKernelPoll();
+    return 0;
+}
+
+int sceCdGetError(void)
+{
+    return last_error;
+}
+
+int sceCdDiskReady(int mode)
+{
+    (void)mode;
+    return 2;   /* SCECdComplete */
+}
+
+int sceCdBreak(void)
+{
+    return 1;
+}
+
+int sceCdPause(void)
+{
+    return 1;
+}
+
+int sceCdStandby(void)
+{
+    return 1;
+}
+
+int sceCdGetDiskType(void)
+{
+    return SCECdPS2DVD;
+}
+
+static unsigned char to_bcd(int v)
+{
+    return (unsigned char)(((v / 10) << 4) | (v % 10));
+}
+
+int sceCdReadClock(sceCdCLOCK* rtc)
+{
+    time_t t = time(NULL);
+    struct tm* lt = localtime(&t);
+
+    rtc->stat = 0;
+    rtc->second = to_bcd(lt->tm_sec);
+    rtc->minute = to_bcd(lt->tm_min);
+    rtc->hour = to_bcd(lt->tm_hour);
+    rtc->pad = 0;
+    rtc->day = to_bcd(lt->tm_mday);
+    rtc->month = to_bcd(lt->tm_mon + 1);
+    rtc->year = to_bcd(lt->tm_year % 100);
+
+    return 1;
+}
+
+/* ---- streaming (movies) ---- */
+
+int sceCdStInit(u_int bufmax, u_int bankmax, u_int iop_bufaddr)
+{
+    (void)bufmax; (void)bankmax; (void)iop_bufaddr;
+    return 1;
+}
+
+int sceCdStStart(u_int lsn, sceCdRMode* mode)
+{
+    (void)mode;
+    st_lsn = lsn;
+    st_active = 1;
+    return 1;
+}
+
+int sceCdStRead(u_int sectors, u_int* buf, u_int mode, u_int* err)
+{
+    (void)mode;
+
+    if (!st_active || !read_sectors(st_lsn, sectors, buf))
+    {
+        if (err != NULL)
+        {
+            *err = SCECdErREAD;
+        }
+
+        return 0;
+    }
+
+    st_lsn += sectors;
+
+    if (err != NULL)
+    {
+        *err = SCECdErNO;
+    }
+
+    return sectors;
+}
+
+int sceCdStStop(void)
+{
+    st_active = 0;
+    return 1;
+}
+
+int sceCdStSeek(u_int lsn)
+{
+    st_lsn = lsn;
+    return 1;
+}
+
+int sceCdStPause(void)
+{
+    return 1;
+}
+
+int sceCdStResume(void)
+{
+    return 1;
+}

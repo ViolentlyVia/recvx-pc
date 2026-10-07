@@ -7,7 +7,12 @@
 
 #define REG_RCNT0_COUNT     (volatile int *)0x10000000
 
+#ifdef TARGET_PC
+unsigned int pcHwRcnt0(void); /* PS2 timer 0 counter (pc_kernel.c) */
+#define getRcnt0CountShort() (pcHwRcnt0() & 0xFFFF)
+#else
 #define getRcnt0CountShort() *REG_RCNT0_COUNT & 0xFFFF
+#endif
 
 Sint32 ADXF_AddPartition(Sint32 ptid, Char8 *fname, void *ptinfo, Sint32 nfile);
 ADXF adxf_AllocAdxFs(void);

@@ -6,6 +6,14 @@
  */
 #pragma once
 
+#include <float.h>
+#include <math.h>
+
+/* VU0 registers that the Ninja matrix library keeps state in between calls:
+ * vf28-vf31 hold the "CN" (combined) matrix, vf18 the last transformed point. */
+extern float pcVu0CN[16];
+extern float pcVu0Last[4];
+
 static __inline void pcVu0XformPoint(const float* m, const float* v, float* out)
 {
     float x = v[0], y = v[1], z = v[2];
@@ -34,4 +42,45 @@ static __inline void pcCopyQword(void* dst, const void* src)
     d[1] = s[1];
     d[2] = s[2];
     d[3] = s[3];
+}
+
+/* VU RSQRT/DIV of 0 give the largest float instead of infinity (so 0 * result stays 0). */
+static __inline float pcVu0Rsqrt(float x)
+{
+    x = fabsf(x);
+    return (x == 0) ? FLT_MAX : 1.0f / sqrtf(x);
+}
+
+static __inline float pcVu0Div(float a, float b)
+{
+    if (b == 0)
+    {
+        return (a < 0) ? -FLT_MAX : FLT_MAX;
+    }
+
+    return a / b;
+}
+
+static __inline void pcCopyMatrix(float* d, const float* s)
+{
+    int i;
+
+    for (i = 0; i < 16; i++)
+    {
+        d[i] = s[i];
+    }
+}
+
+/* Two-row rotation used by njRotateX/Y/Z:  a' = a * c + b * s,  b' = a * -s + b * c  (xyz only) */
+static __inline void pcRotRows(float* a, float* b, float s, float c)
+{
+    int i;
+
+    for (i = 0; i < 3; i++)
+    {
+        float av = a[i], bv = b[i];
+
+        a[i] = av * c + bv * s;
+        b[i] = av * -s + bv * c;
+    }
 }

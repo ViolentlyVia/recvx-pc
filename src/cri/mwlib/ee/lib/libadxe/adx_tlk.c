@@ -13,6 +13,9 @@
 #include "../../../cri/mwlib/ee/lib/libadxe/sjr_clt.h"
 
 #include <stdio.h>
+#ifdef TARGET_PC
+void pcAdxRnaReset(ADXRNA rna);
+#endif
 //#include <string.h>
 
 #define	ADXT_OBUF_DIST	(0x2020)
@@ -34,6 +37,12 @@ Sint32 adxt_time_unit = 0;
 float adxt_diff_av = 0;
 
 // 100% matching! 
+#ifdef TARGET_PC
+void adxt_disp_rna_stat(ADXT adxt)
+{
+    printf("stat=%4d\n", adxt->stat);
+}
+#else
 void adxt_disp_rna_stat(ADXT adxt)
 {
     PS2RNA rna;
@@ -71,6 +80,7 @@ void adxt_disp_rna_stat(ADXT adxt)
     
     printf("stat=%4d, ttl=%4d\n", adxt->stat, sum + ttl);
 }
+#endif
 
 // 100% matching! 
 ADXT ADXT_Create(Sint32 maxnch, void *work, Sint32 worksize)
@@ -411,6 +421,10 @@ void ADXT_StopWithoutLsc(ADXT adxt)
 
     ADXCRS_Unlock();
     
+#ifdef TARGET_PC
+    /* PC: stop the PC output stage (pc_adx_rna.c) instead of the IOP transfer */
+    pcAdxRnaReset(adxt->rna);
+#else
     rna = adxt->rna;
     
     nch = ADXT_GetNumChan(adxt);
@@ -447,6 +461,7 @@ void ADXT_StopWithoutLsc(ADXT adxt)
         
         SJ_Reset(sjtmp);
     } 
+#endif
     
     ADXCRS_Lock();
     

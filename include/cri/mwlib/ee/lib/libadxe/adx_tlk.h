@@ -14,8 +14,12 @@ void ADXT_Destroy(ADXT adxt);
 void ADXT_DestroyAll(void);
 Sint32 ADXT_DiscardSmpl(ADXT adxt, Sint32 nsmpl);
 void adxt_disp_rna_stat(ADXT adxt);
+#ifdef TARGET_PC
+/* PC: already declared with full prototypes in cri_adxt.h (redeclaring crashes MSVC) */
+#else
 void ADXT_EntryErrFunc(void (*func)(), void *obj);
 void ADXT_EntryFltFunc(ADXT adxt, void (*f)(), void *obj);
+#endif
 void ADXT_ExecServer(void);
 Sint32 ADXT_GetDecNumSmpl(ADXT adxt);
 Sint32 ADXT_GetErrCode(ADXT adxt);

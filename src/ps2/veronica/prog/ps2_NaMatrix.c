@@ -3,7 +3,13 @@
 #include "../../../ps2/veronica/prog/ps2_NaView.h"
 #include "../../../ps2/veronica/prog/main.h"
 
+#ifdef TARGET_PC
 int lNaMatIsUnitMatrix;
+float pcVu0CN[16];
+float pcVu0Last[4];
+#else
+int lNaMatIsUnitMatrix;
+#endif
 int lNaMatMatrixStuckMax;
 int lNaMatMatrixStuckCnt;
 NJS_MATRIX* pNaMatMatrixStuckPtr;
@@ -29,6 +35,10 @@ void	njInitMatrix(NJS_MATRIX *m, Sint32 n, Int flag)
     
     pi = 3.141592f;
     
+#ifdef TARGET_PC
+    /* PC: VU0 constants are folded into the C code that used them */
+    (void)pi;
+#else
     asm volatile 
     {
     .set noreorder
@@ -89,6 +99,7 @@ void	njInitMatrix(NJS_MATRIX *m, Sint32 n, Int flag)
     
     .set reorder
     }
+#endif
 }
 
 // 100% matching
@@ -99,6 +110,24 @@ void	njCalcPoints(NJS_MATRIX *m, NJS_POINT3 *ps, NJS_POINT3 *pd, Int num)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float* fm = (float*)m;
+        int n = num;
+
+        do
+        {
+            pcVu0XformPoint(fm, (float*)ps, pcVu0Last);
+
+            pd->x = pcVu0Last[0];
+            pd->y = pcVu0Last[1];
+            pd->z = pcVu0Last[2];
+
+            ps++;
+            pd++;
+        } while (--n > 0);
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -153,6 +182,7 @@ void	njCalcPoints(NJS_MATRIX *m, NJS_POINT3 *ps, NJS_POINT3 *pd, Int num)
     .set reorder
     " : : "r"(m), "r"(ps), "r"(pd), "r"(&num) : 
     );
+#endif
 }
 
 // 100% matching! 
@@ -163,6 +193,11 @@ void    njGetTranslation(NJS_MATRIX *m, NJS_POINT3 *p)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    p->x = (*m)[12];
+    p->y = (*m)[13];
+    p->z = (*m)[14];
+#else
     asm volatile 
     ("
     .set noreorder
@@ -176,6 +211,7 @@ void    njGetTranslation(NJS_MATRIX *m, NJS_POINT3 *p)
     .set reorder
     " : : "r"(m), "r"(p) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -186,6 +222,12 @@ void    njUnitTransPortion(NJS_MATRIX *m)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    (*m)[12] = 0;
+    (*m)[13] = 0;
+    (*m)[14] = 0;
+    (*m)[15] = 1.0f;
+#else
     asm volatile 
     ("
     .set noreorder
@@ -193,6 +235,7 @@ void    njUnitTransPortion(NJS_MATRIX *m)
     .set reorder
     " : : "r"(m) : 
     );
+#endif
 }
 
 // 100% matching! 
@@ -203,6 +246,17 @@ void    njUnitRotPortion(NJS_MATRIX *m)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float* fm = (float*)m;
+        int i;
+
+        for (i = 0; i < 12; i++)
+        {
+            fm[i] = ((i % 5) == 0) ? 1.0f : 0;
+        }
+    }
+#else
     asm volatile 
     ("
     .set noreorder
@@ -218,6 +272,7 @@ void    njUnitRotPortion(NJS_MATRIX *m)
     .set reorder
     " : : "r"(m) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -256,6 +311,9 @@ Bool	njPushMatrix(NJS_MATRIX *m)
     
     fpDst = pNaMatMatrixStuckPtr;
     
+#ifdef TARGET_PC
+    pcCopyMatrix((float*)fpDst, (const float*)fpSrc);
+#else
     asm volatile
     ("
     .set noreorder
@@ -271,6 +329,7 @@ Bool	njPushMatrix(NJS_MATRIX *m)
     .set reorder
     " : : "r"(fpSrc), "r"(fpDst) : 
     );
+#endif
 
     return TRUE;
 }
@@ -302,6 +361,17 @@ void	njUnitMatrix(register NJS_MATRIX *m)
         m = pNaMatMatrixStuckPtr;
     }
     
+#ifdef TARGET_PC
+    {
+        float* fm = (float*)m;
+        int i;
+
+        for (i = 0; i < 16; i++)
+        {
+            fm[i] = ((i % 5) == 0) ? 1.0f : 0;
+        }
+    }
+#else
     asm volatile 
     {
     .set noreorder
@@ -319,6 +389,7 @@ void	njUnitMatrix(register NJS_MATRIX *m)
         
     .set reorder
     }
+#endif
 }
 
 // 100% matching!
@@ -330,6 +401,9 @@ void	njSetMatrix(NJS_MATRIX *md, NJS_MATRIX *ms)
     fpSrc = ms;
     fpDst = md ? md : pNaMatMatrixStuckPtr;
 
+#ifdef TARGET_PC
+    pcCopyMatrix((float*)fpDst, (const float*)fpSrc);
+#else
     asm volatile 
     {
     .set noreorder
@@ -346,11 +420,15 @@ void	njSetMatrix(NJS_MATRIX *md, NJS_MATRIX *ms)
         
     .set reorder
     }
+#endif
 }
 
 // 100% matching!
 void njSetMatrixCN(NJS_MATRIX* pMat)
 {
+#ifdef TARGET_PC
+    pcCopyMatrix((float*)pcVu0CN, (const float*)pMat);
+#else
     asm volatile
     ("
     .set noreorder
@@ -361,6 +439,7 @@ void njSetMatrixCN(NJS_MATRIX* pMat)
     .set reorder 
     " : : "r"(pMat) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -372,6 +451,9 @@ void	njGetMatrix(NJS_MATRIX *m)
     fpSrc = pNaMatMatrixStuckPtr;
     fpDst = m; 
     
+#ifdef TARGET_PC
+    pcCopyMatrix((float*)fpDst, (const float*)fpSrc);
+#else
     asm volatile 
     {
     .set noreorder
@@ -388,6 +470,7 @@ void	njGetMatrix(NJS_MATRIX *m)
         
     .set reorder
     }
+#endif
 }
 
 // 100% matching!
@@ -398,6 +481,25 @@ void	njMultiMatrix(NJS_MATRIX *md, NJS_MATRIX *ms)
         md = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float* d = (float*)md;
+        float* s = (float*)ms;
+        float r[16];
+        int i;
+
+        for (i = 0; i < 3; i++)
+        {
+            pcVu0XformVector(d, &s[i * 4], &r[i * 4]);
+            r[i * 4 + 3] = s[i * 4 + 3];
+        }
+
+        pcVu0XformPoint(d, &s[12], &r[12]);
+        r[15] = s[15];
+
+        pcCopyMatrix(d, r);
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -438,6 +540,7 @@ void	njMultiMatrix(NJS_MATRIX *md, NJS_MATRIX *ms)
     .set reorder
     " : : "r"(md), "r"(ms) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -448,6 +551,18 @@ void	njTranslate(NJS_MATRIX *m, Float x, Float y, Float z)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float* fm = (float*)m;
+        float v[3];
+
+        v[0] = x;
+        v[1] = y;
+        v[2] = z;
+
+        pcVu0XformPoint(fm, v, &fm[12]);
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -474,6 +589,7 @@ void	njTranslate(NJS_MATRIX *m, Float x, Float y, Float z)
     .set reorder
     " : : "r"(m), "f"(x), "f"(y), "f"(z) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -484,6 +600,13 @@ void	njTranslateV(NJS_MATRIX *m, NJS_VECTOR *v)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float* fm = (float*)m;
+
+        pcVu0XformPoint(fm, (float*)v, &fm[12]);
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -511,6 +634,7 @@ void	njTranslateV(NJS_MATRIX *m, NJS_VECTOR *v)
     .set reorder
     " : : "r"(m), "r"(v) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -528,6 +652,9 @@ void	njRotateX(NJS_MATRIX *m, Angle ang)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    pcRotRows(&(*m)[4], &(*m)[8], fSin, fCos);
+#else
     asm volatile
     ("
     .set noreorder
@@ -555,6 +682,7 @@ void	njRotateX(NJS_MATRIX *m, Angle ang)
     .set reorder
     " : : "r"(m), "f"(fSin), "f"(fCos) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -572,6 +700,9 @@ void	njRotateY(NJS_MATRIX *m, Angle ang)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    pcRotRows(&(*m)[0], &(*m)[8], -fSin, fCos);
+#else
     asm volatile
     ("
     .set noreorder
@@ -599,6 +730,7 @@ void	njRotateY(NJS_MATRIX *m, Angle ang)
     .set reorder
     " : : "r"(m), "f"(fSin), "f"(fCos) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -616,6 +748,9 @@ void	njRotateZ(NJS_MATRIX *m, Angle ang)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    pcRotRows(&(*m)[0], &(*m)[4], fSin, fCos);
+#else
     asm volatile
     ("
     .set noreorder
@@ -643,6 +778,7 @@ void	njRotateZ(NJS_MATRIX *m, Angle ang)
     .set reorder
     " : : "r"(m), "f"(fSin), "f"(fCos) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -668,6 +804,9 @@ void njRotXYZ(NJS_MATRIX* pMatrix, int lAngleX, int lAngleY, int lAngleZ)
     
     njSinCos(lAngleX, &fSin, &fCos);
     
+#ifdef TARGET_PC
+    pcRotRows(&(*pMatrix)[4], &(*pMatrix)[8], fSin, fCos);
+#else
     asm volatile
     ("
     .set noreorder
@@ -687,11 +826,15 @@ void njRotXYZ(NJS_MATRIX* pMatrix, int lAngleX, int lAngleY, int lAngleZ)
     .set reorder
     " : : "r"(pMatrix) :  
     );
+#endif
 
     lAngleY &= 0xFFFF;
     
     njSinCos(lAngleY, &fSin, &fCos);
     
+#ifdef TARGET_PC
+    pcRotRows(&(*pMatrix)[0], &(*pMatrix)[8], -fSin, fCos);
+#else
     asm volatile
     ("
     .set noreorder
@@ -707,11 +850,15 @@ void njRotXYZ(NJS_MATRIX* pMatrix, int lAngleX, int lAngleY, int lAngleZ)
     .set reorder
     " : : "r"(pMatrix) :  
     );
+#endif
 
     lAngleZ &= 0xFFFF;
     
     njSinCos(lAngleZ, &fSin, &fCos);
     
+#ifdef TARGET_PC
+    pcRotRows(&(*pMatrix)[0], &(*pMatrix)[4], fSin, fCos);
+#else
     asm volatile
     ("
     .set noreorder
@@ -731,6 +878,7 @@ void njRotXYZ(NJS_MATRIX* pMatrix, int lAngleX, int lAngleY, int lAngleZ)
     .set reorder
     " : : "r"(pMatrix) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -749,6 +897,50 @@ void	njRotate(NJS_MATRIX *m, NJS_VECTOR *v, Angle ang)
     
     njSinCos(ang, &fSin, &fCos);
 
+#ifdef TARGET_PC
+    {
+        float* fm = (float*)m;
+        float x = v->x, y = v->y, z = v->z;
+        float q = pcVu0Rsqrt((x * x + y * y) + z * z) * fSin;
+        float w = fCos;
+        float w2, r[9];
+        int i;
+
+        x *= q;
+        y *= q;
+        z *= q;
+
+        w2 = w * w;
+
+        r[0] = ((w2 + x * x) - y * y) - z * z;
+        r[1] = (x * y + w * z) * 2;
+        r[2] = (x * z - w * y) * 2;
+
+        r[3] = (x * y - w * z) * 2;
+        r[4] = ((w2 - x * x) + y * y) - z * z;
+        r[5] = (y * z + w * x) * 2;
+
+        r[6] = (x * z + w * y) * 2;
+        r[7] = (y * z - w * x) * 2;
+        r[8] = ((w2 - x * x) - y * y) + z * z;
+
+        {
+            float o[12];
+
+            for (i = 0; i < 3; i++)
+            {
+                pcVu0XformVector(fm, &r[i * 3], &o[i * 4]);
+            }
+
+            for (i = 0; i < 3; i++)
+            {
+                fm[i * 4 + 0] = o[i * 4 + 0];
+                fm[i * 4 + 1] = o[i * 4 + 1];
+                fm[i * 4 + 2] = o[i * 4 + 2];
+            }
+        }
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -842,6 +1034,7 @@ void	njRotate(NJS_MATRIX *m, NJS_VECTOR *v, Angle ang)
     .set reorder
     " : : "r"(m), "r"(v), "f"(fSin), "f"(fCos) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -852,6 +1045,19 @@ void	njScale(NJS_MATRIX *m, Float sx, Float sy, Float sz)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float* fm = (float*)m;
+        int i;
+
+        for (i = 0; i < 3; i++)
+        {
+            fm[0 + i] *= sx;
+            fm[4 + i] *= sy;
+            fm[8 + i] *= sz;
+        }
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -877,6 +1083,7 @@ void	njScale(NJS_MATRIX *m, Float sx, Float sy, Float sz)
     .set reorder
     " : : "r"(m), "f"(sx), "f"(sy), "f"(sz) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -887,6 +1094,19 @@ void	njScaleV(NJS_MATRIX *m, NJS_VECTOR *v)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float* fm = (float*)m;
+        int i;
+
+        for (i = 0; i < 3; i++)
+        {
+            fm[0 + i] *= v->x;
+            fm[4 + i] *= v->y;
+            fm[8 + i] *= v->z;
+        }
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -913,6 +1133,7 @@ void	njScaleV(NJS_MATRIX *m, NJS_VECTOR *v)
     .set reorder
     " : : "r"(m), "r"(v) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -923,6 +1144,32 @@ Bool	njInvertMatrix(NJS_MATRIX *m)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float* fm = (float*)m;
+        float r[16];
+        int i, j;
+
+        for (i = 0; i < 3; i++)
+        {
+            for (j = 0; j < 3; j++)
+            {
+                r[i * 4 + j] = fm[j * 4 + i];
+            }
+
+            r[i * 4 + 3] = 0;
+        }
+
+        pcVu0XformVector(r, &fm[12], &r[12]);
+
+        r[12] = 0 - r[12];
+        r[13] = 0 - r[13];
+        r[14] = 0 - r[14];
+        r[15] = fm[15];
+
+        pcCopyMatrix(fm, r);
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -967,6 +1214,7 @@ Bool	njInvertMatrix(NJS_MATRIX *m)
     .set reorder
     " : : "r"(m) : 
     );
+#endif
 
     return TRUE;
 }
@@ -979,6 +1227,16 @@ void	njTransposeMatrix(NJS_MATRIX *m)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float* fm = (float*)m;
+        float t;
+
+        t = fm[1]; fm[1] = fm[4]; fm[4] = t;
+        t = fm[2]; fm[2] = fm[8]; fm[8] = t;
+        t = fm[6]; fm[6] = fm[9]; fm[9] = t;
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -1004,6 +1262,7 @@ void	njTransposeMatrix(NJS_MATRIX *m)
     .set reorder
     " : : "r"(m) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -1024,6 +1283,21 @@ void	njMirror(NJS_MATRIX *m,NJS_PLANE *pl)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float vx = pl->vx, vy = pl->vy, vz = pl->vz;
+        float inv = pcVu0Rsqrt((vx * vx + vy * vy) + vz * vz);
+        float d = (vx * inv) * pl->px + (vy * inv) * pl->py + (vz * inv) * pl->pz;
+
+        mat[12] = vx * (d * 2);
+        mat[13] = vy * (d * 2);
+        mat[14] = vz * (d * 2);
+        mat[15] = 1.0f;
+
+        lAngleX = (int)((njAtan2b(vz, vy) * 32768.0f) / 3.141592f);
+        lAngleZ = -(int)((njAtan2b(vx, sqrtf(vy * vy + vz * vz)) * 32768.0f) / 3.141592f);
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -1233,6 +1507,7 @@ void	njMirror(NJS_MATRIX *m,NJS_PLANE *pl)
     .set reorder
     " : : "r"(pl), "f"(&mat), "r"(&lAngleX), "r"(&lAngleZ) : 
     );
+#endif
 
     l_002D7450:
     njUnitRotPortion(&mat);
@@ -1256,6 +1531,13 @@ void	njCalcPoint(NJS_MATRIX *m, NJS_POINT3 *ps, NJS_POINT3 *pd)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    pcVu0XformPoint((float*)m, (float*)ps, pcVu0Last);
+
+    pd->x = pcVu0Last[0];
+    pd->y = pcVu0Last[1];
+    pd->z = pcVu0Last[2];
+#else
     asm volatile
     ("
     .set noreorder
@@ -1290,6 +1572,7 @@ void	njCalcPoint(NJS_MATRIX *m, NJS_POINT3 *ps, NJS_POINT3 *pd)
     .set reorder
     " : : "r"(m), "r"(ps), "r"(pd) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -1300,6 +1583,14 @@ void njCalcPoint4(NJS_MATRIX* pMatrix, NJS_POINT4* pSrcPoint, NJS_POINT4* pDstPo
         pMatrix = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    pcVu0XformPoint((float*)pMatrix, (float*)pSrcPoint, pcVu0Last);
+
+    pDstPoint->x = pcVu0Last[0];
+    pDstPoint->y = pcVu0Last[1];
+    pDstPoint->z = pcVu0Last[2];
+    pDstPoint->w = pSrcPoint->w;
+#else
     asm volatile
     ("
     .set noreorder
@@ -1319,11 +1610,19 @@ void njCalcPoint4(NJS_MATRIX* pMatrix, NJS_POINT4* pSrcPoint, NJS_POINT4* pDstPo
     .set reorder
     " : : "r"(pMatrix), "r"(pSrcPoint), "r"(pDstPoint) : 
     );
+#endif
 }
 
 // 100% matching!
 void njCalcPointCN(NJS_POINT3* pSrcPoint, NJS_POINT3* pDstPoint)
 {
+#ifdef TARGET_PC
+    pcVu0XformPoint(pcVu0CN, (float*)pSrcPoint, pcVu0Last);
+
+    pDstPoint->x = pcVu0Last[0];
+    pDstPoint->y = pcVu0Last[1];
+    pDstPoint->z = pcVu0Last[2];
+#else
     asm volatile
     ("
     .set noreorder
@@ -1354,11 +1653,17 @@ void njCalcPointCN(NJS_POINT3* pSrcPoint, NJS_POINT3* pDstPoint)
     .set reorder
     " : : "r"(pSrcPoint), "r"(pDstPoint) : 
     );
+#endif
 }
 
 // 100% matching!
 void	njAddVector(NJS_VECTOR *vd, NJS_VECTOR *vs)
 {
+#ifdef TARGET_PC
+	vd->x = vd->x + vs->x;
+	vd->y = vd->y + vs->y;
+	vd->z = vd->z + vs->z;
+#else
 	asm volatile
     ("
     .set noreorder
@@ -1380,11 +1685,17 @@ void	njAddVector(NJS_VECTOR *vd, NJS_VECTOR *vs)
     .set reorder
     " : : "r"(vd), "r"(vs) : 
     );
+#endif
 }
 
 // 100% matching!
 void	njSubVector(NJS_VECTOR *vd, NJS_VECTOR *vs)
 {
+#ifdef TARGET_PC
+	vd->x = vd->x - vs->x;
+	vd->y = vd->y - vs->y;
+	vd->z = vd->z - vs->z;
+#else
 	asm volatile
     ("
     .set noreorder
@@ -1406,6 +1717,7 @@ void	njSubVector(NJS_VECTOR *vd, NJS_VECTOR *vs)
     .set reorder
     " : : "r"(vd), "r"(vs) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -1416,6 +1728,17 @@ void	njCalcVector(NJS_MATRIX *m, NJS_VECTOR *vs, NJS_VECTOR *vd)
         m = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float r[3];
+
+        pcVu0XformVector((float*)m, (float*)vs, r);
+
+        vd->x = r[0];
+        vd->y = r[1];
+        vd->z = r[2];
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -1448,6 +1771,7 @@ void	njCalcVector(NJS_MATRIX *m, NJS_VECTOR *vs, NJS_VECTOR *vd)
     .set reorder
     " : : "r"(m), "r"(vs), "r"(vd) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -1455,6 +1779,18 @@ Float	njUnitVector(NJS_VECTOR *v)
 {
 	float ret;
 
+#ifdef TARGET_PC
+    {
+        float l2 = (v->x * v->x + v->y * v->y) + v->z * v->z;
+        float q = pcVu0Rsqrt(l2);
+
+        v->x *= q;
+        v->y *= q;
+        v->z *= q;
+
+        ret = l2 * q;
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -1494,6 +1830,7 @@ Float	njUnitVector(NJS_VECTOR *v)
     .set reorder
     " : "=r"(ret) : "r"(v) : 
     );
+#endif
 
     return ret;
 }
@@ -1503,6 +1840,9 @@ Float	njScalor(NJS_VECTOR *v)
 {
 	float ret;
 
+#ifdef TARGET_PC
+    ret = sqrtf((v->x * v->x + v->y * v->y) + v->z * v->z);
+#else
     asm volatile
     ("
     .set noreorder
@@ -1532,6 +1872,7 @@ Float	njScalor(NJS_VECTOR *v)
     .set reorder
     " : "=r"(ret) : "r"(v) : 
     );
+#endif
 
     return ret;
 }
@@ -1541,6 +1882,9 @@ Float	njScalor2(NJS_VECTOR *v)
 {
 	float ret;
 
+#ifdef TARGET_PC
+    ret = (v->x * v->x + v->y * v->y) + v->z * v->z;
+#else
     asm volatile
     ("
     .set noreorder
@@ -1564,6 +1908,7 @@ Float	njScalor2(NJS_VECTOR *v)
     .set reorder
     " : "=r"(ret) : "r"(v) : 
     );
+#endif
 
     return ret;
 }
@@ -1582,6 +1927,14 @@ void	njProjectScreen(NJS_MATRIX *m, NJS_POINT3 *p3, NJS_POINT2 *p2)
     
     njCalcPointCN(p3, &Point);
     
+#ifdef TARGET_PC
+    {
+        float q = pcVu0Div(_nj_screen_.dist, pcVu0Last[2]);
+
+        p2->x = pcVu0Last[0] * q + fNaViwOffsetX;
+        p2->y = pcVu0Last[1] * q + fNaViwOffsetY;
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -1617,6 +1970,7 @@ void	njProjectScreen(NJS_MATRIX *m, NJS_POINT3 *p3, NJS_POINT2 *p2)
     .set reorder
     " : : "r"(p2), "r"(&Point), "f"(_nj_screen_.dist) : 
     );
+#endif
 }
 
 // 100% matching! 
@@ -1624,6 +1978,19 @@ Float	njOuterProduct(NJS_VECTOR *v1, NJS_VECTOR *v2, NJS_VECTOR *ov)
 {
 	float ret;
 
+#ifdef TARGET_PC
+	{
+	    float x = v1->y * v2->z - v2->y * v1->z;
+	    float y = v1->z * v2->x - v2->z * v1->x;
+	    float z = v1->x * v2->y - v2->x * v1->y;
+
+	    ov->x = x;
+	    ov->y = y;
+	    ov->z = z;
+
+	    ret = sqrtf((x * x + y * y) + z * z);
+	}
+#else
 	asm volatile
     ("
     .set noreorder
@@ -1672,6 +2039,7 @@ Float	njOuterProduct(NJS_VECTOR *v1, NJS_VECTOR *v2, NJS_VECTOR *ov)
     .set reorder
     " : "=r"(ret) : "r"(v1), "r"(v2), "r"(ov) : 
     );
+#endif
 
     return ret;
 }
@@ -1681,6 +2049,9 @@ Float	njInnerProduct(NJS_VECTOR *v1, NJS_VECTOR *v2)
 {
 	float ret;
 
+#ifdef TARGET_PC
+	ret = (v1->x * v2->x + v1->y * v2->y) + v1->z * v2->z;
+#else
 	asm volatile
     ("
     .set noreorder
@@ -1711,6 +2082,7 @@ Float	njInnerProduct(NJS_VECTOR *v1, NJS_VECTOR *v2)
     .set reorder
     " : "=r"(ret) : "r"(v1), "r"(v2) : 
     );
+#endif
 
     return ret;
 }
@@ -1718,6 +2090,14 @@ Float	njInnerProduct(NJS_VECTOR *v1, NJS_VECTOR *v2)
 // 100% matching! 
 void njTranslateEx(NJS_VECTOR *v)
 {
+#ifdef TARGET_PC
+    pcCopyMatrix(pcVu0CN, (float*)pNaMatMatrixStuckPtr);
+    pcVu0XformPoint(pcVu0CN, (float*)v, &pcVu0CN[12]);
+
+    (*pNaMatMatrixStuckPtr)[12] = pcVu0CN[12];
+    (*pNaMatMatrixStuckPtr)[13] = pcVu0CN[13];
+    (*pNaMatMatrixStuckPtr)[14] = pcVu0CN[14];
+#else
     asm volatile
     ("
     .set noreorder
@@ -1745,6 +2125,7 @@ void njTranslateEx(NJS_VECTOR *v)
     .set reorder
     " : : "r"(v), "r"(pNaMatMatrixStuckPtr) : 
     );
+#endif
 }
 
 // 100% matching! 
@@ -1767,6 +2148,19 @@ void njRotateEx( Angle *ang, Sint32 lv )
 // 100% matching! 
 void njScaleEx(NJS_VECTOR *v)
 {
+#ifdef TARGET_PC
+    {
+        float* fm = (float*)pNaMatMatrixStuckPtr;
+        int i;
+
+        for (i = 0; i < 4; i++)
+        {
+            pcVu0CN[0 + i] = fm[0 + i] = fm[0 + i] * v->x;
+            pcVu0CN[4 + i] = fm[4 + i] = fm[4 + i] * v->y;
+            pcVu0CN[8 + i] = fm[8 + i] = fm[8 + i] * v->z;
+        }
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -1793,6 +2187,7 @@ void njScaleEx(NJS_VECTOR *v)
     .set reorder
     " : : "r"(v), "r"(pNaMatMatrixStuckPtr) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -1814,6 +2209,16 @@ void njRotTransPers(NJS_POINT3* pPoint, NJS_SCRVECTOR* pScreen)
 
     njCalcPointCN(pPoint, (NJS_POINT3*)&pScreen->x);
 
+#ifdef TARGET_PC
+    {
+        float q = pcVu0Div(1.0f, pcVu0Last[2]);
+        float s = _nj_screen_.dist * q;
+
+        pScreen->x = pcVu0Last[0] * s + fNaViwOffsetX;
+        pScreen->y = pcVu0Last[1] * s + fNaViwOffsetY;
+        pScreen->iz = q;
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -1850,6 +2255,7 @@ void njRotTransPers(NJS_POINT3* pPoint, NJS_SCRVECTOR* pScreen)
     .set reorder
     " : : "r"(pPoint), "r"(pScreen), "f"(_nj_screen_.dist) : 
     );
+#endif
 
     pScreen->fog = njCalcFogPower(pScreen->z);
 }
@@ -1865,6 +2271,20 @@ void njRotTrans(NJS_POINT3* pPoint, NJS_POINT3* pOut)
 // 100% matching!
 void njPers(NJS_SCRVECTOR* pScreen)
 {
+#ifdef TARGET_PC
+    {
+        float q = pcVu0Div(1.0f, pScreen->z);
+        float s = _nj_screen_.dist * q;
+
+        pcVu0Last[0] = pScreen->x;
+        pcVu0Last[1] = pScreen->y;
+        pcVu0Last[2] = pScreen->z;
+
+        pScreen->x = pcVu0Last[0] * s + fNaViwOffsetX;
+        pScreen->y = pcVu0Last[1] * s + fNaViwOffsetY;
+        pScreen->iz = q;
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -1910,11 +2330,15 @@ void njPers(NJS_SCRVECTOR* pScreen)
     .set reorder
     " : : "r"(pScreen), "f"(_nj_screen_.dist) : 
     );
+#endif
 }
 
 // 100% matching!
 void njCopyMatrix(NJS_MATRIX* pDstMat, NJS_MATRIX* pSrcMat) 
 {
+#ifdef TARGET_PC
+    pcCopyMatrix((float*)pDstMat, (const float*)pSrcMat);
+#else
     asm volatile
     ("
     .set noreorder
@@ -1930,6 +2354,7 @@ void njCopyMatrix(NJS_MATRIX* pDstMat, NJS_MATRIX* pSrcMat)
     .set reorder
     " : : "r"(pDstMat), "r"(pSrcMat) : 
     );
+#endif
 }
 
 // 100% matching!
@@ -1940,6 +2365,23 @@ void njMulMatrixCN(NJS_MATRIX* pSrcMat1, NJS_MATRIX* pSrcMat2)
         pSrcMat2 = pNaMatMatrixStuckPtr;
     }
 
+#ifdef TARGET_PC
+    {
+        float* a = (float*)pSrcMat1;
+        float* b = (float*)pSrcMat2;
+        int i, j;
+
+        for (i = 0; i < 4; i++)
+        {
+            for (j = 0; j < 4; j++)
+            {
+                float v = (a[j] * b[i * 4 + 0] + a[4 + j] * b[i * 4 + 1]) + a[8 + j] * b[i * 4 + 2];
+
+                pcVu0CN[i * 4 + j] = (i == 3) ? v + a[12 + j] : v;
+            }
+        }
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -1975,4 +2417,5 @@ void njMulMatrixCN(NJS_MATRIX* pSrcMat1, NJS_MATRIX* pSrcMat2)
     .set reorder
     " : : "r"(pSrcMat1), "r"(pSrcMat2) : 
     );
+#endif
 }

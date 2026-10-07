@@ -2,6 +2,9 @@
 #include "../../../cri/mwlib/ee/lib/libadxe/adx_fsvr.h"
 
 #include <libgraph.h>
+#ifdef TARGET_PC
+#include "pc_kernel.h"
+#endif
 
 char* volatile adxps2_build = "\nADXPS2 Ver.1.01 Build:Mar 14 2001 14:23:33\n";
 static ADXPS2_TPRM adxps2_save_tprm __attribute__((aligned(64))) = { 0 };
@@ -44,9 +47,16 @@ void adxps2_safe_thrd_func(void)
 {
     while (TRUE) 
     {
+#ifdef TARGET_PC
+        /* PC: spinning here only works with real interrupts; wait for the next one instead */
+        adxps2_scnt++;
+
+        pcKernelBusyWait();
+#else
         adxps2_scnt++;
         
         adxps2_scnt;
+#endif
     }
 }
 
