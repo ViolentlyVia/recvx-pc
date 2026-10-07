@@ -2,7 +2,8 @@
 import io, os, urllib.request, zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DEPS = os.path.join(ROOT, "build_pc", "deps")
+# RECVX_DEPS overrides the location (the share package keeps its tools outside the repository)
+DEPS = os.environ.get("RECVX_DEPS") or os.path.join(ROOT, "build_pc", "deps")
 
 SDL2_VERSION = "2.32.10"
 SDL2_URL = (f"https://github.com/libsdl-org/SDL/releases/download/release-{SDL2_VERSION}/"
