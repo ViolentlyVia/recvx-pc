@@ -10,6 +10,9 @@
 #include "../../../ps2/veronica/prog/njplus.h"
 #include "../../../ps2/veronica/prog/ps2_NaMatrix.h"
 #include "../../../ps2/veronica/prog/hitchkl.h"
+#ifdef TARGET_PC
+#include "../../../ps2/veronica/prog/rutchk.h" /* returns unsigned char: needs a prototype */
+#endif
 
 // ENEMY: First Form Alexia 
 

@@ -86,7 +86,11 @@
 
 #define MTN_NO_CHECK(epw) ((epw->mtn_no == 2) ? 0 : (epw->mtn_no == 3) ? 1 : 2) 
 
+#ifdef TARGET_PC
+#define PREFETCH(_v)
+#else
 #define PREFETCH(_v) asm("pref 0x0,0(%0)": : "r"(_v) : "memory")
+#endif
 
 #define SCE_GIF_PRIM(prim, iip, tme, fge, abe, aa1, fst, ctxt, fix) SCE_GIF_SET_TAG(0, 0, 0, SCE_GS_SET_PRIM(prim, iip, tme, fge, abe, aa1, fst, ctxt, fix), 0, 0)
 

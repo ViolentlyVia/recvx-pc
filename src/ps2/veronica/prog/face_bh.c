@@ -793,6 +793,12 @@ void _fmCnkCalcMuscle(MASK_WORK* fm)
     
     n = fm->jnum;
     
+#ifdef TARGET_PC
+    for ( ; n > 0; n--, jaw++)
+    {
+        pcCopyQword(&dvp[jaw->id * 8], &svp[jaw->id * 8]);
+    }
+#else
     asm volatile
     ("
     .set noreorder
@@ -821,6 +827,7 @@ void _fmCnkCalcMuscle(MASK_WORK* fm)
     .set reorder
     " : "=r"(n), "=r"(jaw) : "r"(jaw->id), "r"(svp), "r"(dvp) : "t0", "t1", "t2", "t3", "memory" 
     );
+#endif
     
     con = fm->list;
     list = fm->vlist;
@@ -869,6 +876,28 @@ void _fmCnkCalcMuscle(MASK_WORK* fm)
         p0 = mvp;
         p1 = mrp;
         
+#ifdef TARGET_PC
+        if (m > 0)
+        {
+            NJS_POINT3** vp = mvp;
+            float* rp = mrp;
+            float x = dvp[0], y = dvp[1], z = dvp[2];
+
+            for ( ; m > 0; m--)
+            {
+                float r = *--rp * rsum;
+                NJS_POINT3* v = *--vp;
+
+                x += v->x * r;
+                y += v->y * r;
+                z += v->z * r;
+            }
+
+            dvp[0] = x;
+            dvp[1] = y;
+            dvp[2] = z;
+        }
+#else
         asm volatile
         ("
         .set noreorder
@@ -926,6 +955,7 @@ void _fmCnkCalcMuscle(MASK_WORK* fm)
         " : "=r"(svp), "=r"(dvp), "=r"(p0), "=r"(p1) : "f"(rsum), "r"(mvp), "r"(mrp), "r"(m)
           : "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "t0", "t1", "memory"
         );
+#endif
     }
 }
 
@@ -973,6 +1003,10 @@ void _fmCnkCalcJaw(MASK_WORK* fm)
             
             if (jaw->rate == 1.0f) 
             {
+#ifdef TARGET_PC
+                pcVu0XformPoint((float*)mat, (float*)dvp1, (float*)&vec);
+                vec.w = dvp1->w;
+#else
                 asm volatile
                 ("
                 .set noreorder
@@ -1007,6 +1041,7 @@ void _fmCnkCalcJaw(MASK_WORK* fm)
                 .set reorder
                 " : : "r"(&vec), "r"(mat), "r"(dvp1) : 
                 ); 
+#endif
             } 
             else 
             {
@@ -1014,6 +1049,34 @@ void _fmCnkCalcJaw(MASK_WORK* fm)
                 
                 njRotateX(mat2, (int)(182.04445f * (jawang * jaw->rate)) & 0xFFFF);
                 
+#ifdef TARGET_PC
+                {
+                    float* m2 = (float*)mat2;
+                    float* j1 = (float*)jmat1;
+                    float mt[16], t[16];
+                    int r;
+
+                    for (r = 0; r < 12; r++)
+                    {
+                        mt[r] = m2[r];
+                    }
+
+                    mt[12] = m2[0] * jawtrans + m2[12];
+                    mt[13] = m2[1] * jawtrans + m2[13];
+                    mt[14] = m2[2] * jawtrans + m2[14];
+                    mt[15] = m2[15];
+
+                    for (r = 0; r < 3; r++)
+                    {
+                        pcVu0XformVector(mt, &j1[r * 4], &t[r * 4]);
+                    }
+
+                    pcVu0XformPoint(mt, &j1[12], &t[12]);
+
+                    pcVu0XformPoint(t, (float*)dvp1, (float*)&vec);
+                    vec.w = dvp1->w;
+                }
+#else
                 asm volatile
                 ("
                 .set noreorder
@@ -1084,6 +1147,7 @@ void _fmCnkCalcJaw(MASK_WORK* fm)
                 .set reorder
                 " : : "r"(&vec), "r"(dvp1), "r"(jmat1), "r"(mat2), "f"(jawtrans) : 
                 ); 
+#endif
             }
             
             *(u_long128*)dvp1 = *(u_long128*)&vec;
@@ -1127,6 +1191,23 @@ void _fmCnkCalcEye(MASK_WORK* fm)
         { 
             njPushMatrix(NULL);
             
+#ifdef TARGET_PC
+            {
+                float* em = (float*)&fm->eyemat[i];
+                float a[3], b[3];
+
+                pcVu0XformPoint(em, (float*)&obj->pos, a);
+                pcVu0XformPoint(em, (float*)&t3, b);
+
+                q3.x = (a[0] + fm->param.eye.x) - a[0];
+                q3.y = (a[1] + fm->param.eye.y) - a[1];
+                q3.z = (a[2] + fm->param.eye.z) - a[2];
+
+                r3.x = b[0];
+                r3.y = b[1];
+                r3.z = b[2];
+            }
+#else
             asm volatile
             ("
             .set noreorder
@@ -1190,6 +1271,7 @@ void _fmCnkCalcEye(MASK_WORK* fm)
             .set reorder
             " : : "r"(&fm->eyemat[i]), "r"(&obj->pos), "r"(&q3), "r"(&t3), "r"(&r3), "r"(&fm->param.eye) : 
             ); 
+#endif
 
             dx = q3.x;
             dy = q3.y;
@@ -1251,6 +1333,17 @@ void _fmCnkCalcTang(MASK_WORK* fm)
        
         for ( ; i > 0; i--) 
         { 
+#ifdef TARGET_PC
+            {
+                float* m = (float*)mat;
+                int r;
+
+                for (r = 0; r < 16; r++)
+                {
+                    m[r] = ((r % 5) == 0) ? 1.0f : 0.0f;
+                }
+            }
+#else
             asm volatile
             ("
             .set noreorder
@@ -1267,12 +1360,25 @@ void _fmCnkCalcTang(MASK_WORK* fm)
             .set reorder
             " : : "r"(mat) : 
             ); 
+#endif
             
             njRotateX(mat, (int)(182.04445f * (tangx * tang->rate)) & 0xFFFF);
             njRotateY(mat, (int)(182.04445f * (tangy * tang->rate)) & 0xFFFF);
             
             calc_ofs = tang->id * vofs;
             
+#ifdef TARGET_PC
+            {
+                float* m = (float*)mat;
+                float* s = &svp[calc_ofs];
+                float* d = &dvp[calc_ofs];
+                float x = s[0], y = s[1], z = s[2];
+
+                d[0] = m[0] * x + m[4] * y + (m[8]  * tangz) * z + m[12];
+                d[1] = m[1] * x + m[5] * y + (m[9]  * tangz) * z + m[13];
+                d[2] = m[2] * x + m[6] * y + (m[10] * tangz) * z + m[14];
+            }
+#else
             asm volatile  
             ("
             .set noreorder
@@ -1311,6 +1417,7 @@ void _fmCnkCalcTang(MASK_WORK* fm)
             .set reorder
             " : : "r"(&svp[calc_ofs]), "r"(&dvp[calc_ofs]), "f"(tangz), "r"(mat) : 
             );
+#endif
             
             tang++; 
         }

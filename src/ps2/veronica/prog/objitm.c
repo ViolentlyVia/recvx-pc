@@ -1383,6 +1383,50 @@ void bhObj005(O_WRK* op)
         
         nb = op->ct2;
         
+#ifdef TARGET_PC
+        {
+            unsigned char* s = (unsigned char*)pCnk;
+            unsigned char* d = (unsigned char*)pOrg;
+            int zp = sys->wt_zp;
+            int cnt = nb >> 1;
+            float* h;
+
+            if (j == 0)
+            {
+                *(float*)(d + 4) = *(float*)(s + 4) + **(float**)s;
+
+                cnt--;
+
+                s += 32;
+                d += 32;
+            }
+
+            h = *(float**)s;
+
+            s += 16;
+            d += 16;
+
+            do
+            {
+                float nx = h[zp] - h[-zp];
+                float ny = -2.0f;
+                float nz = h[1] - h[-1];
+                float q = 1.0f / ((fabsf(nx) + fabsf(ny)) + fabsf(nz));
+
+                *(float*)(d + 0x14) = *(float*)(s + 0x14) + **(float**)(s + 0x10);
+
+                h = *(float**)(s + 0x30);
+
+                ((float*)d)[0] = (0 - nx) * q;
+                ((float*)d)[1] = ny * q;
+                ((float*)d)[2] = (0 - nz) * q;
+                ((float*)d)[3] = 0;
+
+                s += 64;
+                d += 64;
+            } while (--cnt != 0);
+        }
+#else
         asm volatile 
         ("
         .set noreorder
@@ -1470,7 +1514,21 @@ void bhObj005(O_WRK* op)
         .set reorder
         " : : "r"(nb), "r"(pCnk), "r"(pOrg), "r"(sys->gfrm_ct), "r"(xp), "r"(j), "r"(sys->wt_zp) : "$s2", "$s5", "memory" 
         ); 
+#endif
      
+#ifdef TARGET_PC
+        {
+            float* w = (float*)sys->wt_wvp;
+            int k, n = (sys->wt_nbpt >> 4) * 16;
+
+            for (k = 0; k < n; k++)
+            {
+                float v = w[k] - 0.2f;
+
+                w[k] = (v > 0) ? v : 0;
+            }
+        }
+#else
         asm volatile 
         (" 
             
@@ -1532,6 +1590,7 @@ void bhObj005(O_WRK* op)
         
         " : : "r"(sys->wt_nbpt), "r"(sys->wt_wvp), "f"(0.2f) : "$t0", "$t1", "$t2", "memory" 
         );  
+#endif
             
     exit:
         break;

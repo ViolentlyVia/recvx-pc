@@ -1238,7 +1238,11 @@ void bhSysCallOption()
     { 
         if (sys->opt_md0 != 0) 
         {
+#ifdef TARGET_PC
+            /* PC: no delay slot padding needed */
+#else
             asm("nop"); 
+#endif
         } 
         else if (!(sys->cb_flg & 0x2))
         { 

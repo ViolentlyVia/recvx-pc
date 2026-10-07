@@ -15,6 +15,9 @@
 #include "../../../ps2/veronica/prog/ps2_NaColi.h"
 #include "../../../ps2/veronica/prog/effsub3.h"
 #include "../../../ps2/veronica/prog/main.h"
+#ifdef TARGET_PC
+#include "../../../ps2/veronica/prog/rutchk.h" /* returns unsigned char: needs a prototype */
+#endif
 
 // ENEMY: Bandersnatch 
 

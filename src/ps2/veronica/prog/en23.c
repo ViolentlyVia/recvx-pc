@@ -2145,11 +2145,19 @@ void bhEne23_DG06(BH_PWORK* epw)
 
         if ((epw->mtn_md & 0x2))
         {
+#ifdef TARGET_PC
+            njRotateXYZ((NJS_MATRIX*)epw->exp0, mkaP->key[0], -mkaP->key[1], -mkaP->key[2]);
+#else
             njRotateXYZ((NJS_MATRIX*)epw->exp0, *mkaP->key++, -*mkaP->key++, -*mkaP->key++);
+#endif
         }
         else
         {
+#ifdef TARGET_PC
+            njRotateXYZ((NJS_MATRIX*)epw->exp0, mkaP->key[0], mkaP->key[1], mkaP->key[2]);
+#else
             njRotateXYZ((NJS_MATRIX*)epw->exp0, *mkaP->key++, *mkaP->key++, *mkaP->key++);
+#endif
         }
         
         if ((epw->flg & 0x400000))
@@ -2184,9 +2192,15 @@ void bhEne23_DG06(BH_PWORK* epw)
 
         mkaP = epw->mnwP[epw->mtn_no].md2P->p[1];
 
+#ifdef TARGET_PC
+        epw->mlwP->objP->ang[0] = mkaP->key[0];
+        epw->mlwP->objP->ang[1] = mkaP->key[1];
+        epw->mlwP->objP->ang[2] = mkaP->key[2];
+#else
         epw->mlwP->objP->ang[0] = *mkaP->key++;
         epw->mlwP->objP->ang[1] = *mkaP->key++;
         epw->mlwP->objP->ang[2] = *mkaP->key++;
+#endif
         }
 
         {
@@ -2310,9 +2324,15 @@ void bhEne23_DG06(BH_PWORK* epw)
 
                 mkaP = epw->mnwP[epw->mtn_no].md2P->p[1];
 
+#ifdef TARGET_PC
+                epw->mlwP->objP->ang[0] = mkaP->key[0];
+                epw->mlwP->objP->ang[1] = mkaP->key[1];
+                epw->mlwP->objP->ang[2] = mkaP->key[2];
+#else
                 epw->mlwP->objP->ang[0] = *mkaP->key++;
                 epw->mlwP->objP->ang[1] = *mkaP->key++;
                 epw->mlwP->objP->ang[2] = *mkaP->key++;
+#endif
             }
         }
 
@@ -2363,11 +2383,19 @@ void bhEne23_DG07(BH_PWORK* epw)
 
         if ((epw->mtn_md & 0x2))
         {
+#ifdef TARGET_PC
+            njRotateXYZ((NJS_MATRIX*)epw->exp0, mkaP->key[0], -mkaP->key[1], -mkaP->key[2]);
+#else
             njRotateXYZ((NJS_MATRIX*)epw->exp0, *mkaP->key++, -*mkaP->key++, -*mkaP->key++);
+#endif
         }
         else
         {
+#ifdef TARGET_PC
+            njRotateXYZ((NJS_MATRIX*)epw->exp0, mkaP->key[0], mkaP->key[1], mkaP->key[2]);
+#else
             njRotateXYZ((NJS_MATRIX*)epw->exp0, *mkaP->key++, *mkaP->key++, *mkaP->key++);
+#endif
         }
 
         EXP0_F(84) = 3.0f * EXP0_F(16);
@@ -2391,9 +2419,15 @@ void bhEne23_DG07(BH_PWORK* epw)
 
         mkaP = epw->mnwP[epw->mtn_no].md2P->p[1];
 
+#ifdef TARGET_PC
+        epw->mlwP->objP->ang[0] = mkaP->key[0];
+        epw->mlwP->objP->ang[1] = mkaP->key[1];
+        epw->mlwP->objP->ang[2] = mkaP->key[2];
+#else
         epw->mlwP->objP->ang[0] = *mkaP->key++;
         epw->mlwP->objP->ang[1] = *mkaP->key++;
         epw->mlwP->objP->ang[2] = *mkaP->key++;
+#endif
         }
 
         {
@@ -2585,11 +2619,19 @@ void bhEne23_DD01(BH_PWORK* epw)
 
         if ((epw->mtn_md & 0x2))
         {
+#ifdef TARGET_PC
+            njRotateXYZ((NJS_MATRIX*)epw->exp0, mkaP->key[0], -mkaP->key[1], -mkaP->key[2]);
+#else
             njRotateXYZ((NJS_MATRIX*)epw->exp0, *mkaP->key++, -*mkaP->key++, -*mkaP->key++);
+#endif
         }
         else
         {
+#ifdef TARGET_PC
+            njRotateXYZ((NJS_MATRIX*)epw->exp0, mkaP->key[0], mkaP->key[1], mkaP->key[2]);
+#else
             njRotateXYZ((NJS_MATRIX*)epw->exp0, *mkaP->key++, *mkaP->key++, *mkaP->key++);
+#endif
         }
 
         if ((epw->flg & 0x400000))
@@ -2625,9 +2667,15 @@ void bhEne23_DD01(BH_PWORK* epw)
 
         mkaP = epw->mnwP[epw->mtn_no].md2P->p[1];
 
+#ifdef TARGET_PC
+        epw->mlwP->objP->ang[0] = mkaP->key[0];
+        epw->mlwP->objP->ang[1] = mkaP->key[1];
+        epw->mlwP->objP->ang[2] = mkaP->key[2];
+#else
         epw->mlwP->objP->ang[0] = *mkaP->key++;
         epw->mlwP->objP->ang[1] = *mkaP->key++;
         epw->mlwP->objP->ang[2] = *mkaP->key++;
+#endif
 
         njCalcVector((NJS_MATRIX*)epw->exp0, epw->mnwP[epw->mtn_no].md2P->p[0], &trans);
         njSubVector((NJS_VECTOR*)&epw->px, &trans);
@@ -2790,11 +2838,19 @@ void bhEne23_DD03(BH_PWORK* epw)
 
         if ((epw->mtn_md & 0x2))
         {
+#ifdef TARGET_PC
+            njRotateXYZ((NJS_MATRIX*)epw->exp0, mkaP->key[0], -mkaP->key[1], -mkaP->key[2]);
+#else
             njRotateXYZ((NJS_MATRIX*)epw->exp0, *mkaP->key++, -*mkaP->key++, -*mkaP->key++);
+#endif
         }
         else
         {
+#ifdef TARGET_PC
+            njRotateXYZ((NJS_MATRIX*)epw->exp0, mkaP->key[0], mkaP->key[1], mkaP->key[2]);
+#else
             njRotateXYZ((NJS_MATRIX*)epw->exp0, *mkaP->key++, *mkaP->key++, *mkaP->key++);
+#endif
         }
 
         EXP0_F(84) = 3.0f * EXP0_F(16);
@@ -2819,9 +2875,15 @@ void bhEne23_DD03(BH_PWORK* epw)
 
         mkaP = epw->mnwP[epw->mtn_no].md2P->p[1];
 
+#ifdef TARGET_PC
+        epw->mlwP->objP->ang[0] = mkaP->key[0];
+        epw->mlwP->objP->ang[1] = mkaP->key[1];
+        epw->mlwP->objP->ang[2] = mkaP->key[2];
+#else
         epw->mlwP->objP->ang[0] = *mkaP->key++;
         epw->mlwP->objP->ang[1] = *mkaP->key++;
         epw->mlwP->objP->ang[2] = *mkaP->key++;
+#endif
 
         njCalcVector((NJS_MATRIX*)epw->exp0, epw->mnwP[epw->mtn_no].md2P->p[0], &trans);
         njSubVector((NJS_VECTOR*)&epw->px, &trans);
@@ -2983,7 +3045,11 @@ void bhEne23_CollisionWalls(BH_PWORK* epw)
         mkaP  = (NJS_MKEY_A_MOD*)epw->mnwP[epw->mtn_no].md2P->p[1];
         mkaP += epw->frm_no / 65536;
         
+#ifdef TARGET_PC
+        njRotateXYZ(NULL, mkaP->key[0], mkaP->key[1], mkaP->key[2]);
+#else
         njRotateXYZ(NULL, *mkaP->key++, *mkaP->key++, *mkaP->key++);
+#endif
     }
 
     njCalcVector(NULL, &body, &body);

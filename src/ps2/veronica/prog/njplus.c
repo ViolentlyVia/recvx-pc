@@ -733,7 +733,11 @@ void npTransform(NJS_CNK_OBJECT* srcobj, NJS_CNK_OBJECT* dstobj, register float 
     dp = (NJS_POINT4*)((HDR_PS*)fp + 1); 
     fp = (NJS_POINT4*)np.vlp2[ono]; 
 
+#ifdef TARGET_PC
+    /* PC: no uncached-accelerated RAM mirror */
+#else
     fp = (NJS_POINT4*)((int)fp | 0x30000000); 
+#endif
 
     ((HDR_PS*)fp)->ucType = pSrc->ucType; 
     ((HDR_PS*)fp)->ucAttr = pSrc->ucAttr; 
@@ -751,6 +755,23 @@ void npTransform(NJS_CNK_OBJECT* srcobj, NJS_CNK_OBJECT* dstobj, register float 
     { 
         if ((sp->x != dp->x) || (sp->y != dp->y) || (sp->z != dp->z)) 
         { 
+#ifdef TARGET_PC
+            {
+                float* s = (float*)sp;
+                float* d = (float*)dp;
+                float* f = (float*)fp;
+
+                f[0] = (d[0] - s[0]) * no + s[0];
+                f[1] = (d[1] - s[1]) * no + s[1];
+                f[2] = (d[2] - s[2]) * no + s[2];
+                f[3] = d[3];
+
+                f[4] = (d[4] - s[4]) * no + s[4];
+                f[5] = (d[5] - s[5]) * no + s[5];
+                f[6] = (d[6] - s[6]) * no + s[6];
+                f[7] = d[7];
+            }
+#else
             asm volatile 
             {
             .set noreorder
@@ -778,6 +799,7 @@ void npTransform(NJS_CNK_OBJECT* srcobj, NJS_CNK_OBJECT* dstobj, register float 
 
             .set reorder
             }
+#endif
                 
             fp += 2; 
             sp += 2; 
@@ -785,6 +807,10 @@ void npTransform(NJS_CNK_OBJECT* srcobj, NJS_CNK_OBJECT* dstobj, register float 
         } 
         else 
         { 
+#ifdef TARGET_PC
+            pcCopyQword(&fp[0], &sp[0]);
+            pcCopyQword(&fp[1], &sp[1]);
+#else
             asm volatile
             {
                 .set noreorder
@@ -797,6 +823,7 @@ void npTransform(NJS_CNK_OBJECT* srcobj, NJS_CNK_OBJECT* dstobj, register float 
 
                 .set reorder
             }
+#endif
             
             fp += 2; 
             sp += 2;
@@ -1588,6 +1615,36 @@ void npSetOffsetUV(NJS_CNK_MODEL* mdlp, short offu, short offv)
             } 
             else 
             {
+#ifdef TARGET_PC
+                {
+                    /* walk the strips: [count] then count * (index, u, v); count < 0 means reversed strip */
+                    unsigned char* p = (unsigned char*)plp;
+
+                    do
+                    {
+                        int cnt = *(short*)p;
+
+                        p += 2;
+
+                        if (cnt < 0)
+                        {
+                            cnt = -cnt;
+                        }
+
+                        do
+                        {
+                            ((short*)p)[1] += offu;
+                            ((short*)p)[2] += offv;
+
+                            p += 6;
+                        } while (--cnt > 0);
+
+                        p += usr_num * 2;
+                    } while (--srp_num > 0);
+
+                    plp = (short*)p;
+                }
+#else
                 asm volatile 
                 ("
                 .set noreorder
@@ -1626,6 +1683,7 @@ void npSetOffsetUV(NJS_CNK_MODEL* mdlp, short offu, short offv)
                 .set reorder
                 " : "=r"(plp) : "r"(offu), "r"(offv), "r"(usr_num), "r"(srp_num) : "t0", "t1", "t2"
                 );
+#endif
             }
         }
         else if (head == 8) 
@@ -1668,6 +1726,36 @@ void npSetOffsetUV2(NJS_CNK_MODEL* mdlp, short offu, short offv)
             usr_num = (*++plp >> 14) & 0x3; 
             srp_num = *plp++ & ~0xC000;
            
+#ifdef TARGET_PC
+            {
+                /* walk the strips: [count] then count * (index, u, v); count < 0 means reversed strip */
+                unsigned char* p = (unsigned char*)plp;
+
+                do
+                {
+                    int cnt = *(short*)p;
+
+                    p += 2;
+
+                    if (cnt < 0)
+                    {
+                        cnt = -cnt;
+                    }
+
+                    do
+                    {
+                        ((short*)p)[1] += offu;
+                        ((short*)p)[2] += offv;
+
+                        p += 6;
+                    } while (--cnt > 0);
+
+                    p += usr_num * 2;
+                } while (--srp_num > 0);
+
+                plp = (short*)p;
+            }
+#else
             asm volatile 
             ("
             .set noreorder
@@ -1704,6 +1792,7 @@ void npSetOffsetUV2(NJS_CNK_MODEL* mdlp, short offu, short offv)
             .set reorder
             " : "=r"(plp) : "r"(offu), "r"(offv), "r"(usr_num), "r"(srp_num) : "t0", "t1", "t2"
             );
+#endif
 
             break;
         }
@@ -1798,6 +1887,25 @@ void npInitCalcSkin(void* pwp, int obj_n, int* sknp)
                 np.sknp++; 
             }
             
+#ifdef TARGET_PC
+            {
+                /* two copies of the object matrix with the character position removed from the translation */
+                float* m = owp->mtx;
+                float* pos = &((BH_PWORK*)pwp)->px;
+                float* d = (float*)np.mxp[i][0];
+                int k;
+
+                for (k = 0; k < 16; k++)
+                {
+                    d[k] = d[k + 16] = m[k];
+                }
+
+                for (k = 0; k < 3; k++)
+                {
+                    d[12 + k] = d[28 + k] = m[12 + k] - pos[k];
+                }
+            }
+#else
             asm volatile 
             ("
             .set noreorder
@@ -1830,6 +1938,7 @@ void npInitCalcSkin(void* pwp, int obj_n, int* sknp)
             .set reorder
             " : : "r"(&owp->mtx), "r"(&((BH_PWORK*)pwp)->px), "r"(np.mxp[i][0]), "r"(owp) 
             );
+#endif
                 
             njRotXYZ(np.mxp[i][0], -op->ang[0], -op->ang[1], -op->ang[2]); 
         }
@@ -1880,7 +1989,11 @@ void npCalcSkin(void* pwp, int obj_n, int* sknp)
                     
                     nb = *np.sknp++;
     
+#ifdef TARGET_PC
+                    /* PC: no uncached-accelerated RAM mirror */
+#else
                     pHdr1 = (HDR_PS*)((int)pHdr1 | 0x30000000); 
+#endif
     
                     pHdr1->ucType = pHdr0->ucType;
                     pHdr1->ucAttr = pHdr0->ucAttr; 
@@ -1903,6 +2016,22 @@ void npCalcSkin(void* pwp, int obj_n, int* sknp)
                         
                         if (lv != 1.0f) 
                         { 
+#ifdef TARGET_PC
+                            {
+                                /* blend vertex position between the two bone matrices by lv */
+                                float* m0 = (float*)np.mxp[rg0][0];
+                                float* m1 = (float*)np.mxp[rg0][1];
+                                float a[3], b[3];
+
+                                pcVu0XformPoint(m0, (float*)p0, a);
+                                pcVu0XformPoint(m1, (float*)p0, b);
+
+                                p1[0] = (b[0] - a[0]) * lv + a[0];
+                                p1[1] = (b[1] - a[1]) * lv + a[1];
+                                p1[2] = (b[2] - a[2]) * lv + a[2];
+                                p1[3] = m1[11];
+                            }
+#else
                             asm volatile 
                             ("
                             .set noreorder
@@ -1947,10 +2076,27 @@ void npCalcSkin(void* pwp, int obj_n, int* sknp)
                             .set reorder
                             " : : "f"(lv), "r"(p0), "r"(p1), "r"(np.mxp[rg0][0]), "r"(np.mxp[rg0][1]) : "t0" 
                             );
+#endif
                             
                             p1 += 4; 
                             p0++; 
                             
+#ifdef TARGET_PC
+                            {
+                                /* blend vertex normal between the two bone matrices by lv */
+                                float* m0 = (float*)np.mxp[rg0][0];
+                                float* m1 = (float*)np.mxp[rg0][1];
+                                float a[3], b[3];
+
+                                pcVu0XformVector(m0, (float*)p0, a);
+                                pcVu0XformVector(m1, (float*)p0, b);
+
+                                p1[0] = (b[0] - a[0]) * lv + a[0];
+                                p1[1] = (b[1] - a[1]) * lv + a[1];
+                                p1[2] = (b[2] - a[2]) * lv + a[2];
+                                p1[3] = m0[11];
+                            }
+#else
                             asm volatile 
                             ("
                             .set noreorder
@@ -1990,12 +2136,25 @@ void npCalcSkin(void* pwp, int obj_n, int* sknp)
                             .set reorder
                             " : : "f"(lv), "r"(p0),  "r"(p1), "r"(np.mxp[rg0][0]), "r"(np.mxp[rg0][1]) : "t0" 
                             );
+#endif
                             
                             p1 += 4; 
                             p0++;
                         } 
                         else 
                         { 
+#ifdef TARGET_PC
+                            {
+                                /* vertex fully bound to the second bone matrix: transform position and normal */
+                                float* m1 = (float*)np.mxp[rg0][1];
+
+                                pcVu0XformPoint(m1, (float*)&p0[0], &p1[0]);
+                                p1[3] = p0[0].w;
+
+                                pcVu0XformVector(m1, (float*)&p0[1], &p1[4]);
+                                p1[7] = p0[1].w;
+                            }
+#else
                             asm volatile 
                             ("
                             .set noreorder
@@ -2026,6 +2185,7 @@ void npCalcSkin(void* pwp, int obj_n, int* sknp)
                             .set reorder
                             " : : "r"(p0), "r"(p1), "r"(np.mxp[rg0][1]), "r"(op)
                             ); 
+#endif
                             
                             p0 += 2; 
                             p1 += 8; 
@@ -2097,6 +2257,25 @@ void npInitCalcSkinFM(void* pwp, int obj_n, int* sknp)
                     np.sknp++; 
                 }
                 
+#ifdef TARGET_PC
+                {
+                    /* two copies of the object matrix with the character position removed from the translation */
+                    float* m = owp->mtx;
+                    float* pos = &((BH_PWORK*)pwp)->px;
+                    float* d = (float*)np.mxp[i][0];
+                    int k;
+
+                    for (k = 0; k < 16; k++)
+                    {
+                        d[k] = d[k + 16] = m[k];
+                    }
+
+                    for (k = 0; k < 3; k++)
+                    {
+                        d[12 + k] = d[28 + k] = m[12 + k] - pos[k];
+                    }
+                }
+#else
                 asm volatile 
                 ("
                 .set noreorder
@@ -2129,6 +2308,7 @@ void npInitCalcSkinFM(void* pwp, int obj_n, int* sknp)
                 .set reorder
                 " : : "r"(&owp->mtx), "r"(&((BH_PWORK*)pwp)->px), "r"(np.mxp[i][0]), "r"(owp) 
                 );
+#endif
                     
                 njRotXYZ(np.mxp[i][0], -op->ang[0], -op->ang[1], -op->ang[2]); 
             }
@@ -2182,7 +2362,11 @@ void npCalcSkinFM(void* pwp, int obj_n, int* sknp)
                         
                         nb = *np.sknp++;
         
+#ifdef TARGET_PC
+                        /* PC: no uncached-accelerated RAM mirror */
+#else
                         pHdr1 = (HDR_PS*)((int)pHdr1 | 0x30000000); 
+#endif
         
                         pHdr1->ucType = pHdr0->ucType;
                         pHdr1->ucAttr = pHdr0->ucAttr; 
@@ -2210,6 +2394,22 @@ void npCalcSkinFM(void* pwp, int obj_n, int* sknp)
                             
                             if (lv != 1.0f) 
                             { 
+#ifdef TARGET_PC
+                                {
+                                    /* blend vertex position between the two bone matrices by lv */
+                                    float* m0 = (float*)np.mxp[rg0][0];
+                                    float* m1 = (float*)np.mxp[rg0][1];
+                                    float a[3], b[3];
+
+                                    pcVu0XformPoint(m0, (float*)p0, a);
+                                    pcVu0XformPoint(m1, (float*)p0, b);
+
+                                    p1[0] = (b[0] - a[0]) * lv + a[0];
+                                    p1[1] = (b[1] - a[1]) * lv + a[1];
+                                    p1[2] = (b[2] - a[2]) * lv + a[2];
+                                    p1[3] = m1[11];
+                                }
+#else
                                 asm volatile 
                                 ("
                                 .set noreorder
@@ -2254,10 +2454,27 @@ void npCalcSkinFM(void* pwp, int obj_n, int* sknp)
                                 .set reorder
                                 " : : "f"(lv), "r"(p0), "r"(p1), "r"(np.mxp[rg0][0]), "r"(np.mxp[rg0][1]) : "t0" 
                                 );
+#endif
                                 
                                 p1 += 4; 
                                 p0++; 
                                 
+#ifdef TARGET_PC
+                                {
+                                    /* blend vertex normal between the two bone matrices by lv */
+                                    float* m0 = (float*)np.mxp[rg0][0];
+                                    float* m1 = (float*)np.mxp[rg0][1];
+                                    float a[3], b[3];
+
+                                    pcVu0XformVector(m0, (float*)p0, a);
+                                    pcVu0XformVector(m1, (float*)p0, b);
+
+                                    p1[0] = (b[0] - a[0]) * lv + a[0];
+                                    p1[1] = (b[1] - a[1]) * lv + a[1];
+                                    p1[2] = (b[2] - a[2]) * lv + a[2];
+                                    p1[3] = m0[11];
+                                }
+#else
                                 asm volatile 
                                 ("
                                 .set noreorder
@@ -2297,12 +2514,25 @@ void npCalcSkinFM(void* pwp, int obj_n, int* sknp)
                                 .set reorder
                                 " : : "f"(lv), "r"(p0),  "r"(p1), "r"(np.mxp[rg0][0]), "r"(np.mxp[rg0][1]) : "t0" 
                                 );
+#endif
                                 
                                 p1 += 4; 
                                 p0++;
                             } 
                             else 
                             { 
+#ifdef TARGET_PC
+                                {
+                                    /* vertex fully bound to the second bone matrix: transform position and normal */
+                                    float* m1 = (float*)np.mxp[rg0][1];
+
+                                    pcVu0XformPoint(m1, (float*)&p0[0], &p1[0]);
+                                    p1[3] = p0[0].w;
+
+                                    pcVu0XformVector(m1, (float*)&p0[1], &p1[4]);
+                                    p1[7] = p0[1].w;
+                                }
+#else
                                 asm volatile 
                                 ("
                                 .set noreorder
@@ -2333,6 +2563,7 @@ void npCalcSkinFM(void* pwp, int obj_n, int* sknp)
                                 .set reorder
                                 " : : "r"(p0), "r"(p1), "r"(np.mxp[rg0][1]), "r"(op)
                                 ); 
+#endif
                                 
                                 p0 += 2; 
                                 p1 += 8; 

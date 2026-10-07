@@ -14,6 +14,9 @@
 #include "../../../ps2/veronica/prog/ps2_NaMem.h"
 #include "../../../ps2/veronica/prog/subpl.h"
 #include "../../../ps2/veronica/prog/sdfunc.h"
+#ifdef TARGET_PC
+#include "../../../ps2/veronica/prog/rutchk.h" /* returns unsigned char: needs a prototype */
+#endif
 
 // ENEMY: Tyrant T-078 
 
