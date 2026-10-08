@@ -2263,6 +2263,18 @@ void SpriteSet2D(S_WORK* st, PARTS* cbjim, NJS_TEXANIM* anim1, NJS_TEXLIST* tlis
 }
 
 #ifdef TARGET_PC
+/* widescreen: the background piece whose right edge was the screen's right edge (parts_07b,
+ * anim 1) has a light border in its last texel column; with the pattern continued past the 4:3
+ * edges that column would show as a line, so it is left out */
+static void pc_wide_trim(PARTS* table)
+{
+    extern float pcVideoWideScale(void);
+    extern int pcWide2DTrimRight;
+
+    pcWide2DTrimRight = (table >= parts_07b) && (table < &parts_07b[8]) && (table->anim == 1) &&
+                        (pcVideoWideScale() < 1.0f);
+}
+
 /* widescreen: the status screen background (parts_07b, a brick pattern that repeats every 640
  * pixels) is drawn again 640 to each side, so it fills the side areas around the 4:3 layout */
 static void pc_wide_background(S_WORK* st, PARTS* table, PARTS* spr, NJS_TEXANIM* anim, NJS_TEXLIST* tlist)
@@ -3709,18 +3721,26 @@ void StatusMain()
                             {
                                 njSetTexture(&fv->fbtx_list);
                                 
+#ifdef TARGET_PC
+                                pc_wide_trim(spr_a);
+#endif
                                 SpriteSet2D(st, &spr_t, parts, &fv->fbtx_list);
 #ifdef TARGET_PC
                                 pc_wide_background(st, spr_a, &spr_t, parts, &fv->fbtx_list);
+                                pc_wide_trim(NULL);
 #endif
                             } 
                             else if ((spr_t.atr & 0x40)) 
                             {
                                 njSetTexture(&fv->fstx_list);
                                 
+#ifdef TARGET_PC
+                                pc_wide_trim(spr_a);
+#endif
                                 SpriteSet2D(st, &spr_t, parts, &fv->fstx_list);
 #ifdef TARGET_PC
                                 pc_wide_background(st, spr_a, &spr_t, parts, &fv->fstx_list);
+                                pc_wide_trim(NULL);
 #endif
                             }
                         }
@@ -3728,9 +3748,13 @@ void StatusMain()
                         {
                             njSetTexture(&st->subtx_list);
                             
+#ifdef TARGET_PC
+                            pc_wide_trim(spr_a);
+#endif
                             SpriteSet2D(st, &spr_t, parts, &st->subtx_list);
 #ifdef TARGET_PC
                                 pc_wide_background(st, spr_a, &spr_t, parts, &st->subtx_list);
+                                pc_wide_trim(NULL);
 #endif
                             
                             njSetPaletteBankNum(0, 5);

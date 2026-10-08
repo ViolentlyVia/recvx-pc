@@ -74,9 +74,31 @@ void gsFlushPrims(void)
 static void emit(const GsVertex* v, int n)
 {
     GsDrawState st;
+    float cu0 = -1e30f, cv0 = -1e30f, cu1 = 1e30f, cv1 = 1e30f;
     int i;
 
     current_state(&st);
+
+    /* 2D pieces (textured with integer UV coordinates) cut from a larger texture sheet: when
+     * upscaled, filtering at their edges would blend in the neighbouring image on the sheet
+     * (thin lines at every tile edge). They may only sample their own texels: from half a
+     * texel inside their UV rectangle. (3D surfaces use ST coordinates and are left alone.) */
+    if (st.tme && st.fst)
+    {
+        cu0 = cv0 = 1e30f;
+        cu1 = cv1 = -1e30f;
+
+        for (i = 0; i < n; i++)
+        {
+            if (v[i].u < cu0) cu0 = v[i].u;
+            if (v[i].u > cu1) cu1 = v[i].u;
+            if (v[i].v < cv0) cv0 = v[i].v;
+            if (v[i].v > cv1) cv1 = v[i].v;
+        }
+
+        if (cu1 - cu0 >= 1.0f) { cu0 += 0.5f; cu1 -= 0.5f; } else { cu0 = cu1 = (cu0 + cu1) * 0.5f; }
+        if (cv1 - cv0 >= 1.0f) { cv0 += 0.5f; cv1 -= 0.5f; } else { cv0 = cv1 = (cv0 + cv1) * 0.5f; }
+    }
 
     /* sprites, points and lines become separate batches by type */
     if (out_valid && ((memcmp(&st, &out_state, sizeof(st)) != 0) || (out_count + n > (int)(sizeof(out_verts) / sizeof(out_verts[0])))))
@@ -92,7 +114,10 @@ static void emit(const GsVertex* v, int n)
 
     for (i = 0; i < n; i++)
     {
-        out_verts[out_count++] = v[i];
+        GsVertex* o = &out_verts[out_count++];
+
+        *o = v[i];
+        o->cu0 = cu0; o->cv0 = cv0; o->cu1 = cu1; o->cv1 = cv1;
     }
 }
 

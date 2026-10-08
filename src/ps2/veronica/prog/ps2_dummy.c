@@ -321,7 +321,64 @@ void PS2_swap()
 
 // 99.93% matching
 #ifdef TARGET_PC
+/* Upscaling: 2D pieces drawn texel for pixel (UI panels, backgrounds) often start half a texel
+ * into their image (u = 60.5). At the PS2's resolution the screen samples never fall in that
+ * outer half texel; upscaled, the outermost sub-pixels do and pick up a sliver of the next image
+ * on the sheet: thin lines at every tile edge. Moving such a piece's texture coordinates to the
+ * texel boundary keeps the texels the PS2 shows and stops the bleeding. UV (integer) coordinates
+ * only: U and V are 1/16 texel in words 0 and 1 of each vertex, x and y floats in words 8, 9. */
+static void pc_snap_uv(unsigned int* v, unsigned int num)
+{
+    int axis;
+    unsigned int i;
+
+    for (axis = 0; axis < 2; axis++)   /* U along x, V along y */
+    {
+        float tmin = 1e9f, tmax = -1e9f, smin = 1e9f, smax = -1e9f, t_at_smin = 0, off;
+        int k;
+
+        for (i = 0; i < num; i++)
+        {
+            float t = (v[(i * 12) + axis] & 0x3FFF) / 16.0f;
+            float sc = ((float*)v)[(i * 12) + 8 + axis];
+
+            if (t < tmin) tmin = t;
+            if (t > tmax) tmax = t;
+
+            if (sc < smin)
+            {
+                smin = sc;
+                t_at_smin = t;
+            }
+
+            if (sc > smax) smax = sc;
+        }
+
+        /* only texel-for-pixel pieces that are not mirrored */
+        if ((smax - smin < 1.0f) || (fabsf((tmax - tmin) - (smax - smin)) > 0.1f * (smax - smin)) || (t_at_smin != tmin))
+        {
+            continue;
+        }
+
+        off = floorf(tmin + 0.5f) - tmin;
+        k = (int)(off * 16.0f + 0.5f);
+
+        if (k <= 0)
+        {
+            continue;
+        }
+
+        for (i = 0; i < num; i++)
+        {
+            unsigned int w = v[(i * 12) + axis];
+
+            v[(i * 12) + axis] = (w & ~0x3FFFu) | (((w & 0x3FFF) + k) & 0x3FFF);
+        }
+    }
+}
+
 int pcWide2DUnclipped;   /* widescreen: 2D drawn into the side areas on purpose (backgrounds) */
+int pcWide2DTrimRight;   /* widescreen: leave out the piece's last texel column (a screen-edge border) */
 
 /* widescreen: clip a 2D rectangle (sprite, or quad with two distinct x values) to the 4:3
  * frame, 1728..2368 in GS coordinates. Vertices are 3 qwords: ST/Q (or UV), RGBA, XYZ. */
@@ -459,6 +516,28 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
     } 
     
 #ifdef TARGET_PC
+    if ((clip_3d_on == 0) && (prim & 0x8000000000000) && (prim & 0x80000000000000) && (num <= 64))
+    {
+        memcpy(wide_buf, dp, num * 48);
+        dp = wide_buf;
+        pc_snap_uv((unsigned int*)wide_buf, num);
+
+        if (pcWide2DTrimRight)
+        {
+            unsigned int i2, umax = 0;
+
+            for (i2 = 0; i2 < num; i2++)
+            {
+                if ((wide_buf[i2 * 12] & 0x3FFF) > umax) umax = wide_buf[i2 * 12] & 0x3FFF;
+            }
+
+            for (i2 = 0; i2 < num; i2++)
+            {
+                if ((wide_buf[i2 * 12] & 0x3FFF) == umax) wide_buf[i2 * 12] -= 16;
+            }
+        }
+    }
+
     /* widescreen: 2D keeps its 4:3 layout in the middle of the stretched frame. Primitives
      * that cover the whole width stay full width when they are untextured (fades, flashes) or
      * translucent full screen overlays (room darkness filters); opaque full screen pictures
@@ -496,7 +575,13 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
             /* 2D beyond the 4:3 edges (panels parked off screen or sliding in) was hidden by
              * the screen edge; squeezed, it would show in the side areas. Backgrounds the
              * game code extends into those areas on purpose set pcWide2DUnclipped. */
-            if ((wide_2d < 1.0f) && !pcWide2DUnclipped)
+            /* Pieces reaching at most 32 pixels past an edge belong to panels drawn running off
+             * the edge of the screen: they are drawn whole, so the panel continues instead of
+             * ending in a hard cut. */
+            if ((wide_2d < 1.0f) && !pcWide2DUnclipped && (x0 >= 1728.0f - 32.0f) && (x1 <= 2368.0f + 32.0f))
+            {
+            }
+            else if ((wide_2d < 1.0f) && !pcWide2DUnclipped)
             {
                 if ((x1 <= 1728.0f) || (x0 >= 2368.0f))
                 {
@@ -505,8 +590,12 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
 
                 if (((x0 < 1728.0f) || (x1 > 2368.0f)) && (num <= 64))
                 {
-                    memcpy(wide_buf, dp, num * 48);
-                    dp = wide_buf;
+                    if (dp != wide_buf)
+                    {
+                        memcpy(wide_buf, dp, num * 48);
+                        dp = wide_buf;
+                    }
+
                     pc_wide_clip((unsigned int*)wide_buf, num, (prim & 0x80000000000000) != 0);
                 }
             }

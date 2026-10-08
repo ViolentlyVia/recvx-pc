@@ -42,6 +42,7 @@ typedef struct {
     float s, t, q;
     float u, v;         /* texels (FST = 1) */
     unsigned char f;
+    float cu0, cv0, cu1, cv1;   /* texels the primitive may sample (see emit) */
 } GsVertex;
 
 /* everything that decides how a primitive is drawn */

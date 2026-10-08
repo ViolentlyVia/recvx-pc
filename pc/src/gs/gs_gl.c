@@ -43,15 +43,17 @@ static const char* vs_src =
     "layout(location = 2) in vec3 aSTQ;\n"
     "layout(location = 3) in vec2 aUV;\n"
     "layout(location = 4) in float aFog;\n"
+    "layout(location = 5) in vec4 aClamp;\n"   /* texels a 2D piece may sample: u0, v0, u1, v1 */
     "uniform vec2 uTarget;\n"                   /* render target size in PS2 pixels */
     "out vec4 vColor;\n"
     "flat out vec4 vFlatColor;\n"
     "noperspective out vec3 vSTQ;\n"
     "noperspective out vec2 vUV;\n"
     "noperspective out float vFog;\n"
+    "flat out vec4 vClamp;\n"
     "void main() {\n"
     "    gl_Position = vec4(aPos.xy / uTarget * 2.0 - 1.0, aPos.z * 2.0 - 1.0, 1.0);\n"
-    "    vColor = aColor; vFlatColor = aColor; vSTQ = aSTQ; vUV = aUV; vFog = aFog;\n"
+    "    vColor = aColor; vFlatColor = aColor; vSTQ = aSTQ; vUV = aUV; vFog = aFog; vClamp = aClamp;\n"
     "}\n";
 
 static const char* fs_src =
@@ -61,6 +63,7 @@ static const char* fs_src =
     "noperspective in vec3 vSTQ;\n"
     "noperspective in vec2 vUV;\n"
     "noperspective in float vFog;\n"
+    "flat in vec4 vClamp;\n"
     "uniform sampler2D uTex;\n"
     "uniform int uTme, uFst, uTfx, uTcc, uIip;\n"
     "uniform vec3 uTexa;\n"                    /* TA0, TA1, AEM */
@@ -122,7 +125,7 @@ static const char* fs_src =
     "    vec4 vc = (uIip != 0 ? vColor : vFlatColor) * 255.0;\n"
     "    vec3 rgb = vc.rgb; float a = vc.a;\n"
     "    if (uTme != 0) {\n"
-    "        vec2 uv = (uFst != 0) ? vUV : (vSTQ.xy / vSTQ.z) * uTexSize;\n"
+    "        vec2 uv = (uFst != 0) ? clamp(vUV, vClamp.xy, vClamp.zw) : (vSTQ.xy / vSTQ.z) * uTexSize;\n"
     "        vec4 t = sampleTex(uv);\n"
     "        if (uTfx == 0) { rgb = t.rgb * vc.rgb / 128.0; a = (uTcc != 0) ? t.a * vc.a / 128.0 : vc.a; }\n"
     "        else if (uTfx == 1) { rgb = t.rgb; a = (uTcc != 0) ? t.a : vc.a; }\n"
@@ -205,6 +208,7 @@ typedef struct {
     float s, t, q;
     float u, v;
     float fog;
+    float cu0, cv0, cu1, cv1;   /* sampling limits in texels (GsVertex) */
 } GlVertex;
 
 #define MAX_GL_VERTS 65536
@@ -687,8 +691,9 @@ void gsRendererInit(void)
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(GlVertex), (void*)offsetof(GlVertex, s));
     glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(GlVertex), (void*)offsetof(GlVertex, u));
     glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(GlVertex), (void*)offsetof(GlVertex, fog));
+    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(GlVertex), (void*)offsetof(GlVertex, cu0));
 
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 6; i++)
     {
         glEnableVertexAttribArray(i);
     }
@@ -926,6 +931,7 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
                 c[k].s = sx->s; c[k].t = sy->t; c[k].q = b->q;
                 c[k].u = sx->u; c[k].v = sy->v;
                 c[k].fog = b->f / 255.0f;
+                c[k].cu0 = b->cu0; c[k].cv0 = b->cv0; c[k].cu1 = b->cu1; c[k].cv1 = b->cv1;
             }
 
             glverts[n++] = c[0]; glverts[n++] = c[1]; glverts[n++] = c[2];
@@ -947,6 +953,7 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
             o->s = v[i].s; o->t = v[i].t; o->q = v[i].q;
             o->u = v[i].u; o->v = v[i].v;
             o->fog = v[i].f / 255.0f;
+            o->cu0 = v[i].cu0; o->cv0 = v[i].cv0; o->cu1 = v[i].cu1; o->cv1 = v[i].cv1;
         }
 
         mode = (st->type == 0) ? GL_POINTS : ((st->type <= 2) ? GL_LINES : GL_TRIANGLES);
@@ -1243,6 +1250,28 @@ void pcGsScreenshot(const char* path, unsigned int fbp)
     glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
     glPixelStorei(GL_PACK_ALIGNMENT, 4);
     glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, px);
+
+    /* RECVX_SHOTS_FULL=1: the internal resolution instead of 640x480 (for checking fine detail) */
+    if (getenv("RECVX_SHOTS_FULL") != NULL)
+    {
+        int w = 640 * pcGsScaleX, h = 480 * pcGsScale;
+
+        free(rgb);
+        rgb = malloc(w * h * 3);
+
+        for (y = 0; y < h; y++)
+        {
+            for (x = 0; x < w; x++)
+            {
+                memcpy(&rgb[(y * w + x) * 3], &px[(y * W + x) * 4], 3);
+            }
+        }
+
+        pcWritePng(path, rgb, w, h);
+        free(px);
+        free(rgb);
+        return;
+    }
 
     for (y = 0; y < 480; y++)
     {
