@@ -320,6 +320,96 @@ void PS2_swap()
 }
 
 // 99.93% matching
+#ifdef TARGET_PC
+/* widescreen: clip a 2D rectangle (sprite, or quad with two distinct x values) to the 4:3
+ * frame, 1728..2368 in GS coordinates. Vertices are 3 qwords: ST/Q (or UV), RGBA, XYZ. */
+static void pc_wide_clip(unsigned int* v, unsigned int num, int uv)
+{
+    static unsigned int orig[64 * 12];
+    float xa = ((float*)v)[8], xb = xa;
+    unsigned int i, j, k;
+
+    for (i = 0; i < num; i++)
+    {
+        float x = ((float*)v)[(i * 12) + 8];
+
+        if ((x != xa) && (xb == xa))
+        {
+            xb = x;
+        }
+        else if ((x != xa) && (x != xb))
+        {
+            return;   /* not a rectangle: leave it */
+        }
+    }
+
+    memcpy(orig, v, num * 48);   /* interpolate from the unclipped corners */
+
+    for (i = 0; i < num; i++)
+    {
+        unsigned int* a = &v[i * 12];
+        float x = ((float*)a)[8];
+        float e = (x < 1728.0f) ? 1728.0f : (x > 2368.0f) ? 2368.0f : x;
+        unsigned int* b = NULL;
+        float t;
+
+        if (e == x)
+        {
+            continue;
+        }
+
+        /* the vertex across the rectangle on the same row (a sprite has just two) */
+        for (j = 0; j < num; j++)
+        {
+            unsigned int* c = &orig[j * 12];
+
+            if ((((float*)c)[8] != x) && ((num == 2) || (((float*)c)[9] == ((float*)a)[9])))
+            {
+                b = c;
+                break;
+            }
+        }
+
+        if (b == NULL)
+        {
+            continue;
+        }
+
+        t = (e - x) / (((float*)b)[8] - x);
+
+        /* a sprite's other vertex is the opposite corner: only the horizontal texture
+         * coordinate follows x there */
+        if (uv)
+        {
+            for (k = 0; k < ((num > 2) ? 2u : 1u); k++)
+            {
+                a[k] = (unsigned int)((int)a[k] + (int)(t * ((int)b[k] - (int)a[k])));
+            }
+        }
+        else
+        {
+            for (k = 0; k < ((num > 2) ? 3u : 1u); k++)
+            {
+                ((float*)a)[k] += t * (((float*)b)[k] - ((float*)a)[k]);
+            }
+        }
+
+        /* sprites are flat shaded from their last vertex; the first one's color is unset */
+        for (k = 4; (num > 2) && (k < 8); k++)
+        {
+            a[k] = (unsigned int)((int)a[k] + (int)(t * ((int)b[k] - (int)a[k]) + 0.5f));
+        }
+
+        ((float*)a)[8] = e;
+
+        if (num > 2)
+        {
+            ((float*)a)[10] += t * (((float*)b)[10] - ((float*)a)[10]);
+        }
+    }
+}
+#endif
+
 void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int clip_3d_on)
 {
     unsigned long* p;           
@@ -336,6 +426,7 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
     float y;                    
 #ifdef TARGET_PC
     float wide_2d = 1.0f;
+    static unsigned int wide_buf[64 * 12];
 #endif
 
     clip_flag = 0; 
@@ -397,6 +488,23 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
                     ((prim & 0x20000000000000) && (y0 <= 1808.0f + 1.0f) && (y1 >= 2288.0f - 1.0f)))
                 {
                     wide_2d = 1.0f;
+                }
+            }
+
+            /* 2D beyond the 4:3 edges (panels parked off screen or sliding in) was hidden by
+             * the screen edge; squeezed, it would show in the side areas */
+            if (wide_2d < 1.0f)
+            {
+                if ((x1 <= 1728.0f) || (x0 >= 2368.0f))
+                {
+                    return;
+                }
+
+                if (((x0 < 1728.0f) || (x1 > 2368.0f)) && (num <= 64))
+                {
+                    memcpy(wide_buf, dp, num * 48);
+                    dp = wide_buf;
+                    pc_wide_clip((unsigned int*)wide_buf, num, (prim & 0x80000000000000) != 0);
                 }
             }
         }
