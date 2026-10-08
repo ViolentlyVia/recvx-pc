@@ -275,9 +275,7 @@ int pcCdOpen(void)
 
     if (!find_iso())
     {
-        pcPlatformFatal("Could not find the game disc image.\n\n"
-                        "Put your Resident Evil Code: Veronica X (USA, SLUS-20184) .iso next to "
-                        "recvx.exe, or set its path in recvx.ini (iso=C:\\path\\to\\game.iso).");
+        pcPlatformNotSetUp();
         return 0;
     }
 

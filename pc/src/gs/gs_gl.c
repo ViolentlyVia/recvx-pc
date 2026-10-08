@@ -661,7 +661,8 @@ void gsRendererInit(void)
 {
     if (!pcGlLoad())
     {
-        pcPlatformFatal("OpenGL 3.3 is required.");
+        pcPlatformFatal("The graphics driver does not support OpenGL 3.3, which the game needs.\n\n"
+                        "Updating the graphics driver usually fixes this.");
     }
 
     decode_buf = malloc(1024 * 1024 * 4);

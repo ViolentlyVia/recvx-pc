@@ -76,6 +76,45 @@ void pcPlatformFatal(const char* fmt, ...)
     exit(1);
 }
 
+void pcPlatformNotSetUp(void)
+{
+    static const SDL_MessageBoxButtonData buttons[] = {
+        { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Open settings" },
+        { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Quit" },
+    };
+    SDL_MessageBoxData box;
+    char dir[1024], exe[1100];
+    int choice = 0;
+
+    pcLog("FATAL: the game is not set up (no data folder or disc image)");
+
+    if (window != NULL)
+    {
+        SDL_HideWindow(window);   /* not an empty black game window behind the question */
+    }
+
+    memset(&box, 0, sizeof(box));
+    box.flags = SDL_MESSAGEBOX_INFORMATION;
+    box.title = "Resident Evil Code: Veronica X";
+    box.message = "The game is not set up yet.\n\n"
+                  "It needs the files from your own copy of the game: a disc image (.iso) of Resident Evil "
+                  "Code: Veronica X for the US PlayStation 2 (SLUS-20184).\n\n"
+                  "Open the settings app to set it up?";
+    box.numbuttons = 2;
+    box.buttons = buttons;
+
+    pcPlatformExeDir(dir, sizeof(dir));
+    snprintf(exe, sizeof(exe), "%s\\recvx-config.exe", dir);
+
+    if ((SDL_ShowMessageBox(&box, &choice) == 0) && (choice == 1) && !pcOsLaunch(exe))
+    {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Resident Evil Code: Veronica X",
+                                 "Could not start recvx-config.exe. It should be in the same folder as recvx.exe.", NULL);
+    }
+
+    exit(1);
+}
+
 void pcPlatformExeDir(char* out, int size)
 {
     char* base = SDL_GetBasePath();

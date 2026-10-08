@@ -10,7 +10,8 @@ double pcOsTime(void);          /* seconds, monotonic */
 void   pcOsSleep(double seconds);
 
 void pcOsOpenConsole(void);
-void pcOsSetWindowIcon(void* hwnd);  /* the exe's icon (pc/res/recvx.ico) on a window */          /* a console window for stdout (RECVX_CONSOLE=1) */
+void pcOsSetWindowIcon(void* hwnd);
+int  pcOsLaunch(const char* exe_path);    /* start another program (no waiting); 0 on failure */  /* the exe's icon (pc/res/recvx.ico) on a window */          /* a console window for stdout (RECVX_CONSOLE=1) */
 void pcOsInstallDiagnostics(void);   /* crash handler + hang watchdog (stack traces to the log) */
 void pcOsHeartbeat(void);            /* call once per presented frame */
 

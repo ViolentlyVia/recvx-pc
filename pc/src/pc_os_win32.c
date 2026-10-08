@@ -173,6 +173,15 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep)
              ep->ExceptionRecord->ExceptionAddress);
     print_stack(GetCurrentThread(), ep->ContextRecord, why);
 
+    /* tell the player instead of just vanishing (scripted test runs stay unattended) */
+    if ((getenv("RECVX_INPUT") == NULL) && (getenv("RECVX_REPLAY") == NULL))
+    {
+        MessageBoxA(NULL, "The game stopped because of an error.\n\n"
+                          "Details were saved to recvx.log next to recvx.exe. If you report the problem, "
+                          "please include recvx.log and last_run_input.txt (a recording of this session).",
+                    "Resident Evil Code: Veronica X", MB_ICONERROR | MB_OK | MB_TOPMOST | MB_SETFOREGROUND);
+    }
+
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -224,6 +233,34 @@ void pcOsOpenConsole(void)
         freopen("CONOUT$", "w", stderr);
         SetConsoleTitleA("recvx log");
     }
+}
+
+int pcOsLaunch(const char* exe_path)
+{
+    char cmd[MAX_PATH + 4], dir[MAX_PATH];
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    char* slash;
+
+    snprintf(cmd, sizeof(cmd), "\"%s\"", exe_path);
+    snprintf(dir, sizeof(dir), "%s", exe_path);
+
+    if ((slash = strrchr(dir, '\\')) != NULL || (slash = strrchr(dir, '/')) != NULL)
+    {
+        *slash = 0;
+    }
+
+    memset(&si, 0, sizeof(si));
+    si.cb = sizeof(si);
+
+    if (!CreateProcessA(NULL, cmd, NULL, NULL, FALSE, 0, NULL, dir, &si, &pi))
+    {
+        return 0;
+    }
+
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    return 1;
 }
 
 void pcOsSetWindowIcon(void* hwnd)

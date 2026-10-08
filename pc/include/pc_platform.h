@@ -5,6 +5,8 @@
 
 void pcLog(const char* fmt, ...);
 void pcPlatformFatal(const char* fmt, ...);
+/* The game files are missing: offer to open recvx-config.exe to set the game up, then quit. */
+void pcPlatformNotSetUp(void);
 
 /* Directory containing recvx.exe (no trailing slash). */
 void pcPlatformExeDir(char* out, int size);
