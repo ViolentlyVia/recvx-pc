@@ -89,6 +89,51 @@ void pcPlatformExeDir(char* out, int size)
     }
 }
 
+int pcIniGet(const char* key, char* out, int size)
+{
+    char dir[1024], ini[1100], line[1300];
+    size_t klen = strlen(key);
+    int found = 0;
+    FILE* f;
+
+    pcPlatformExeDir(dir, sizeof(dir));
+    snprintf(ini, sizeof(ini), "%s/recvx.ini", dir);
+
+    if ((f = fopen(ini, "r")) == NULL)
+    {
+        return 0;
+    }
+
+    while (fgets(line, sizeof(line), f) != NULL)
+    {
+        if ((_strnicmp(line, key, klen) == 0) && (line[klen] == '='))
+        {
+            size_t n;
+
+            snprintf(out, size, "%s", line + klen + 1);
+            n = strlen(out);
+
+            while ((n > 0) && ((out[n - 1] == '\n') || (out[n - 1] == '\r') || (out[n - 1] == ' ') ||
+                               (out[n - 1] == '\t')))
+            {
+                out[--n] = 0;
+            }
+
+            found = 1;
+        }
+    }
+
+    fclose(f);
+    return found;
+}
+
+int pcIniGetInt(const char* key, int def)
+{
+    char v[64];
+
+    return pcIniGet(key, v, sizeof(v)) ? atoi(v) : def;
+}
+
 int pcPlatformFindFile(const char* dir, const char* ext, char* out, int size)
 {
     /* SDL2 has no directory listing; use the CRT one */
@@ -113,8 +158,93 @@ int pcPlatformFindFile(const char* dir, const char* ext, char* out, int size)
 /* ------------------------------------------------------------------------------------------- */
 /* video */
 
+/* recvx.ini video settings: scale=N, window=WxH, fullscreen=0|1|desktop, aspect=W:H */
+static struct {
+    int loaded;
+    int win_w, win_h;
+    int fullscreen;          /* 0 window, 1 exclusive, 2 desktop */
+    float aspect;            /* display aspect, 4:3 = 1.333 */
+} video_cfg;
+
+static void video_settings(void)
+{
+    char v[64];
+    int w, h;
+
+    if (video_cfg.loaded)
+    {
+        return;
+    }
+
+    video_cfg.loaded = 1;
+    video_cfg.win_w = PS2_WIDTH * 2;
+    video_cfg.win_h = PS2_HEIGHT * 2;
+    video_cfg.aspect = 4.0f / 3.0f;
+
+    pcGsScale = pcIniGetInt("scale", pcGsScale);
+
+    if (pcGsScale < 1) pcGsScale = 1;
+    if (pcGsScale > 8) pcGsScale = 8;
+
+    if (pcIniGet("fullscreen", v, sizeof(v)))
+    {
+        video_cfg.fullscreen = (_stricmp(v, "desktop") == 0) ? 2 : (atoi(v) != 0);
+    }
+
+    if (pcIniGet("aspect", v, sizeof(v)) && (sscanf(v, "%d:%d", &w, &h) == 2) && (w > 0) && (h > 0))
+    {
+        float a = (float)w / (float)h;
+
+        /* narrower than 4:3 is not supported (the 2D layout is 4:3); cap at 32:9 */
+        if (a < 4.0f / 3.0f) a = 4.0f / 3.0f;
+        if (a > 32.0f / 9.0f) a = 32.0f / 9.0f;
+
+        video_cfg.aspect = a;
+        video_cfg.win_w = (int)(video_cfg.win_h * a + 0.5f);
+    }
+
+    if (pcIniGet("window", v, sizeof(v)) && (sscanf(v, "%dx%d", &w, &h) == 2) && (w >= 320) && (h >= 240))
+    {
+        video_cfg.win_w = w;
+        video_cfg.win_h = h;
+    }
+
+    /* the 640 wide frame is stretched to the display aspect: render more columns to match */
+    pcGsScaleX = (int)(pcGsScale * video_cfg.aspect / (4.0f / 3.0f) + 0.5f);
+}
+
+float pcVideoAspect(void)
+{
+    video_settings();
+    return video_cfg.aspect;
+}
+
+/* horizontal factor that maps the widened 3D view (and the 4:3 2D layout) into the 640 wide
+ * frame buffer: 1.0 at 4:3, 0.75 at 16:9 */
+float pcVideoWideScale(void)
+{
+    video_settings();
+    return (4.0f / 3.0f) / video_cfg.aspect;
+}
+
+static void toggle_fullscreen(void)
+{
+    Uint32 flags = SDL_GetWindowFlags(window);
+
+    if (flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP))
+    {
+        SDL_SetWindowFullscreen(window, 0);
+    }
+    else
+    {
+        SDL_SetWindowFullscreen(window, (video_cfg.fullscreen == 1) ? SDL_WINDOW_FULLSCREEN : SDL_WINDOW_FULLSCREEN_DESKTOP);
+    }
+}
+
 void pcVideoInit(void)
 {
+    Uint32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL;
+
     if (window != NULL)
     {
         return;
@@ -133,8 +263,15 @@ void pcVideoInit(void)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
+    video_settings();
+
+    if (video_cfg.fullscreen)
+    {
+        flags |= (video_cfg.fullscreen == 1) ? SDL_WINDOW_FULLSCREEN : SDL_WINDOW_FULLSCREEN_DESKTOP;
+    }
+
     window = SDL_CreateWindow("Resident Evil Code: Veronica X", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                              PS2_WIDTH * 2, PS2_HEIGHT * 2, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
+                              video_cfg.win_w, video_cfg.win_h, flags);
 
     if (window == NULL)
     {
@@ -163,8 +300,8 @@ void pcVideoInit(void)
 
     pcPadInit();
 
-    pcLog("video: SDL %d.%d.%d, window %dx%d", SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL,
-          PS2_WIDTH * 2, PS2_HEIGHT * 2);
+    pcLog("video: SDL %d.%d.%d, window %dx%d%s, aspect %.3f", SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL,
+          video_cfg.win_w, video_cfg.win_h, video_cfg.fullscreen ? " (fullscreen)" : "", video_cfg.aspect);
 }
 
 int pcVideoPumpEvents(void)
@@ -181,6 +318,11 @@ int pcVideoPumpEvents(void)
         if ((ev.type == SDL_CONTROLLERDEVICEADDED) || (ev.type == SDL_CONTROLLERDEVICEREMOVED))
         {
             pcPadInit();
+        }
+
+        if ((ev.type == SDL_KEYDOWN) && !ev.key.repeat && (ev.key.keysym.scancode == SDL_SCANCODE_F11))
+        {
+            toggle_fullscreen();
         }
     }
 
@@ -496,13 +638,15 @@ void pcPadUpdate(void)
     }
 
     /* testing aid: RECVX_INPUT=<file> replays button presses. Each line: "<frame> <button>[+<button>...] [hold]"
-     * where <frame> is a frame number (only until the status screen first opens) or "status+<n>"
-     * (n frames after the status screen opens, each time);
+     * where <frame> is a frame number (only until the status screen first opens), "title+<n>"
+     * (n frames after the title screen first starts, so load times don't shift it) or
+     * "status+<n>" (n frames after the status screen opens, each time);
      * with buttons start select cross circle square triangle up down left right l1 r1 l2 r2;
      * the buttons are held for <hold> frames (default 4) from that frame on. */
     {
         static struct { unsigned int frame, hold; unsigned short mask; int rel; } script[512];
         static unsigned int status_frame = 0xFFFFFFFF;
+        static unsigned int title_frame = 0xFFFFFFFF;
         static int in_status;
         static int nscript = -1;
         static const char* names[16] = { "select", "l3", "r3", "start", "up", "right", "down", "left",
@@ -530,6 +674,11 @@ void pcPadUpdate(void)
                 {
                     rel = 1;
                     memmove(line, line + 7, strlen(line + 7) + 1);
+                }
+                else if (strncmp(line, "title+", 6) == 0)
+                {
+                    rel = 2;
+                    memmove(line, line + 6, strlen(line + 6) + 1);
                 }
 
                 if (sscanf(line, "%u %199s %u", &fr, btn, &hold) < 2)
@@ -574,12 +723,27 @@ void pcPadUpdate(void)
             in_status = now;
         }
 
+        {
+            extern int pcGameInTitle(void);
+
+            if ((title_frame == 0xFFFFFFFF) && pcGameInTitle())
+            {
+                title_frame = frames;
+            }
+        }
+
         for (k = 0; k < nscript; k++)
         {
-            unsigned int at = script[k].rel ? status_frame + script[k].frame : script[k].frame;
+            unsigned int at = (script[k].rel == 1) ? status_frame + script[k].frame :
+                              (script[k].rel == 2) ? title_frame + script[k].frame : script[k].frame;
 
-            /* relative entries wait for the status screen; absolute ones stop once it has opened */
-            if ((status_frame == 0xFFFFFFFF) == (script[k].rel != 0))
+            /* status entries wait for the status screen; the others stop once it has opened */
+            if ((status_frame == 0xFFFFFFFF) == (script[k].rel == 1))
+            {
+                continue;
+            }
+
+            if ((script[k].rel == 2) && (title_frame == 0xFFFFFFFF))
             {
                 continue;
             }

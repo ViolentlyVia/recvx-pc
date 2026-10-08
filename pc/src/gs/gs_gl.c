@@ -1,7 +1,7 @@
 /* PC port, GS emulator: OpenGL 3.3 renderer.
  *
  * Render targets: every frame buffer the game draws to (FRAME.FBP) is an FBO, rendered at
- * pcGsScale times the PS2 resolution. A texture whose TBP0 is the address of a render target
+ * pcGsScaleX x pcGsScale times the PS2 resolution (more horizontally for widescreen). A texture whose TBP0 is the address of a render target
  * samples that FBO (the PS2 copies its draw buffer to the display buffer this way). Other
  * textures are decoded from GS memory and cached until the pages they cover are written.
  *
@@ -17,6 +17,7 @@
 #include "../../include/pc_platform.h"
 
 int pcGsScale = 3;
+int pcGsScaleX = 3;
 
 #define PC_GL_DEFINE(ret, name, args) PFN_pc_##name pc_##name;
 PC_GL_FUNCS(PC_GL_DEFINE)
@@ -332,7 +333,7 @@ static RenderTarget* get_rt(unsigned int fbp, unsigned int fbw)
     rt->fbw = fbw;
     rt->w = fbw * 64;
     rt->h = 512;
-    rt->color = make_texture(rt->w * pcGsScale, rt->h * pcGsScale, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR);
+    rt->color = make_texture(rt->w * pcGsScaleX, rt->h * pcGsScale, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR);
 
     glGenFramebuffers(1, &rt->fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
@@ -366,7 +367,7 @@ static DepthBuffer* get_db(unsigned int zbp, int w, int h)
             dbs[i].zbp = zbp;
             dbs[i].w = w;
             dbs[i].h = h;
-            dbs[i].tex = make_texture(w * pcGsScale, h * pcGsScale, GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT,
+            dbs[i].tex = make_texture(w * pcGsScaleX, h * pcGsScale, GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT,
                                       GL_UNSIGNED_INT, GL_NEAREST);
             return &dbs[i];
         }
@@ -564,7 +565,7 @@ static void rt_load_from_vram(RenderTarget* rt)
 {
     double t0 = pcOsTime();
     int x, y, sx, sy;
-    unsigned int* buf = malloc(rt->w * rt->h * 4 * pcGsScale * pcGsScale);
+    unsigned int* buf = malloc(rt->w * rt->h * 4 * pcGsScaleX * pcGsScale);
 
     for (y = 0; y < rt->h; y++)
     {
@@ -577,16 +578,16 @@ static void rt_load_from_vram(RenderTarget* rt)
 
             for (sy = 0; sy < pcGsScale; sy++)
             {
-                for (sx = 0; sx < pcGsScale; sx++)
+                for (sx = 0; sx < pcGsScaleX; sx++)
                 {
-                    buf[(y * pcGsScale + sy) * rt->w * pcGsScale + x * pcGsScale + sx] = c;
+                    buf[(y * pcGsScale + sy) * rt->w * pcGsScaleX + x * pcGsScaleX + sx] = c;
                 }
             }
         }
     }
 
     glBindTexture(GL_TEXTURE_2D, rt->color);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, rt->w * pcGsScale, rt->h * pcGsScale, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, rt->w * pcGsScaleX, rt->h * pcGsScale, GL_RGBA, GL_UNSIGNED_BYTE, buf);
     free(buf);
 
     rt->vram_dirty = 0;
@@ -624,19 +625,19 @@ void gsFlushLocalToLocal(unsigned int bp, unsigned int bw, unsigned int psm, uns
 
         if (rt->used && rt_overlaps(rt, bp, bw, psm, y, h))
         {
-            unsigned int* buf = malloc(rt->w * rt->h * 4 * pcGsScale * pcGsScale);
+            unsigned int* buf = malloc(rt->w * rt->h * 4 * pcGsScaleX * pcGsScale);
             int px, py;
             double t0 = pcOsTime();
 
             glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
             glPixelStorei(GL_PACK_ALIGNMENT, 4);
-            glReadPixels(0, 0, rt->w * pcGsScale, rt->h * pcGsScale, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+            glReadPixels(0, 0, rt->w * pcGsScaleX, rt->h * pcGsScale, GL_RGBA, GL_UNSIGNED_BYTE, buf);
 
             for (py = 0; py < rt->h; py++)
             {
                 for (px = 0; px < rt->w; px++)
                 {
-                    unsigned int c = buf[(py * pcGsScale) * rt->w * pcGsScale + px * pcGsScale];
+                    unsigned int c = buf[(py * pcGsScale) * rt->w * pcGsScaleX + px * pcGsScaleX];
                     unsigned int a = ((c >> 24) * 128 + 127) / 255;
 
                     gsMemWrite(GS_PSMCT32, rt->fbp * 32, rt->fbw, px, py, (c & 0xFFFFFF) | (a << 24));
@@ -697,7 +698,7 @@ void gsRendererInit(void)
         gsReplaceInit();
     }
 
-    pcLog("gs: renderer ready (internal resolution x%d)", pcGsScale);
+    pcLog("gs: renderer ready (internal resolution x%d horizontal, x%d vertical)", pcGsScaleX, pcGsScale);
 }
 
 void gsRendererFlush(void)
@@ -956,7 +957,7 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
-    glViewport(0, 0, rt->w * pcGsScale, rt->h * pcGsScale);
+    glViewport(0, 0, rt->w * pcGsScaleX, rt->h * pcGsScale);
 
     /* depth */
     if (use_depth)
@@ -985,7 +986,7 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
         int y0 = GSF(st->scissor, 32, 11), y1 = GSF(st->scissor, 48, 11);
 
         glEnable(GL_SCISSOR_TEST);
-        glScissor(x0 * pcGsScale, y0 * pcGsScale, (x1 - x0 + 1) * pcGsScale, (y1 - y0 + 1) * pcGsScale);
+        glScissor(x0 * pcGsScaleX, y0 * pcGsScale, (x1 - x0 + 1) * pcGsScaleX, (y1 - y0 + 1) * pcGsScale);
     }
 
     glColorMask((fbmsk & 0xFF) != 0xFF, (fbmsk & 0xFF00) != 0xFF00, (fbmsk & 0xFF0000) != 0xFF0000,
@@ -1169,14 +1170,18 @@ void gsRendererPresent(unsigned int dispfb_fbp, unsigned int dispfb_fbw)
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    /* 640x480 shown at 4:3 */
-    vh = wh;
-    vw = wh * 4 / 3;
-
-    if (vw > ww)
+    /* 640x480 shown at the display aspect (4:3, or stretched for widescreen) */
     {
-        vw = ww;
-        vh = ww * 3 / 4;
+        float aspect = pcVideoAspect();
+
+        vh = wh;
+        vw = (int)(wh * aspect + 0.5f);
+
+        if (vw > ww)
+        {
+            vw = ww;
+            vh = (int)(ww / aspect + 0.5f);
+        }
     }
 
     glViewport((ww - vw) / 2, (wh - vh) / 2, vw, vh);
@@ -1229,7 +1234,7 @@ void pcGsScreenshot(const char* path, unsigned int fbp)
 
     gsRendererFlush();
 
-    W = rt->w * pcGsScale;
+    W = rt->w * pcGsScaleX;
     H = rt->h * pcGsScale;
     px = malloc(W * H * 4);
     rgb = malloc(640 * 480 * 3);
@@ -1242,7 +1247,7 @@ void pcGsScreenshot(const char* path, unsigned int fbp)
     {
         for (x = 0; x < 640; x++)
         {
-            const unsigned char* s = &px[((y * pcGsScale) * W + x * pcGsScale) * 4];
+            const unsigned char* s = &px[((y * pcGsScale) * W + x * pcGsScaleX) * 4];
 
             rgb[(y * 640 + x) * 3 + 0] = s[0];
             rgb[(y * 640 + x) * 3 + 1] = s[1];

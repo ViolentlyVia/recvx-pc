@@ -49,8 +49,7 @@ static struct {
 static void mc_root(void)
 {
     const char* env = getenv("RECVX_SAVES");
-    char dir[1024], ini[1100], line[1300];
-    FILE* f;
+    char dir[1024];
 
     if (root[0] != 0)
     {
@@ -63,28 +62,9 @@ static void mc_root(void)
     {
         snprintf(root, sizeof(root), "%s", env);
     }
-    else
+    else if (!pcIniGet("saves", root, sizeof(root)) || (root[0] == 0))
     {
-        snprintf(ini, sizeof(ini), "%s/recvx.ini", dir);
-
-        if ((f = fopen(ini, "r")) != NULL)
-        {
-            while (fgets(line, sizeof(line), f) != NULL)
-            {
-                if (_strnicmp(line, "saves=", 6) == 0)
-                {
-                    line[6 + strcspn(line + 6, "\r\n")] = 0;
-                    snprintf(root, sizeof(root), "%s", line + 6);
-                }
-            }
-
-            fclose(f);
-        }
-
-        if (root[0] == 0)
-        {
-            snprintf(root, sizeof(root), "%s/saves", dir);
-        }
+        snprintf(root, sizeof(root), "%s/saves", dir);
     }
 
     _mkdir(root);

@@ -80,6 +80,14 @@ void njSetScreenProjection(float dist)
 // 100% matching!
 void    njSetAspect(Float ax, Float ay)
 { 
+#ifdef TARGET_PC
+    {
+        extern float pcVideoWideScale(void);
+
+        /* widescreen: a wider view squeezed into the 640 wide frame, stretched when shown */
+        ax *= pcVideoWideScale();
+    }
+#endif
     fNaViwAspectW = ax; 
     fNaViwAspectH = ay; 
     
@@ -249,6 +257,13 @@ void _Make_ClipMatrix(sceVu0FMATRIX sc, float scr, float near, float far)
     
     gsx = (near * cv->x) / scr; 
     gsy = (near * cv->y) / scr; 
+#ifdef TARGET_PC
+    {
+        extern float pcVideoWideScale(void);
+
+        gsx /= pcVideoWideScale();   /* widescreen: clip against the wider view */
+    }
+#endif
     
     sceVu0UnitMatrix(mp); 
 

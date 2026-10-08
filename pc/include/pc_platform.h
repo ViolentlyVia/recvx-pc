@@ -9,6 +9,11 @@ void pcPlatformFatal(const char* fmt, ...);
 /* Directory containing recvx.exe (no trailing slash). */
 void pcPlatformExeDir(char* out, int size);
 
+/* recvx.ini (next to the exe): value of the last "key=value" line, trailing whitespace trimmed.
+ * Returns 0 (out untouched) when the key is missing. */
+int pcIniGet(const char* key, char* out, int size);
+int pcIniGetInt(const char* key, int def);
+
 /* First file in dir whose name ends with ext (case-insensitive); full path in out. */
 int pcPlatformFindFile(const char* dir, const char* ext, char* out, int size);
 
@@ -16,6 +21,8 @@ int pcPlatformFindFile(const char* dir, const char* ext, char* out, int size);
 void pcVideoInit(void);
 void pcVideoPresent(void);
 int  pcVideoPumpEvents(void);   /* returns 0 when the window was closed */
+float pcVideoAspect(void);      /* display aspect from recvx.ini (4:3 = 1.333) */
+float pcVideoWideScale(void);   /* (4/3) / aspect: horizontal squeeze of the 640 wide frame */
 
 /* Disc */
 int   pcCdOpen(void);

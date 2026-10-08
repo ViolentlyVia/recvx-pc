@@ -124,6 +124,14 @@ void pcGameStateLog(void)
           sys->st_flg, sys->stg_no, sys->rom_no, sys->gm_mode);
 }
 
+/* debug: nonzero while the title screen task is running */
+int pcGameInTitle(void)
+{
+    extern SYS_WORK* sys;
+
+    return ((sys->tk_flg & ~sys->ts_flg) & (1 << 3)) != 0;
+}
+
 /* debug: nonzero while the status screen (item select task) is running */
 int pcGameInStatusScreen(void)
 {

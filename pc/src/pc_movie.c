@@ -166,7 +166,8 @@ void setImageTag(unsigned int* tags, void* unused)
 void vbrank_draw()
 {
     u_long gif[18];
-    int u, v, y, w, h;
+    int u, v, x0, x1, y, w, h;
+    float k = pcVideoWideScale();
 
     if (!playing || (image_w == 0))
     {
@@ -178,6 +179,10 @@ void vbrank_draw()
     y = (int)(mdSize.sDispY + 1824) * 16;
     w = (int)mdSize.sWidth * 16;
     h = (int)mdSize.sHeight * 16;
+
+    /* widescreen: keep the 4:3 movie at 4:3 in the middle of the stretched frame */
+    x0 = 32768 + (int)((27648 - 32768) * k);
+    x1 = 32768 + (int)((27648 + w - 32768) * k);
 
     gif[0] = SCE_GIF_SET_TAG(8, SCE_GS_TRUE, SCE_GS_FALSE, 0, SCE_GIF_PACKED, 1);
     gif[1] = SCE_GIF_PACKED_AD;
@@ -191,11 +196,11 @@ void vbrank_draw()
     gif[9] = SCE_GS_PRIM;
     gif[10] = SCE_GS_SET_UV(8, 8);
     gif[11] = SCE_GS_UV;
-    gif[12] = SCE_GS_SET_XYZ2(27648, y, 0);
+    gif[12] = SCE_GS_SET_XYZ2(x0, y, 0);
     gif[13] = SCE_GS_XYZ2;
     gif[14] = SCE_GS_SET_UV(u + 8, v + 8);
     gif[15] = SCE_GS_UV;
-    gif[16] = SCE_GS_SET_XYZ2(w + 27648, y + h, 0);
+    gif[16] = SCE_GS_SET_XYZ2(x1, y + h, 0);
     gif[17] = SCE_GS_XYZ2;
     gsGifTransfer(gif, 9);
 }

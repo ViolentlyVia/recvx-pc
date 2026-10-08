@@ -334,6 +334,9 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
     float sz;                   
     float x;                   
     float y;                    
+#ifdef TARGET_PC
+    float wide_2d = 1.0f;
+#endif
 
     clip_flag = 0; 
     sc_flag = 0;
@@ -361,6 +364,44 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
             Ps2_tex_load_tp_cancel = 0; 
         }
     } 
+    
+#ifdef TARGET_PC
+    /* widescreen: 2D keeps its 4:3 layout in the middle of the stretched frame. Primitives
+     * that cover the whole width stay full width when they are untextured (fades, flashes) or
+     * translucent full screen overlays (room darkness filters); opaque full screen pictures
+     * (logos, title) are 4:3 art and get pillarboxed like the rest. */
+    if (clip_3d_on == 0)
+    {
+        extern float pcVideoWideScale(void);
+
+        wide_2d = pcVideoWideScale();
+
+        if (wide_2d < 1.0f)
+        {
+            float x0 = 4096.0f, x1 = -4096.0f, y0 = 4096.0f, y1 = -4096.0f;
+
+            for (i = 0; i < num; i++)
+            {
+                float vx = ((float*)dp)[(i * 12) + 8];
+                float vy = ((float*)dp)[(i * 12) + 9];
+
+                if (vx < x0) x0 = vx;
+                if (vx > x1) x1 = vx;
+                if (vy < y0) y0 = vy;
+                if (vy > y1) y1 = vy;
+            }
+
+            if ((x0 <= 1728.0f + 1.0f) && (x1 >= 2368.0f - 1.0f))
+            {
+                if (!(prim & 0x8000000000000) ||
+                    ((prim & 0x20000000000000) && (y0 <= 1808.0f + 1.0f) && (y1 >= 2288.0f - 1.0f)))
+                {
+                    wide_2d = 1.0f;
+                }
+            }
+        }
+    }
+#endif
     
     p = (unsigned long*)WORKBASE; 
     
@@ -407,6 +448,12 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
         ((u_long128*)p)[1] = ((u_long128*)dp)[1]; 
         ((u_long128*)p)[2] = ((u_long128*)dp)[2]; 
         
+#ifdef TARGET_PC
+        if (wide_2d < 1.0f)
+        {
+            ((float*)p)[8] = 2048.0f + ((((float*)p)[8] - 2048.0f) * wide_2d);
+        }
+#endif
         x = ((float*)p)[8]; 
         y = ((float*)p)[9]; 
             

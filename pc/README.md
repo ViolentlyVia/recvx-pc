@@ -72,7 +72,7 @@ Environment variables for testing:
 |---|---|
 | `RECVX_REPLAY=<file>` | replay a recorded input file |
 | `RECVX_RECORD=<file>` | record input to a specific file |
-| `RECVX_INPUT=<file>` | scripted button presses (format in `pc_platform.c`) |
+| `RECVX_INPUT=<file>` | scripted button presses; `title+<n>` lines count from the title screen (format in `pc_platform.c`) |
 | `RECVX_AUTOPRESS=1` | tap Start/Cross for unattended tests |
 | `RECVX_SPEED=<n>` | run n times faster |
 | `RECVX_SHOTS=<seconds>` | save screenshots to `shots/` periodically |

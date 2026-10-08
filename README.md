@@ -17,7 +17,8 @@ graveyard), saving and loading. Report problems with a `last_run_input.txt` reco
 
 | Feature | State |
 |---|---|
-| Graphics (OpenGL 3.3, 3x internal resolution, exact PS2 blending) | done |
+| Graphics (OpenGL 3.3, 3x internal resolution by default, exact PS2 blending) | done |
+| Widescreen (wider 3D view, 2D kept at 4:3), window size, fullscreen | done |
 | PCSX2-format HD texture packs (`.dds`) | done |
 | Movies (converted once from the disc with FFmpeg) | done |
 | Music and voices (CRI ADX) | done |
@@ -25,8 +26,6 @@ graveyard), saving and loading. Report problems with a `last_run_input.txt` reco
 | Saving and loading (to a `saves` folder, no memory card screens) | done |
 | Keyboard and game controllers (SDL2) | done |
 | Fast-forward (hold Numpad 0) | done |
-
-Known gaps: widescreen / resolution options are not exposed yet.
 
 ## Building
 
@@ -68,7 +67,8 @@ After that the ISO is no longer needed. Alternatives:
 Start `build_pc/recvx.exe`.
 
 Keyboard: arrows = move, Z = Cross, X = Square, C = Circle, V = Triangle, A / S = L1 / R1,
-Q / W = L2 / R2, Enter = Start, Backspace = Select, hold Numpad 0 = fast-forward. Game
+Q / W = L2 / R2, Enter = Start, Backspace = Select, hold Numpad 0 = fast-forward, F11 =
+fullscreen on/off. Game
 controllers are picked up automatically.
 
 Saves are written to `build_pc/saves` (copy the folder to back them up).
@@ -83,6 +83,14 @@ Optional, next to `recvx.exe`, one `key=value` per line:
 | `iso=` | disc image to run from instead of extracted data |
 | `saves=` | save folder (default: `saves` next to the exe) |
 | `hd_textures=` | folder of a PCSX2 texture replacement pack (`.dds` files) |
+| `scale=` | internal resolution multiplier, 1 to 8 (default 3: 1920x1440 at 4:3) |
+| `aspect=` | display aspect, e.g. `16:9` or `21:9` (default `4:3`) |
+| `window=` | window size, e.g. `1920x1080` (default: 960 pixels high at the chosen aspect) |
+| `fullscreen=` | `1` for exclusive fullscreen at the window size, `desktop` for borderless (default `0`) |
+
+With a widescreen `aspect=`, the 3D view is widened rather than stretched, and menus, text and
+movies stay at 4:3 in the middle of the screen. The internal resolution rises horizontally to
+match, so `scale=3` at 16:9 renders at 2560x1440.
 
 ## Sharing with friends
 

@@ -51,40 +51,13 @@ static int cmp_rep(const void* a, const void* b)
 static void find_dir(void)
 {
     const char* e = getenv("RECVX_HDTEX");
-    char ini[1100], dir[1024], line[1200];
-    FILE* f;
-
     if (e != NULL)
     {
         snprintf(rep_dir, sizeof(rep_dir), "%s", e);
         return;
     }
 
-    pcPlatformExeDir(dir, sizeof(dir));
-    snprintf(ini, sizeof(ini), "%s/recvx.ini", dir);
-
-    if ((f = fopen(ini, "r")) == NULL)
-    {
-        return;
-    }
-
-    while (fgets(line, sizeof(line), f))
-    {
-        if (_strnicmp(line, "hd_textures=", 12) == 0)
-        {
-            size_t n;
-
-            snprintf(rep_dir, sizeof(rep_dir), "%s", line + 12);
-            n = strlen(rep_dir);
-
-            while ((n > 0) && ((rep_dir[n - 1] == '\n') || (rep_dir[n - 1] == '\r') || (rep_dir[n - 1] == ' ')))
-            {
-                rep_dir[--n] = 0;
-            }
-        }
-    }
-
-    fclose(f);
+    pcIniGet("hd_textures", rep_dir, sizeof(rep_dir));
 }
 
 static void check_extensions(void)

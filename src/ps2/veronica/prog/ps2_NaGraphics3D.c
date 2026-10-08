@@ -35,10 +35,32 @@ void Ps2CalcScreenCone()
 
     cp[2] = -_nj_screen_.dist;
 
+#ifdef TARGET_PC
+    {
+        extern float pcVideoWideScale(void);
+        sceVu0FMATRIX wide;
+        int i;
+
+        /* widescreen: the clipping cone follows the wider view */
+        for (i = 0; i < 4; i++)
+        {
+            wide[i][0] = pos[i][0] / pcVideoWideScale();
+            wide[i][1] = pos[i][1];
+            wide[i][2] = pos[i][2];
+            wide[i][3] = pos[i][3];
+        }
+
+        Ps2SetPlane(&c_plane[1], cp, wide[1], wide[0]);
+        Ps2SetPlane(&c_plane[2], cp, wide[2], wide[1]);
+        Ps2SetPlane(&c_plane[3], cp, wide[3], wide[2]);
+        Ps2SetPlane(&c_plane[4], cp, wide[0], wide[3]);
+    }
+#else
     Ps2SetPlane(&c_plane[1], cp, pos[1], pos[0]);
     Ps2SetPlane(&c_plane[2], cp, pos[2], pos[1]);
     Ps2SetPlane(&c_plane[3], cp, pos[3], pos[2]);
     Ps2SetPlane(&c_plane[4], cp, pos[0], pos[3]);
+#endif
 }
 
 // 100% matching! 

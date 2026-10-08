@@ -129,7 +129,7 @@ static int data_read_sectors(u_int lsn, u_int count, unsigned char* buf)
 static int data_open(void)
 {
     const char* env = getenv("RECVX_DATA");
-    char dir[1024], ini[1100], line[1300], idx[1100];
+    char dir[1024], line[1300], idx[1100];
     FILE* f;
     int cap = 0;
 
@@ -140,28 +140,9 @@ static int data_open(void)
     {
         snprintf(data_dir, sizeof(data_dir), "%s", env);
     }
-    else
+    else if (!pcIniGet("data", data_dir, sizeof(data_dir)) || (data_dir[0] == 0))
     {
-        snprintf(ini, sizeof(ini), "%s/recvx.ini", dir);
-
-        if ((f = fopen(ini, "r")) != NULL)
-        {
-            while (fgets(line, sizeof(line), f) != NULL)
-            {
-                if (_strnicmp(line, "data=", 5) == 0)
-                {
-                    line[5 + strcspn(line + 5, "\r\n")] = 0;
-                    snprintf(data_dir, sizeof(data_dir), "%s", line + 5);
-                }
-            }
-
-            fclose(f);
-        }
-
-        if (data_dir[0] == 0)
-        {
-            snprintf(data_dir, sizeof(data_dir), "%s/data", dir);
-        }
+        snprintf(data_dir, sizeof(data_dir), "%s/data", dir);
     }
 
     snprintf(idx, sizeof(idx), "%s/files.idx", data_dir);
@@ -260,8 +241,7 @@ static int read_sectors(u_int lsn, u_int count, void* buf)
 static int find_iso(void)
 {
     const char* env = getenv("RECVX_ISO");
-    char dir[1024], ini[1024], line[1100];
-    FILE* f;
+    char dir[1024];
 
     if ((env != NULL) && (env[0] != '\0'))
     {
@@ -269,29 +249,12 @@ static int find_iso(void)
         return 1;
     }
 
-    pcPlatformExeDir(dir, sizeof(dir));
-
-    snprintf(ini, sizeof(ini), "%s/recvx.ini", dir);
-    f = fopen(ini, "r");
-
-    if (f != NULL)
+    if (pcIniGet("iso", iso_path, sizeof(iso_path)) && (iso_path[0] != '\0'))
     {
-        while (fgets(line, sizeof(line), f) != NULL)
-        {
-            if (_strnicmp(line, "iso=", 4) == 0)
-            {
-                char* p = line + 4;
-                size_t n = strcspn(p, "\r\n");
-
-                p[n] = '\0';
-                strncpy(iso_path, p, sizeof(iso_path) - 1);
-                fclose(f);
-                return 1;
-            }
-        }
-
-        fclose(f);
+        return 1;
     }
+
+    pcPlatformExeDir(dir, sizeof(dir));
 
     return pcPlatformFindFile(dir, ".iso", iso_path, sizeof(iso_path));
 }
