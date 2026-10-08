@@ -21,7 +21,9 @@ EXPECTED_ID = "SLUS_201.84"
 
 
 def find_exe_dir():
-    for d in (os.path.dirname(HERE), HERE):
+    # shared package: setup/ next to recvx.exe; repository: pc/tools/ with the exe in build_pc/
+    repo_build = os.path.join(os.path.dirname(os.path.dirname(HERE)), "build_pc")
+    for d in (os.path.dirname(HERE), HERE, repo_build):
         if os.path.exists(os.path.join(d, "recvx.exe")):
             return d
     return os.path.dirname(HERE)

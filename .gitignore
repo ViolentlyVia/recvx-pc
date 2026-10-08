@@ -43,3 +43,7 @@ config/undefined_syms_auto.txt
 build_pc/
 pc/tools/.msvc_env.json
 pc/tools/__pycache__/
+*.iso
+pc/data/
+pc/tools/deps/
+RE-ENHANCE_ADDON_RECV_v1.1/
