@@ -852,7 +852,16 @@ static void MapCodeProcess()
             break;
         }
         case 12:
+#ifdef TARGET_PC
+            {
+                /* PC: read in the PS2 compiler's left-to-right order (MSVC evaluates arguments right to left) */
+                int type = *ocP++, flag = *ocP++;
+
+                MapBoolSet(bhFlagCk(type, flag, 0), mode & 0xF000);
+            }
+#else
             MapBoolSet(bhFlagCk(*ocP++, *ocP++, 0), mode & 0xF000);
+#endif
             break;
         case 13:
             x = ocP[0] / 32.0f;
@@ -901,7 +910,16 @@ static void MapCodeProcess()
             ocP = &mwP->map_cdeP[*ocP];
             break;
         case 14:
+#ifdef TARGET_PC
+            {
+                /* PC: read in the PS2 compiler's left-to-right order (MSVC evaluates arguments right to left) */
+                int type = *ocP++, flag = *ocP++;
+
+                MapBoolSet(bhFlagSet(type, flag, 0), mode & 0xF000);
+            }
+#else
             MapBoolSet(bhFlagSet(*ocP++, *ocP++, 0), mode & 0xF000);
+#endif
             break;
         case 15:
             if (!(*stsP & 0x40))
