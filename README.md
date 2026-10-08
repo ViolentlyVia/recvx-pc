@@ -21,12 +21,12 @@ graveyard), saving and loading. Report problems with a `last_run_input.txt` reco
 | PCSX2-format HD texture packs (`.dds`) | done |
 | Movies (converted once from the disc with FFmpeg) | done |
 | Music and voices (CRI ADX) | done |
-| Sound effects (Tamsoft sound driver replacement) | done (no reverb yet) |
+| Sound effects with room reverb (Tamsoft sound driver replacement) | done |
 | Saving and loading (to a `saves` folder, no memory card screens) | done |
 | Keyboard and game controllers (SDL2) | done |
 | Fast-forward (hold Numpad 0) | done |
 
-Known gaps: sound reverb, and widescreen / resolution options are not exposed yet.
+Known gaps: widescreen / resolution options are not exposed yet.
 
 ## Building
 

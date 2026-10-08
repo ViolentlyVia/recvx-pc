@@ -18,8 +18,10 @@
  * mixed at 48 kHz a few frames ahead into one mixer voice. The EE marks channels / ports as
  * playing in se_info / midi_info; the driver clears the bits when they end.
  *
- * Debug: RECVX_SNDLOG=1 logs sequence starts, RECVX_SEDUMP=<file> dumps the mix.
- * Not implemented: reverb (cmd 0x44).
+ * Each sample's SPU attribute byte routes its voice dry and/or into the reverb of SPU core 0 or 1;
+ * reverb (cmd 0x44) emulates the SPU reverberator with the Hall preset, the only one the game uses.
+ *
+ * Debug: RECVX_SNDLOG=1 logs sequence starts and reverb changes, RECVX_SEDUMP=<file> dumps the mix.
  */
 #include <math.h>
 #include <stdio.h>
@@ -97,6 +99,13 @@ static unsigned int chunk_entry(const Blob* b, unsigned int off, unsigned int i)
 
 enum { OWNER_SE, OWNER_MIDI };
 
+/* sample SPU attributes (last byte of a sample record): dry / reverb sends and the SPU core */
+#define SPU_ATTR_DRY_L  0x01
+#define SPU_ATTR_DRY_R  0x02
+#define SPU_ATTR_WET_L  0x04
+#define SPU_ATTR_WET_R  0x08
+#define SPU_ATTR_CORE1  0x20
+
 typedef struct {
     int active;
     int owner, port, channel, note;   /* SE: port/channel; MIDI: player port/MIDI channel/note */
@@ -117,6 +126,7 @@ typedef struct {
     float vol;                        /* request / velocity * channel volume */
     float scale;                      /* MIDI port volume */
     int pan;
+    int spu_attr;                     /* sample's SPU routing: SPU_ATTR_* */
     float vol_l, vol_r;
     unsigned short adsr1, adsr2;
     int phase;                        /* 0 attack 1 decay 2 sustain 3 release 4 off */
@@ -485,6 +495,7 @@ static Voice* note_on(const Blob* hd, const Blob* bd, int prog, int note, int ve
     v->vol = velocity / 127.0f;
     v->scale = 1.0f;
     v->pan = pan;
+    v->spu_attr = hd->data[smp + 41];
     v->block_pos = 28;
 
     voice_update_volume(v);
@@ -886,6 +897,168 @@ static void midi_advance(int samples)
 }
 
 /* ------------------------------------------------------------------------------------------- */
+/* reverb */
+
+/* The SPU's Schroeder reverberator, one per core, running at half the output rate. Registers in
+ * hardware order; offsets are in 8-byte units of the reverb work area. The game only uses the
+ * Hall preset (libsd mode 5, values from psx-spx), so the other libsd modes fall back to it. */
+enum {
+    dAPF1, dAPF2, vIIR, vCOMB1, vCOMB2, vCOMB3, vCOMB4, vWALL,
+    vAPF1, vAPF2, mLSAME, mRSAME, mLCOMB1, mRCOMB1, mLCOMB2, mRCOMB2,
+    dLSAME, dRSAME, mLDIFF, mRDIFF, mLCOMB3, mRCOMB3, mLCOMB4, mRCOMB4,
+    dLDIFF, dRDIFF, mLAPF1, mRAPF1, mLAPF2, mRAPF2, vLIN, vRIN
+};
+
+#define REV_MODE_OFF  0
+#define REV_MODE_HALL 5
+
+static const unsigned short rev_hall[32] = {
+    0x01A5, 0x0139, 0x6000, 0x5000, 0x4C00, 0xB800, 0xBC00, 0xC000,
+    0x6000, 0x5C00, 0x15BA, 0x11BB, 0x14C2, 0x10BD, 0x11BC, 0x0DC1,
+    0x11C0, 0x0DC3, 0x0DC0, 0x09C1, 0x0BC4, 0x07C1, 0x0A00, 0x06CD,
+    0x09C2, 0x05C1, 0x05C0, 0x041A, 0x0274, 0x013A, 0x8000, 0x8000
+};
+#define REV_HALL_SIZE (0xADE0 / 2)   /* work area in 16-bit samples */
+
+typedef struct {
+    int mode;
+    float depth;                      /* output volume (EVOL) */
+    short buf[REV_HALL_SIZE];
+    int pos;
+    float in_l, in_r;                 /* input of the current tick */
+    float out_l, out_r, prev_l, prev_r;
+    int phase;                        /* output sample within the tick (0/1) */
+} Reverb;
+
+static Reverb reverb[2];
+
+static float rev_vol(int reg)
+{
+    return (short)rev_hall[reg] / 32768.0f;
+}
+
+/* work area sample at register offset reg (in 8-byte units) plus delta samples */
+static short* rev_at(Reverb* rv, int reg, int delta)
+{
+    int i = (rv->pos + rev_hall[reg] * 4 + delta) % REV_HALL_SIZE;
+
+    return &rv->buf[(i < 0) ? i + REV_HALL_SIZE : i];
+}
+
+static void rev_write(Reverb* rv, int reg, float x)
+{
+    *rev_at(rv, reg, 0) = (short)((x > 32767) ? 32767 : (x < -32768) ? -32768 : x);
+}
+
+static float rev_read(Reverb* rv, int reg)
+{
+    return *rev_at(rv, reg, 0);
+}
+
+static float rev_read_diff(Reverb* rv, int reg, int dreg)
+{
+    return *rev_at(rv, reg, -(int)rev_hall[dreg] * 4);
+}
+
+static void reverb_tick(Reverb* rv)
+{
+    float lin = rv->in_l * rev_vol(vLIN), rin = rv->in_r * rev_vol(vRIN);
+    float iir = rev_vol(vIIR), wall = rev_vol(vWALL), l, r, prev;
+
+    prev = *rev_at(rv, mLSAME, -1);
+    rev_write(rv, mLSAME, (lin + rev_read(rv, dLSAME) * wall - prev) * iir + prev);
+    prev = *rev_at(rv, mRSAME, -1);
+    rev_write(rv, mRSAME, (rin + rev_read(rv, dRSAME) * wall - prev) * iir + prev);
+    prev = *rev_at(rv, mLDIFF, -1);
+    rev_write(rv, mLDIFF, (lin + rev_read(rv, dRDIFF) * wall - prev) * iir + prev);
+    prev = *rev_at(rv, mRDIFF, -1);
+    rev_write(rv, mRDIFF, (rin + rev_read(rv, dLDIFF) * wall - prev) * iir + prev);
+
+    l = rev_vol(vCOMB1) * rev_read(rv, mLCOMB1) + rev_vol(vCOMB2) * rev_read(rv, mLCOMB2) +
+        rev_vol(vCOMB3) * rev_read(rv, mLCOMB3) + rev_vol(vCOMB4) * rev_read(rv, mLCOMB4);
+    r = rev_vol(vCOMB1) * rev_read(rv, mRCOMB1) + rev_vol(vCOMB2) * rev_read(rv, mRCOMB2) +
+        rev_vol(vCOMB3) * rev_read(rv, mRCOMB3) + rev_vol(vCOMB4) * rev_read(rv, mRCOMB4);
+
+    l -= rev_vol(vAPF1) * rev_read_diff(rv, mLAPF1, dAPF1);
+    rev_write(rv, mLAPF1, l);
+    l = l * rev_vol(vAPF1) + rev_read_diff(rv, mLAPF1, dAPF1);
+    r -= rev_vol(vAPF1) * rev_read_diff(rv, mRAPF1, dAPF1);
+    rev_write(rv, mRAPF1, r);
+    r = r * rev_vol(vAPF1) + rev_read_diff(rv, mRAPF1, dAPF1);
+
+    l -= rev_vol(vAPF2) * rev_read_diff(rv, mLAPF2, dAPF2);
+    rev_write(rv, mLAPF2, l);
+    l = l * rev_vol(vAPF2) + rev_read_diff(rv, mLAPF2, dAPF2);
+    r -= rev_vol(vAPF2) * rev_read_diff(rv, mRAPF2, dAPF2);
+    rev_write(rv, mRAPF2, r);
+    r = r * rev_vol(vAPF2) + rev_read_diff(rv, mRAPF2, dAPF2);
+
+    rv->prev_l = rv->out_l;
+    rv->prev_r = rv->out_r;
+    rv->out_l = l * rv->depth;
+    rv->out_r = r * rv->depth;
+
+    rv->pos = (rv->pos + 1) % REV_HALL_SIZE;
+}
+
+/* one output sample: feed (wet_l, wet_r) in and add the reverb output to *l, *r */
+static void reverb_sample(Reverb* rv, float wet_l, float wet_r, float* l, float* r)
+{
+    float t;
+
+    if (rv->mode == REV_MODE_OFF)
+    {
+        return;
+    }
+
+    /* input averaged over the two output samples of a tick, output interpolated across them */
+    rv->in_l += wet_l * 0.5f;
+    rv->in_r += wet_r * 0.5f;
+
+    if (rv->phase)
+    {
+        reverb_tick(rv);
+        rv->in_l = rv->in_r = 0;
+    }
+
+    t = rv->phase ? 1.0f : 0.5f;
+    *l += rv->prev_l + (rv->out_l - rv->prev_l) * t;
+    *r += rv->prev_r + (rv->out_r - rv->prev_r) * t;
+
+    rv->phase ^= 1;
+}
+
+/* SdrSetRev: [0x44, mode | (core + 1) << 6, depth hi, depth lo, delay, feedback] */
+static void reverb_set(const unsigned char* p)
+{
+    int core = (p[1] >> 6) - 1, mode = p[1] & 0x3F;
+    Reverb* rv;
+
+    if ((core < 0) || (core > 1))
+    {
+        return;
+    }
+
+    rv = &reverb[core];
+
+    if (getenv("RECVX_SNDLOG")) pcLog("snd: reverb core %d mode %d depth %04x", core, mode, (p[2] << 8) | p[3]);
+
+    if (mode != REV_MODE_OFF)
+    {
+        mode = REV_MODE_HALL;
+    }
+
+    /* a new mode starts from a cleared work area, as sceSdSetEffectAttr does */
+    if (mode != rv->mode)
+    {
+        memset(rv, 0, sizeof(*rv));
+        rv->mode = mode;
+    }
+
+    rv->depth = (short)((p[2] << 8) | p[3]) / 32768.0f;
+}
+
+/* ------------------------------------------------------------------------------------------- */
 /* mixing */
 
 /* many loud voices at once: compress the top of the range instead of hard clipping */
@@ -923,7 +1096,7 @@ static void render(void)
 
     for (i = 0; i < n; i++)
     {
-        float l = 0, r = 0;
+        float l = 0, r = 0, wet[2][2] = { { 0, 0 }, { 0, 0 } };
 
         if ((i & 63) == 0)
         {
@@ -966,13 +1139,29 @@ static void render(void)
             }
 
             s = v->block[v->block_pos] * (v->env / 32767.0f);
-            l += s * v->vol_l;
-            r += s * v->vol_r;
+
+            {
+                int attr = v->spu_attr, core = (attr & SPU_ATTR_CORE1) ? 1 : 0;
+
+                /* no routing at all: play it dry rather than not at all */
+                if (!(attr & (SPU_ATTR_DRY_L | SPU_ATTR_DRY_R | SPU_ATTR_WET_L | SPU_ATTR_WET_R)))
+                {
+                    attr |= SPU_ATTR_DRY_L | SPU_ATTR_DRY_R;
+                }
+
+                if (attr & SPU_ATTR_DRY_L) l += s * v->vol_l;
+                if (attr & SPU_ATTR_DRY_R) r += s * v->vol_r;
+                if (attr & SPU_ATTR_WET_L) wet[core][0] += s * v->vol_l;
+                if (attr & SPU_ATTR_WET_R) wet[core][1] += s * v->vol_r;
+            }
 
             v->frac += v->step;
             v->block_pos += v->frac >> 16;
             v->frac &= 0xFFFF;
         }
+
+        reverb_sample(&reverb[0], wet[0][0], wet[0][1], &l, &r);
+        reverb_sample(&reverb[1], wet[1][0], wet[1][1], &l, &r);
 
         l = soft_clip(l * master);
         r = soft_clip(r * master);
@@ -1270,6 +1459,10 @@ static void request_rpc(unsigned int fno, void* send, int ssize, void* receive, 
             {
                 if (voices[i].active) voice_update_volume(&voices[i]);
             }
+        }
+        else if (cd == 0x44)
+        {
+            reverb_set(p);
         }
         else if (cd == 0x4B)
         {
