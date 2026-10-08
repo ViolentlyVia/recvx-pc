@@ -15,8 +15,4 @@
 
 #define PC_STUB() do { static int once; if (!once) { once = 1; pcLog("stub: %s", __func__); } } while (0)
 
-void Ps2ZbuffOffI(void)
-{
-    PC_STUB();
-}
 

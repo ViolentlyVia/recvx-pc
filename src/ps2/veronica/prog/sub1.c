@@ -1339,7 +1339,6 @@ static inline void StatusInit_Parts06bCheck()
     }
 }
 
-#ifndef TARGET_PC /* reimplemented in pc/src */
 // 100% matching! 
 void Ps2ZbuffOffI()
 {
@@ -1358,7 +1357,6 @@ void Ps2ZbuffOffI()
     
     D2_SyncTag();
 }
-#endif
 
 // 100% matching! 
 void Ps2DrawOTagI()
