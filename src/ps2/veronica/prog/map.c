@@ -1412,9 +1412,34 @@ static int FsubMapDraw(func_wrk_typ* fwP)
 }
 
 // 100% matching!
+#ifdef TARGET_PC
+/* widescreen: how far the map's background and frame reach past each 4:3 edge, in 640 wide
+ * screen units, so they fill the side areas (0 at 4:3) */
+static float pc_wide_extra(void)
+{
+    extern float pcVideoWideScale(void);
+
+    return 320.0f / pcVideoWideScale() - 320.0f;
+}
+#endif
+
 static int FsubBackDraw() 
 {
+#ifdef TARGET_PC
+    {
+        extern int pcWide2DUnclipped;
+        NJS_POINT2 p0 = mwP->bck_p0, p1 = mwP->bck_p1;
+        float extra = ceilf(pc_wide_extra() / 32.0f) * 32.0f;   /* keeps the grid lines in step */
+
+        p0.x -= extra;
+        p1.x += extra;
+        pcWide2DUnclipped = 1;
+        MapDrawBackground(mwP->bck_depth, &p0, &p1);
+        pcWide2DUnclipped = 0;
+    }
+#else
     MapDrawBackground(mwP->bck_depth, &mwP->bck_p0, &mwP->bck_p1);
+#endif
     
     return 1;
 }
@@ -2580,17 +2605,33 @@ static int FsubZoomScreen(FS_WRK* fsP)
 {
     int ang; 
     int tmp; 
+#ifdef TARGET_PC
+    /* widescreen: the dark frame around the map window reaches the screen edges */
+    extern int pcWide2DUnclipped;
+    NJS_POINT2 ScrOut[2] = 
+    {
+        { 0.0f,   0.0f   },
+        { 640.0f, 480.0f }
+    };
+#else
     static const NJS_POINT2 ScrOut[2] = 
     {
         { 0.0f,   0.0f   },
         { 640.0f, 480.0f }
     };
+#endif
     static const NJS_POINT2 ScrIn[2] = 
     {
         {  56.0f,  64.0f },
         { 585.0f, 417.0f }
     };
 	static NJS_POINT2 pnt[4];
+
+#ifdef TARGET_PC
+    ScrOut[0].x -= pc_wide_extra();
+    ScrOut[1].x += pc_wide_extra();
+    pcWide2DUnclipped = 1;
+#endif
 
     switch (fsP->mode) 
     {                             
@@ -2708,6 +2749,9 @@ static int FsubZoomScreen(FS_WRK* fsP)
         break;
     }
     
+#ifdef TARGET_PC
+    pcWide2DUnclipped = 0;
+#endif
     return 1;
 }
 
