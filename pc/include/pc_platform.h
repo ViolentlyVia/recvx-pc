@@ -13,6 +13,8 @@ void pcPlatformExeDir(char* out, int size);
  * Returns 0 (out untouched) when the key is missing. */
 int pcIniGet(const char* key, char* out, int size);
 int pcIniGetInt(const char* key, int def);
+/* Set (or with value NULL remove) "key=value" in recvx.ini, keeping every other line. */
+void pcIniSet(const char* key, const char* value);
 
 /* First file in dir whose name ends with ext (case-insensitive); full path in out. */
 int pcPlatformFindFile(const char* dir, const char* ext, char* out, int size);

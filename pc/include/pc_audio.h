@@ -2,6 +2,7 @@
 #pragma once
 
 void pcAudioInit(void);
+void pcAudioPause(int pause);   /* stop / resume the sound output (window not active) */
 
 /* A voice is one output stream (e.g. one ADX player). Returns a handle >= 0. */
 int  pcAudioOpenVoice(void);

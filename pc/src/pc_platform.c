@@ -13,6 +13,7 @@
 #include "pc_os.h"
 #include "pc_gs.h"
 #include "pc_bindings.h"
+#include "pc_audio.h"
 
 static unsigned int frames;   /* frames presented */
 
@@ -136,6 +137,74 @@ int pcIniGet(const char* key, char* out, int size)
     return found;
 }
 
+void pcIniSet(const char* key, const char* value)
+{
+    char dir[1024], ini[1100], line[1300];
+    char* out = NULL;
+    size_t len = 0, cap = 0, klen = strlen(key);
+    int written = 0;
+    FILE* f;
+
+    pcPlatformExeDir(dir, sizeof(dir));
+    snprintf(ini, sizeof(ini), "%s/recvx.ini", dir);
+
+    if ((f = fopen(ini, "r")) != NULL)
+    {
+        while (fgets(line, sizeof(line), f) != NULL)
+        {
+            size_t n;
+
+            if ((_strnicmp(line, key, klen) == 0) && (line[klen] == '='))
+            {
+                if (written || (value == NULL))
+                {
+                    continue;   /* drop it (and any duplicates) */
+                }
+
+                snprintf(line, sizeof(line), "%s=%s\n", key, value);
+                written = 1;
+            }
+
+            n = strlen(line);
+
+            if (len + n + 2 > cap)
+            {
+                cap = (cap + n + 2) * 2;
+                out = (char*)realloc(out, cap);
+            }
+
+            memcpy(out + len, line, n);
+            len += n;
+
+            if (out[len - 1] != '\n')
+            {
+                out[len++] = '\n';
+            }
+        }
+
+        fclose(f);
+    }
+
+    if ((f = fopen(ini, "w")) == NULL)
+    {
+        free(out);
+        return;
+    }
+
+    if (len > 0)
+    {
+        fwrite(out, 1, len, f);
+    }
+
+    if (!written && (value != NULL))
+    {
+        fprintf(f, "%s=%s\n", key, value);
+    }
+
+    fclose(f);
+    free(out);
+}
+
 int pcIniGetInt(const char* key, int def)
 {
     char v[64];
@@ -171,9 +240,17 @@ int pcPlatformFindFile(const char* dir, const char* ext, char* out, int size)
 static struct {
     int loaded;
     int win_w, win_h;
+    int win_x, win_y, has_pos;   /* window_pos= (remembered from the last run) */
+    int maximized;               /* window_max= */
     int fullscreen;          /* 0 window, 1 exclusive, 2 desktop */
+    int pause_unfocused;     /* pause_unfocused= (default 1) */
     float aspect;            /* display aspect, 4:3 = 1.333 */
 } video_cfg;
+
+/* the window as it was last seen windowed: saved to recvx.ini when the game closes */
+static struct {
+    int x, y, w, h, maximized;
+} win_state;
 
 static void video_settings(void)
 {
@@ -218,6 +295,16 @@ static void video_settings(void)
         video_cfg.win_h = h;
     }
 
+    if (pcIniGet("window_pos", v, sizeof(v)) && (sscanf(v, "%d,%d", &w, &h) == 2))
+    {
+        video_cfg.win_x = w;
+        video_cfg.win_y = h;
+        video_cfg.has_pos = 1;
+    }
+
+    video_cfg.maximized = pcIniGetInt("window_max", 0) != 0;
+    video_cfg.pause_unfocused = pcIniGetInt("pause_unfocused", 1) != 0;
+
     /* the 640 wide frame is stretched to the display aspect: render more columns to match */
     pcGsScaleX = (int)(pcGsScale * video_cfg.aspect / (4.0f / 3.0f) + 0.5f);
 }
@@ -250,9 +337,75 @@ static void toggle_fullscreen(void)
     }
 }
 
+/* the remembered spot is used only while it is still on a connected monitor */
+static int position_visible(int x, int y, int w, int h)
+{
+    int i;
+
+    for (i = 0; i < SDL_GetNumVideoDisplays(); i++)
+    {
+        SDL_Rect r;
+
+        if ((SDL_GetDisplayUsableBounds(i, &r) == 0) && (x + w / 2 >= r.x) && (x + w / 2 < r.x + r.w) &&
+            (y >= r.y - 8) && (y + 32 < r.y + r.h))
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static void track_window(void)
+{
+    Uint32 flags = SDL_GetWindowFlags(window);
+
+    if (flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_MINIMIZED))
+    {
+        return;
+    }
+
+    win_state.maximized = (flags & SDL_WINDOW_MAXIMIZED) != 0;
+
+    if (!win_state.maximized)
+    {
+        SDL_GetWindowPosition(window, &win_state.x, &win_state.y);
+        SDL_GetWindowSize(window, &win_state.w, &win_state.h);
+    }
+}
+
+/* the next run opens the window where this one was left */
+static void save_window(void)
+{
+    char v[64];
+
+    if ((window == NULL) || (win_state.w == 0) || (getenv("RECVX_INPUT") != NULL) || (getenv("RECVX_REPLAY") != NULL))
+    {
+        return;   /* scripted test runs leave the settings alone */
+    }
+
+    if ((win_state.w != video_cfg.win_w) || (win_state.h != video_cfg.win_h))
+    {
+        snprintf(v, sizeof(v), "%dx%d", win_state.w, win_state.h);
+        pcIniSet("window", v);
+    }
+
+    if (!video_cfg.has_pos || (win_state.x != video_cfg.win_x) || (win_state.y != video_cfg.win_y))
+    {
+        snprintf(v, sizeof(v), "%d,%d", win_state.x, win_state.y);
+        pcIniSet("window_pos", v);
+    }
+
+    if (win_state.maximized != video_cfg.maximized)
+    {
+        pcIniSet("window_max", win_state.maximized ? "1" : NULL);
+    }
+}
+
 void pcVideoInit(void)
 {
     Uint32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL;
+    int x = SDL_WINDOWPOS_CENTERED, y = SDL_WINDOWPOS_CENTERED;
 
     if (window != NULL)
     {
@@ -279,8 +432,18 @@ void pcVideoInit(void)
         flags |= (video_cfg.fullscreen == 1) ? SDL_WINDOW_FULLSCREEN : SDL_WINDOW_FULLSCREEN_DESKTOP;
     }
 
-    window = SDL_CreateWindow("Resident Evil Code: Veronica X", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                              video_cfg.win_w, video_cfg.win_h, flags);
+    if (video_cfg.has_pos && position_visible(video_cfg.win_x, video_cfg.win_y, video_cfg.win_w, video_cfg.win_h))
+    {
+        x = video_cfg.win_x;
+        y = video_cfg.win_y;
+    }
+
+    if (video_cfg.maximized && !video_cfg.fullscreen)
+    {
+        flags |= SDL_WINDOW_MAXIMIZED;
+    }
+
+    window = SDL_CreateWindow("Resident Evil Code: Veronica X", x, y, video_cfg.win_w, video_cfg.win_h, flags);
 
     if (window == NULL)
     {
@@ -297,6 +460,15 @@ void pcVideoInit(void)
             pcOsSetWindowIcon(info.info.win.window);
         }
     }
+
+    /* the windowed size and spot, also when starting fullscreen or maximized */
+    win_state.x = (x == SDL_WINDOWPOS_CENTERED) ? 0 : x;
+    win_state.y = (y == SDL_WINDOWPOS_CENTERED) ? 0 : y;
+    win_state.w = video_cfg.win_w;
+    win_state.h = video_cfg.win_h;
+    win_state.maximized = video_cfg.maximized;
+    track_window();
+    atexit(save_window);
 
     gl_context = SDL_GL_CreateContext(window);
 
@@ -324,6 +496,69 @@ void pcVideoInit(void)
           video_cfg.win_w, video_cfg.win_h, video_cfg.fullscreen ? " (fullscreen)" : "", video_cfg.aspect);
 }
 
+/* testing aids drive the game without the window being active: never pause for them */
+static int scripted_run(void)
+{
+    return (getenv("RECVX_INPUT") != NULL) || (getenv("RECVX_REPLAY") != NULL) ||
+           (getenv("RECVX_AUTOPRESS") != NULL) || (getenv("RECVX_SHOTS") != NULL);
+}
+
+/* the window lost focus: hold the game (and its sound) until it is active again;
+ * returns 0 when the window was closed meanwhile */
+static int pause_until_active(void)
+{
+    SDL_Event ev;
+
+    pcAudioPause(1);
+    SDL_SetWindowTitle(window, "Resident Evil Code: Veronica X  [PAUSED]");
+    SDL_ShowCursor(SDL_ENABLE);
+
+    for (;;)
+    {
+        pcOsHeartbeat();   /* paused on purpose, not hung */
+
+        if (!SDL_WaitEventTimeout(&ev, 500))
+        {
+            continue;
+        }
+
+        if (ev.type == SDL_QUIT)
+        {
+            return 0;
+        }
+
+        if (ev.type == SDL_WINDOWEVENT)
+        {
+            if (ev.window.event == SDL_WINDOWEVENT_FOCUS_GAINED)
+            {
+                break;
+            }
+
+            if ((ev.window.event == SDL_WINDOWEVENT_MOVED) || (ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED))
+            {
+                track_window();
+            }
+
+            if ((ev.window.event == SDL_WINDOWEVENT_EXPOSED) || (ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED))
+            {
+                pcGsPresent();   /* redraw the frozen picture */
+                SDL_GL_SwapWindow(window);
+            }
+        }
+
+        if ((ev.type == SDL_CONTROLLERDEVICEADDED) || (ev.type == SDL_CONTROLLERDEVICEREMOVED))
+        {
+            pcPadInit();
+        }
+    }
+
+    SDL_SetWindowTitle(window, "Resident Evil Code: Veronica X");
+    pcAudioPause(0);
+    return 1;
+}
+
+static Uint32 last_mouse_move;
+
 int pcVideoPumpEvents(void)
 {
     SDL_Event ev;
@@ -333,6 +568,36 @@ int pcVideoPumpEvents(void)
         if (ev.type == SDL_QUIT)
         {
             return 0;
+        }
+
+        if (ev.type == SDL_WINDOWEVENT)
+        {
+            if ((ev.window.event == SDL_WINDOWEVENT_MOVED) || (ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) ||
+                (ev.window.event == SDL_WINDOWEVENT_MAXIMIZED) || (ev.window.event == SDL_WINDOWEVENT_RESTORED))
+            {
+                track_window();
+            }
+
+            if ((ev.window.event == SDL_WINDOWEVENT_FOCUS_LOST) && video_cfg.pause_unfocused && !scripted_run() &&
+                !pause_until_active())
+            {
+                return 0;
+            }
+        }
+
+        /* the mouse is not used by the game: it hides after 2 seconds without moving */
+        if (ev.type == SDL_MOUSEMOTION)
+        {
+            last_mouse_move = SDL_GetTicks();
+            SDL_ShowCursor(SDL_ENABLE);
+        }
+
+        /* Alt+Enter: fullscreen on/off, like other Windows games */
+        if ((ev.type == SDL_KEYDOWN) && !ev.key.repeat && (ev.key.keysym.scancode == SDL_SCANCODE_RETURN) &&
+            (ev.key.keysym.mod & KMOD_ALT))
+        {
+            toggle_fullscreen();
+            continue;
         }
 
         if ((ev.type == SDL_CONTROLLERDEVICEADDED) || (ev.type == SDL_CONTROLLERDEVICEREMOVED))
@@ -359,6 +624,11 @@ void pcVideoPresent(void)
     {
         pcLog("window closed");
         exit(0);
+    }
+
+    if ((SDL_GetTicks() - last_mouse_move > 2000) && (SDL_ShowCursor(SDL_QUERY) == SDL_ENABLE))
+    {
+        SDL_ShowCursor(SDL_DISABLE);
     }
 
     pcPadUpdate();
@@ -539,6 +809,11 @@ void pcPadInit(void)
 static int pad_down(const PadMap* m, const Uint8* keys)
 {
     int down = (m->key != SDL_SCANCODE_UNKNOWN) && keys[m->key];
+
+    if ((m->key == SDL_SCANCODE_RETURN) && (SDL_GetModState() & KMOD_ALT))
+    {
+        down = 0;   /* Alt+Enter is the fullscreen toggle */
+    }
 
     if (controller != NULL)
     {

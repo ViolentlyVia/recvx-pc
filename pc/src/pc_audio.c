@@ -134,6 +134,14 @@ void pcAudioInit(void)
     pcLog("audio: %d Hz stereo", have.freq);
 }
 
+void pcAudioPause(int pause)
+{
+    if (device != 0)
+    {
+        SDL_PauseAudioDevice(device, pause);
+    }
+}
+
 int pcAudioOpenVoice(void)
 {
     int v;

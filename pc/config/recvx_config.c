@@ -259,12 +259,13 @@ static const char* pad_label(const char* name)
 enum {
     ID_RES = 100, ID_ASPECT, ID_MODE, ID_SCALE,
     ID_HD, ID_HD_BROWSE, ID_SAVES, ID_SAVES_BROWSE,
-    ID_RESET, ID_SAVE, ID_PLAY, ID_CLOSE, ID_SETUP,
+    ID_RESET, ID_SAVE, ID_PLAY, ID_CLOSE, ID_SETUP, ID_PAUSE,
     ID_KEY = 1000, ID_PAD = 1100,
 };
 
 static HWND main_wnd;
-static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game;
+static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game, h_pause;
+static int loaded_res;   /* resolution entry when the settings were loaded */
 static HWND h_key[PC_BINDING_COUNT], h_pad[PC_BINDING_COUNT];
 static HFONT font, bold_font;
 static float dpi = 1.0f;
@@ -375,6 +376,7 @@ static void load_settings(void)
     }
 
     SendMessageA(h_res, CB_SETCURSEL, sel, 0);
+    loaded_res = sel;
 
     sel = 0;
 
@@ -394,6 +396,9 @@ static void load_settings(void)
     v = ini_get("fullscreen");
     sel = (v == NULL) ? 0 : (_stricmp(v, "desktop") == 0) ? 2 : (atoi(v) != 0) ? 1 : 0;
     SendMessageA(h_mode, CB_SETCURSEL, sel, 0);
+
+    v = ini_get("pause_unfocused");
+    SendMessageA(h_pause, BM_SETCHECK, ((v == NULL) || (atoi(v) != 0)) ? BST_CHECKED : BST_UNCHECKED, 0);
 
     fill_scale_combo();   /* the list must exist before an entry can be selected */
     v = ini_get("scale");
@@ -428,6 +433,13 @@ static int save_settings(void)
 
     sel = (int)SendMessageA(h_res, CB_GETCURSEL, 0, 0);
 
+    if (sel != loaded_res)
+    {
+        ini_set("window_max", NULL);   /* the game remembers a maximized window; a new size replaces it */
+    }
+
+    loaded_res = sel;
+
     if (sel > 0)
     {
         snprintf(buf, sizeof(buf), "%dx%d", res[sel].w, res[sel].h);
@@ -443,6 +455,8 @@ static int save_settings(void)
 
     sel = (int)SendMessageA(h_mode, CB_GETCURSEL, 0, 0);
     ini_set("fullscreen", (sel == 1) ? "1" : (sel == 2) ? "desktop" : NULL);
+
+    ini_set("pause_unfocused", (SendMessageA(h_pause, BM_GETCHECK, 0, 0) == BST_CHECKED) ? NULL : "0");
 
     sel = (int)SendMessageA(h_scale, CB_GETCURSEL, 0, 0) + 1;
     snprintf(buf, sizeof(buf), "%d", sel);
@@ -782,9 +796,12 @@ static void create_controls(void)
     y += 32;
     label("Internal resolution", lx, y, cx - lx);
     h_scale = combo(cx, y, cw, ID_SCALE);
-    y += 34;
+    y += 32;
+    h_pause = make("BUTTON", "Pause the game while its window is not active", BS_AUTOCHECKBOX | WS_TABSTOP,
+                   lx, y, cx + cw - lx, 24, ID_PAUSE);
+    y += 30;
     make("STATIC", "Widescreen widens the 3D view; menus, text and movies stay 4:3 in the middle. "
-                   "In the game, the fullscreen key (F11) switches between window and fullscreen.",
+                   "In the game, F11 or Alt+Enter switches between window and fullscreen.",
          SS_LEFT, lx, y, cx + cw - lx, 52, -1);
 
     y += 70;
@@ -912,7 +929,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
             dirty = 1;
         }
-        else if (code == EN_CHANGE)
+        else if ((code == EN_CHANGE) || (id == ID_PAUSE))
         {
             dirty = 1;
         }

@@ -65,12 +65,14 @@ Alternatives:
 
 ## Running
 
-Start `build_pc/recvx.exe`.
+Start `build_pc/recvx.exe` (or "Save and play" in `recvx-config.exe`). It is a normal Windows
+program: no console window (set `RECVX_CONSOLE=1` for one with the log), the window comes back
+at its last size and position, the mouse cursor hides while playing, and the game pauses while
+its window is not active (can be turned off in the settings app).
 
 Keyboard: arrows = move, Z = Cross, X = Square, C = Circle, V = Triangle, A / S = L1 / R1,
-Q / W = L2 / R2, Enter = Start, Backspace = Select, hold Numpad 0 = fast-forward, F11 =
-fullscreen on/off. Game
-controllers are picked up automatically.
+Enter = Start, Backspace = Select, hold Numpad 0 = fast-forward, F11 or Alt+Enter =
+fullscreen on/off. Game controllers are picked up automatically.
 
 Saves are written to `build_pc/saves` (copy the folder to back them up).
 
@@ -93,6 +95,8 @@ Optional, next to `recvx.exe`, one `key=value` per line (the settings app writes
 | `aspect=` | display aspect, e.g. `16:9` or `21:9` (default `4:3`) |
 | `window=` | window size, e.g. `1920x1080` (default: 960 pixels high at the chosen aspect) |
 | `fullscreen=` | `1` for exclusive fullscreen at the window size, `desktop` for borderless (default `0`) |
+| `pause_unfocused=` | `0` keeps the game running while its window is not active (default `1`) |
+| `window_pos=`, `window_max=` | written by the game: where the window was left, and if it was maximized |
 | `key_<action>=` | keyboard key, by its SDL name (`Z`, `Return`, `Left Shift`, `Keypad 0`, `none`) |
 | `pad_<action>=` | controller button, by its SDL name (`a`, `b`, `leftshoulder`, `lefttrigger`, `dpup`, `none`) |
 
