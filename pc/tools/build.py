@@ -116,20 +116,22 @@ def main():
 
 def build_config(sdl, debug):
     """recvx-config.exe: the settings app (pc/config), a small Win32 program next to recvx.exe."""
-    src = os.path.join(common.ROOT, "pc/config/recvx_config.c")
+    cfg = os.path.join(common.ROOT, "pc/config")
+    srcs = [os.path.join(cfg, f) for f in ("recvx_config.c", "setup_game.c")]
     exe = os.path.join(common.BUILD, "recvx-config.exe")
-    deps = [src, os.path.join(common.ROOT, "pc/include/pc_bindings.h")]
+    deps = srcs + [os.path.join(cfg, "setup_game.h"), os.path.join(common.ROOT, "pc/include/pc_bindings.h")]
     if os.path.exists(exe) and os.path.getmtime(exe) >= max(os.path.getmtime(d) for d in deps):
         return 0
-    obj = os.path.join(OBJ_DIR, "recvx_config.obj")
+    objs = [os.path.join(OBJ_DIR, os.path.basename(s)[:-2] + ".obj") for s in srcs]
     cmd = ["cl", "/nologo", "/W3", "/wd4996", "/O2" if not debug else "/Od", "/MD", "/c",
-           "/I" + os.path.join(common.ROOT, "pc/include"), "/I" + os.path.join(sdl, "include"), "/Fo" + obj, src]
+           "/I" + os.path.join(common.ROOT, "pc/include"), "/I" + os.path.join(sdl, "include"),
+           "/Fo" + OBJ_DIR + os.sep] + srcs
     r = msvc.run(cmd, capture_output=True, text=True, errors="replace", cwd=common.ROOT)
     if r.returncode != 0:
-        print("FAILED pc/config/recvx_config.c")
+        print("FAILED compiling recvx-config.exe (pc/config)")
         print(r.stdout + r.stderr)
         return 1
-    link = ["link", "/nologo", "/SUBSYSTEM:WINDOWS", "/MACHINE:X86", "/MANIFEST:EMBED", "/OUT:" + exe, obj,
+    link = ["link", "/nologo", "/SUBSYSTEM:WINDOWS", "/MACHINE:X86", "/MANIFEST:EMBED", "/OUT:" + exe] + objs + [
             "/LIBPATH:" + os.path.join(sdl, "lib", "x86"), "SDL2.lib", "user32.lib", "gdi32.lib"]
     r = msvc.run(link, capture_output=True, text=True, errors="replace", cwd=common.ROOT)
     if r.returncode != 0:

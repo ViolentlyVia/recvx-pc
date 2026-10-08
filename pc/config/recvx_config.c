@@ -9,6 +9,7 @@
 #define SDL_MAIN_HANDLED
 #include <windows.h>
 #include <commctrl.h>
+#include <commdlg.h>
 #include <shlobj.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,10 +19,12 @@
 #include <SDL_syswm.h>
 
 #include "pc_bindings.h"
+#include "setup_game.h"
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "comdlg32.lib")
 #pragma comment(linker, "\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' " \
                         "version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
@@ -256,12 +259,12 @@ static const char* pad_label(const char* name)
 enum {
     ID_RES = 100, ID_ASPECT, ID_MODE, ID_SCALE,
     ID_HD, ID_HD_BROWSE, ID_SAVES, ID_SAVES_BROWSE,
-    ID_RESET, ID_SAVE, ID_PLAY, ID_CLOSE,
+    ID_RESET, ID_SAVE, ID_PLAY, ID_CLOSE, ID_SETUP,
     ID_KEY = 1000, ID_PAD = 1100,
 };
 
 static HWND main_wnd;
-static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves;
+static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game;
 static HWND h_key[PC_BINDING_COUNT], h_pad[PC_BINDING_COUNT];
 static HFONT font, bold_font;
 static float dpi = 1.0f;
@@ -643,8 +646,16 @@ static void browse(HWND edit, const char* title)
     }
 }
 
+static int game_ready(void);
+
 static void launch_game(void)
 {
+    if (!game_ready())
+    {
+        MessageBoxA(main_wnd, "Set the game up from your disc image first (\"Set up from disc image...\").", APP_TITLE, MB_ICONINFORMATION);
+        return;
+    }
+
     char exe[MAX_PATH + 16];
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
@@ -679,6 +690,74 @@ static void reset_controls(void)
 }
 
 /* ------------------------------------------------------------------------------------------- */
+/* game setup (setup_game.c) */
+
+static int game_ready(void)
+{
+    char data[MAX_PATH + 8], text[MAX_PATH + 64];
+    const char* iso = ini_get("iso");
+    int ready = SetupGameIsReady(exe_dir, data, sizeof(data));
+
+    if (ready)
+    {
+        snprintf(text, sizeof(text), "Ready: %s", data);
+    }
+    else if ((iso != NULL) && (iso[0] != 0))
+    {
+        snprintf(text, sizeof(text), "Runs from the disc image (no movies): %s", iso);
+    }
+    else
+    {
+        snprintf(text, sizeof(text), "Not set up yet: choose your disc image (.iso) to set it up.");
+    }
+
+    SetWindowTextA(h_game, text);
+    return ready || ((iso != NULL) && (iso[0] != 0));
+}
+
+static char cmd_iso[MAX_PATH];   /* a disc image given on the command line (or dropped on the exe) */
+
+static void setup_game(const char* given)
+{
+    char iso[MAX_PATH] = "", error[1024];
+    OPENFILENAMEA ofn;
+    int r;
+
+    memset(&ofn, 0, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = main_wnd;
+    ofn.lpstrFilter = "Disc images (*.iso)\0*.iso\0All files\0*.*\0";
+    ofn.lpstrFile = iso;
+    ofn.nMaxFile = sizeof(iso);
+    ofn.lpstrTitle = "Your Resident Evil Code: Veronica X (USA, SLUS-20184) disc image";
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY;
+
+    if (given != NULL)
+    {
+        snprintf(iso, sizeof(iso), "%s", given);
+    }
+    else if (!GetOpenFileNameA(&ofn))
+    {
+        return;
+    }
+
+    r = SetupGameFromIso(main_wnd, font, dpi, exe_dir, iso, error, sizeof(error));
+
+    if (r > 0)
+    {
+        /* the game finds the data folder next to it by itself */
+        ini_set("data", NULL);
+        ini_save();
+        game_ready();
+        MessageBoxA(main_wnd, "The game is set up. The disc image is no longer needed.", APP_TITLE, MB_ICONINFORMATION);
+    }
+    else if (r == 0)
+    {
+        MessageBoxA(main_wnd, (error[0] != 0) ? error : "Setting up the game failed.", APP_TITLE, MB_ICONERROR);
+    }
+}
+
+/* ------------------------------------------------------------------------------------------- */
 
 static void create_controls(void)
 {
@@ -686,8 +765,12 @@ static void create_controls(void)
     const int lx = 16, cx = 150, cw = 230;     /* left column: labels, inputs */
     const int rx = 420;                        /* right column: controls */
 
-    heading("Display", lx, 14, 200);
-    y = 40;
+    heading("Game", lx, 14, 200);
+    h_game = make("STATIC", "", SS_LEFT | SS_PATHELLIPSIS, lx, 40, cx + cw - lx, 20, -1);
+    make("BUTTON", "Set up from disc image...", BS_PUSHBUTTON | WS_TABSTOP, lx, 64, 180, 28, ID_SETUP);
+
+    heading("Display", lx, 112, 200);
+    y = 138;
     label("Resolution", lx, y, cx - lx);
     h_res = combo(cx, y, cw, ID_RES);
     y += 32;
@@ -771,12 +854,36 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         create_controls();
         load_settings();
 
+        if (cmd_iso[0] != 0)
+        {
+            PostMessageA(hwnd, WM_APP, 1, 0);   /* set up from the given disc image */
+        }
+        else if (!game_ready())
+        {
+            PostMessageA(hwnd, WM_APP, 0, 0);   /* offer the setup once the window shows */
+        }
+
         /* fit the window to the controls */
         {
             RECT rc = { 0, 0, S(876), S(layout_h) };
 
             AdjustWindowRect(&rc, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
             SetWindowPos(hwnd, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOMOVE | SWP_NOZORDER);
+        }
+        return 0;
+
+    case WM_APP:
+        if (wp == 1)
+        {
+            setup_game(cmd_iso);
+            return 0;
+        }
+
+        if (MessageBoxA(hwnd, "The game has not been set up yet. It needs the files from your own copy of the "
+                              "game: a disc image (.iso) of Resident Evil Code: Veronica X for the US "
+                              "PlayStation 2 (SLUS-20184).\n\nSet it up now?", APP_TITLE, MB_YESNO | MB_ICONQUESTION) == IDYES)
+        {
+            setup_game(NULL);
         }
         return 0;
 
@@ -820,6 +927,10 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         else if (id == ID_RESET)
         {
             reset_controls();
+        }
+        else if (id == ID_SETUP)
+        {
+            setup_game(NULL);
         }
         else if (id == ID_SAVE)
         {
@@ -887,6 +998,18 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     }
 
     snprintf(ini_path, sizeof(ini_path), "%s\\recvx.ini", exe_dir);
+
+    /* recvx-config.exe "C:\path\game.iso" (also what dropping an .iso on the exe does) */
+    if ((cmd != NULL) && (cmd[0] != 0))
+    {
+        snprintf(cmd_iso, sizeof(cmd_iso), "%s", (cmd[0] == '"') ? cmd + 1 : cmd);
+        cmd_iso[strcspn(cmd_iso, "\"")] = 0;
+
+        if (GetFileAttributesA(cmd_iso) == INVALID_FILE_ATTRIBUTES)
+        {
+            cmd_iso[0] = 0;
+        }
+    }
 
     SDL_SetMainReady();
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");

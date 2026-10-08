@@ -44,20 +44,20 @@ cd recvx-pc
 python pc/tools/build.py
 ```
 
-`build.py` downloads SDL2 into `build_pc/deps` on first run and writes `build_pc/recvx.exe`
-(add `--debug` for an unoptimised build, `--clean` to rebuild everything). If you cloned
-without `--recursive`, run `git submodule update --init` first.
+`build.py` downloads SDL2 into `build_pc/deps` on first run and writes `build_pc/recvx.exe` and
+`build_pc/recvx-config.exe` (add `--debug` for an unoptimised build, `--clean` to rebuild
+everything). If you cloned without `--recursive`, run `git submodule update --init` first.
+Python is only needed to build; players need nothing but the programs.
 
 ## Setting up the game data
 
-Extract your disc image into a `data` folder next to the exe and convert the movies (downloads
-FFmpeg into `build_pc/deps` once, about 100 MB):
+Run `recvx-config.exe` and choose "Set up from disc image..." (it offers this by itself on first
+start; dropping the `.iso` on `recvx-config.exe` works too). It copies the disc into a `data`
+folder next to the exe and converts the movies, downloading FFmpeg into `tools\ffmpeg` next to
+the exe once (about 100 MB). After that the ISO is no longer needed.
 
-```bash
-python pc/tools/setup_game.py "C:\path\to\RECVX.iso"
-```
-
-After that the ISO is no longer needed. Alternatives:
+`python pc/tools/setup_game.py "C:\path\to\RECVX.iso"` does the same from the command line.
+Alternatives:
 
 - Put the `.iso` next to `recvx.exe` (or set `iso=` in `recvx.ini`) to run straight from the
   image; movies are skipped in that mode.
