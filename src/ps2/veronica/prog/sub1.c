@@ -2262,6 +2262,30 @@ void SpriteSet2D(S_WORK* st, PARTS* cbjim, NJS_TEXANIM* anim1, NJS_TEXLIST* tlis
     }
 }
 
+#ifdef TARGET_PC
+/* widescreen: the status screen background (parts_07b, a brick pattern that repeats every 640
+ * pixels) is drawn again 640 to each side, so it fills the side areas around the 4:3 layout */
+static void pc_wide_background(S_WORK* st, PARTS* table, PARTS* spr, NJS_TEXANIM* anim, NJS_TEXLIST* tlist)
+{
+    extern float pcVideoWideScale(void);
+    extern int pcWide2DUnclipped;
+    PARTS copy;
+
+    if ((table < parts_07b) || (table >= &parts_07b[8]) || (pcVideoWideScale() >= 1.0f))
+    {
+        return;
+    }
+
+    copy = *spr;
+    pcWide2DUnclipped = 1;
+    copy.pos[0] = spr->pos[0] - 640.0f;
+    SpriteSet2D(st, &copy, anim, tlist);
+    copy.pos[0] = spr->pos[0] + 640.0f;
+    SpriteSet2D(st, &copy, anim, tlist);
+    pcWide2DUnclipped = 0;
+}
+#endif
+
 // 100% matching!
 void ItemSort()
 {
@@ -3686,12 +3710,18 @@ void StatusMain()
                                 njSetTexture(&fv->fbtx_list);
                                 
                                 SpriteSet2D(st, &spr_t, parts, &fv->fbtx_list);
+#ifdef TARGET_PC
+                                pc_wide_background(st, spr_a, &spr_t, parts, &fv->fbtx_list);
+#endif
                             } 
                             else if ((spr_t.atr & 0x40)) 
                             {
                                 njSetTexture(&fv->fstx_list);
                                 
                                 SpriteSet2D(st, &spr_t, parts, &fv->fstx_list);
+#ifdef TARGET_PC
+                                pc_wide_background(st, spr_a, &spr_t, parts, &fv->fstx_list);
+#endif
                             }
                         }
                         else if ((!(sys->cb_flg & 0x20000)) && (fv->tex_flg == 0)) 
@@ -3699,6 +3729,9 @@ void StatusMain()
                             njSetTexture(&st->subtx_list);
                             
                             SpriteSet2D(st, &spr_t, parts, &st->subtx_list);
+#ifdef TARGET_PC
+                                pc_wide_background(st, spr_a, &spr_t, parts, &st->subtx_list);
+#endif
                             
                             njSetPaletteBankNum(0, 5);
                         } 

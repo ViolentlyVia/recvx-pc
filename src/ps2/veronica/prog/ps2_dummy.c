@@ -321,6 +321,8 @@ void PS2_swap()
 
 // 99.93% matching
 #ifdef TARGET_PC
+int pcWide2DUnclipped;   /* widescreen: 2D drawn into the side areas on purpose (backgrounds) */
+
 /* widescreen: clip a 2D rectangle (sprite, or quad with two distinct x values) to the 4:3
  * frame, 1728..2368 in GS coordinates. Vertices are 3 qwords: ST/Q (or UV), RGBA, XYZ. */
 static void pc_wide_clip(unsigned int* v, unsigned int num, int uv)
@@ -492,8 +494,9 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
             }
 
             /* 2D beyond the 4:3 edges (panels parked off screen or sliding in) was hidden by
-             * the screen edge; squeezed, it would show in the side areas */
-            if (wide_2d < 1.0f)
+             * the screen edge; squeezed, it would show in the side areas. Backgrounds the
+             * game code extends into those areas on purpose set pcWide2DUnclipped. */
+            if ((wide_2d < 1.0f) && !pcWide2DUnclipped)
             {
                 if ((x1 <= 1728.0f) || (x0 >= 2368.0f))
                 {
