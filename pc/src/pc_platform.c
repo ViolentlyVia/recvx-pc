@@ -11,6 +11,7 @@
 #include "pc_platform.h"
 #include "pc_os.h"
 #include "pc_gs.h"
+#include "pc_bindings.h"
 
 static unsigned int frames;   /* frames presented */
 
@@ -18,6 +19,8 @@ static unsigned int frames;   /* frames presented */
 #define PS2_HEIGHT 480
 
 static SDL_Window* window;
+static int pcPadFullscreenKey(void);
+static int pcPadFullscreenButton(void);
 static SDL_GLContext gl_context;
 static FILE* log_file;
 
@@ -320,7 +323,9 @@ int pcVideoPumpEvents(void)
             pcPadInit();
         }
 
-        if ((ev.type == SDL_KEYDOWN) && !ev.key.repeat && (ev.key.keysym.scancode == SDL_SCANCODE_F11))
+        if (((ev.type == SDL_KEYDOWN) && !ev.key.repeat && (ev.key.keysym.scancode != SDL_SCANCODE_UNKNOWN) &&
+             (ev.key.keysym.scancode == pcPadFullscreenKey())) ||
+            ((ev.type == SDL_CONTROLLERBUTTONDOWN) && (ev.cbutton.button == pcPadFullscreenButton())))
         {
             toggle_fullscreen();
         }
@@ -393,9 +398,104 @@ void pcVideoPresent(void)
 static SDL_GameController* controller;
 static unsigned char pad_report[32];
 
+typedef struct {
+    int byte, bit, pressure;           /* report byte/bit (active low), pressure byte or -1 */
+    SDL_Scancode key;
+    SDL_GameControllerButton button;
+    SDL_GameControllerAxis axis;       /* a trigger used as a button, or INVALID */
+} PadMap;
+
+/* report position of each DualShock 2 button, in pc_binding_defs order */
+static const struct { int byte, bit, pressure; } pad_bits[PC_BINDING_PS2_BUTTONS] = {
+    { 3, 6, 14 }, { 3, 7, 15 }, { 3, 5, 13 }, { 3, 4, 12 },    /* cross square circle triangle */
+    { 3, 2, 16 }, { 3, 3, 17 }, { 3, 0, 18 }, { 3, 1, 19 },    /* l1 r1 l2 r2 */
+    { 2, 1, -1 }, { 2, 2, -1 }, { 2, 3, -1 }, { 2, 0, -1 },    /* l3 r3 start select */
+    { 2, 4, 10 }, { 2, 6, 11 }, { 2, 7,  9 }, { 2, 5,  8 },    /* up down left right */
+};
+
+/* keyboard and controller bindings: pc_binding_defs defaults, overridden by recvx.ini
+ * key_<name>= / pad_<name>= lines (written by recvx-config.exe) */
+static PadMap pad_map[PC_BINDING_COUNT];
+#define PAD_FASTFORWARD PC_BINDING_PS2_BUTTONS
+#define PAD_FULLSCREEN  (PC_BINDING_PS2_BUTTONS + 1)
+
+static void load_bindings(void)
+{
+    static int loaded;
+    int i;
+
+    if (loaded)
+    {
+        return;
+    }
+
+    loaded = 1;
+
+    for (i = 0; i < PC_BINDING_COUNT; i++)
+    {
+        const PcBindingDef* d = &pc_binding_defs[i];
+        PadMap* m = &pad_map[i];
+        char ini[64], key[64], pad[64];
+
+        snprintf(key, sizeof(key), "%s", d->key);
+        snprintf(pad, sizeof(pad), "%s", d->pad);
+        snprintf(ini, sizeof(ini), "key_%s", d->name);
+        pcIniGet(ini, key, sizeof(key));
+        snprintf(ini, sizeof(ini), "pad_%s", d->name);
+        pcIniGet(ini, pad, sizeof(pad));
+
+        m->byte = (i < PC_BINDING_PS2_BUTTONS) ? pad_bits[i].byte : -1;
+        m->bit = (i < PC_BINDING_PS2_BUTTONS) ? pad_bits[i].bit : 0;
+        m->pressure = (i < PC_BINDING_PS2_BUTTONS) ? pad_bits[i].pressure : -1;
+        m->key = SDL_SCANCODE_UNKNOWN;
+        m->button = SDL_CONTROLLER_BUTTON_INVALID;
+        m->axis = SDL_CONTROLLER_AXIS_INVALID;
+
+        if ((key[0] != 0) && (_stricmp(key, "none") != 0))
+        {
+            m->key = SDL_GetScancodeFromName(key);
+
+            if (m->key == SDL_SCANCODE_UNKNOWN)
+            {
+                pcLog("input: unknown key \"%s\" for %s", key, d->name);
+            }
+        }
+
+        if ((pad[0] != 0) && (_stricmp(pad, "none") != 0))
+        {
+            m->button = SDL_GameControllerGetButtonFromString(pad);
+
+            if (m->button == SDL_CONTROLLER_BUTTON_INVALID)
+            {
+                m->axis = SDL_GameControllerGetAxisFromString(pad);
+
+                if ((m->axis != SDL_CONTROLLER_AXIS_TRIGGERLEFT) && (m->axis != SDL_CONTROLLER_AXIS_TRIGGERRIGHT))
+                {
+                    m->axis = SDL_CONTROLLER_AXIS_INVALID;
+                    pcLog("input: unknown controller button \"%s\" for %s", pad, d->name);
+                }
+            }
+        }
+    }
+}
+
+static int pcPadFullscreenKey(void)
+{
+    load_bindings();
+    return pad_map[PAD_FULLSCREEN].key;
+}
+
+static int pcPadFullscreenButton(void)
+{
+    load_bindings();
+    return pad_map[PAD_FULLSCREEN].button;
+}
+
 void pcPadInit(void)
 {
     int i;
+
+    load_bindings();
 
     if (controller != NULL)
     {
@@ -418,28 +518,26 @@ void pcPadInit(void)
     }
 }
 
-typedef struct {
-    int byte, bit, pressure;           /* report byte/bit (active low), pressure byte or -1 */
-    SDL_Scancode key;
-    SDL_GameControllerButton button;
-} PadMap;
+/* a binding is held on the keyboard or the controller */
+static int pad_down(const PadMap* m, const Uint8* keys)
+{
+    int down = (m->key != SDL_SCANCODE_UNKNOWN) && keys[m->key];
 
-static const PadMap pad_map[] = {
-    { 2, 0, -1, SDL_SCANCODE_BACKSPACE, SDL_CONTROLLER_BUTTON_BACK },          /* SELECT   */
-    { 2, 1, -1, SDL_SCANCODE_UNKNOWN,   SDL_CONTROLLER_BUTTON_LEFTSTICK },     /* L3       */
-    { 2, 2, -1, SDL_SCANCODE_UNKNOWN,   SDL_CONTROLLER_BUTTON_RIGHTSTICK },    /* R3       */
-    { 2, 3, -1, SDL_SCANCODE_RETURN,    SDL_CONTROLLER_BUTTON_START },         /* START    */
-    { 2, 4, 10, SDL_SCANCODE_UP,        SDL_CONTROLLER_BUTTON_DPAD_UP },       /* UP       */
-    { 2, 5,  8, SDL_SCANCODE_RIGHT,     SDL_CONTROLLER_BUTTON_DPAD_RIGHT },    /* RIGHT    */
-    { 2, 6, 11, SDL_SCANCODE_DOWN,      SDL_CONTROLLER_BUTTON_DPAD_DOWN },     /* DOWN     */
-    { 2, 7,  9, SDL_SCANCODE_LEFT,      SDL_CONTROLLER_BUTTON_DPAD_LEFT },     /* LEFT     */
-    { 3, 2, 16, SDL_SCANCODE_A,         SDL_CONTROLLER_BUTTON_LEFTSHOULDER },  /* L1       */
-    { 3, 3, 17, SDL_SCANCODE_S,         SDL_CONTROLLER_BUTTON_RIGHTSHOULDER }, /* R1       */
-    { 3, 4, 12, SDL_SCANCODE_V,         SDL_CONTROLLER_BUTTON_Y },             /* TRIANGLE */
-    { 3, 5, 13, SDL_SCANCODE_C,         SDL_CONTROLLER_BUTTON_B },             /* CIRCLE   */
-    { 3, 6, 14, SDL_SCANCODE_Z,         SDL_CONTROLLER_BUTTON_A },             /* CROSS    */
-    { 3, 7, 15, SDL_SCANCODE_X,         SDL_CONTROLLER_BUTTON_X },             /* SQUARE   */
-};
+    if (controller != NULL)
+    {
+        if (m->button != SDL_CONTROLLER_BUTTON_INVALID)
+        {
+            down |= SDL_GameControllerGetButton(controller, m->button);
+        }
+
+        if (m->axis != SDL_CONTROLLER_AXIS_INVALID)
+        {
+            down |= SDL_GameControllerGetAxis(controller, m->axis) > 8000;
+        }
+    }
+
+    return down;
+}
 
 static unsigned char axis_to_byte(Sint16 v)
 {
@@ -555,7 +653,7 @@ static void pcPadRecordReplay(unsigned char* r)
             r[i] = 0;
         }
 
-        for (i = 0; i < sizeof(pad_map) / sizeof(pad_map[0]); i++)
+        for (i = 0; i < PC_BINDING_PS2_BUTTONS; i++)
         {
             if ((pad_map[i].pressure >= 0) && !(r[pad_map[i].byte] & (1 << pad_map[i].bit)))
             {
@@ -579,12 +677,12 @@ void pcPadUpdate(void)
     r[3] = 0xFF;
     r[4] = r[5] = r[6] = r[7] = 0x80;
 
-    /* hold Numpad 0 to fast-forward */
+    /* hold the fast-forward binding (Numpad 0) to fast-forward */
     {
         extern int pcFastForward;
         static int shown;
 
-        pcFastForward = keys[SDL_SCANCODE_KP_0] != 0;
+        pcFastForward = pad_down(&pad_map[PAD_FASTFORWARD], keys);
 
         if (pcFastForward != shown)
         {
@@ -593,17 +691,11 @@ void pcPadUpdate(void)
         }
     }
 
-    for (i = 0; i < sizeof(pad_map) / sizeof(pad_map[0]); i++)
+    for (i = 0; i < PC_BINDING_PS2_BUTTONS; i++)
     {
         const PadMap* m = &pad_map[i];
-        int down = (m->key != SDL_SCANCODE_UNKNOWN) && keys[m->key];
 
-        if (controller != NULL)
-        {
-            down |= SDL_GameControllerGetButton(controller, m->button);
-        }
-
-        if (down)
+        if (pad_down(m, keys))
         {
             r[m->byte] &= ~(1 << m->bit);
 
@@ -611,29 +703,6 @@ void pcPadUpdate(void)
             {
                 r[m->pressure] = 0xFF;
             }
-        }
-    }
-
-    /* L2 / R2 */
-    {
-        int l2 = keys[SDL_SCANCODE_Q], r2 = keys[SDL_SCANCODE_W];
-
-        if (controller != NULL)
-        {
-            l2 |= SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 8000;
-            r2 |= SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 8000;
-        }
-
-        if (l2)
-        {
-            r[3] &= ~0x01;
-            r[18] = 0xFF;
-        }
-
-        if (r2)
-        {
-            r[3] &= ~0x02;
-            r[19] = 0xFF;
         }
     }
 

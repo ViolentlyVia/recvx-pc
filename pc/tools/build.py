@@ -110,6 +110,32 @@ def main():
         return 1
     shutil.copyfile(os.path.join(sdl, "lib", "x86", "SDL2.dll"), os.path.join(common.BUILD, "SDL2.dll"))
     print("built " + EXE)
+    return build_config(sdl, opts.debug)
+
+
+def build_config(sdl, debug):
+    """recvx-config.exe: the settings app (pc/config), a small Win32 program next to recvx.exe."""
+    src = os.path.join(common.ROOT, "pc/config/recvx_config.c")
+    exe = os.path.join(common.BUILD, "recvx-config.exe")
+    deps = [src, os.path.join(common.ROOT, "pc/include/pc_bindings.h")]
+    if os.path.exists(exe) and os.path.getmtime(exe) >= max(os.path.getmtime(d) for d in deps):
+        return 0
+    obj = os.path.join(OBJ_DIR, "recvx_config.obj")
+    cmd = ["cl", "/nologo", "/W3", "/wd4996", "/O2" if not debug else "/Od", "/MD", "/c",
+           "/I" + os.path.join(common.ROOT, "pc/include"), "/I" + os.path.join(sdl, "include"), "/Fo" + obj, src]
+    r = msvc.run(cmd, capture_output=True, text=True, errors="replace", cwd=common.ROOT)
+    if r.returncode != 0:
+        print("FAILED pc/config/recvx_config.c")
+        print(r.stdout + r.stderr)
+        return 1
+    link = ["link", "/nologo", "/SUBSYSTEM:WINDOWS", "/MACHINE:X86", "/MANIFEST:EMBED", "/OUT:" + exe, obj,
+            "/LIBPATH:" + os.path.join(sdl, "lib", "x86"), "SDL2.lib", "user32.lib", "gdi32.lib"]
+    r = msvc.run(link, capture_output=True, text=True, errors="replace", cwd=common.ROOT)
+    if r.returncode != 0:
+        print("FAILED linking recvx-config.exe")
+        print(r.stdout + r.stderr)
+        return 1
+    print("built " + exe)
     return 0
 
 

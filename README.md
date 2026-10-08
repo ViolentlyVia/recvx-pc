@@ -19,6 +19,7 @@ graveyard), saving and loading. Report problems with a `last_run_input.txt` reco
 |---|---|
 | Graphics (OpenGL 3.3, 3x internal resolution by default, exact PS2 blending) | done |
 | Widescreen (wider 3D view, 2D kept at 4:3), window size, fullscreen | done |
+| Settings app (`recvx-config.exe`): display, folders, key and controller bindings | done |
 | PCSX2-format HD texture packs (`.dds`) | done |
 | Movies (converted once from the disc with FFmpeg) | done |
 | Music and voices (CRI ADX) | done |
@@ -73,9 +74,14 @@ controllers are picked up automatically.
 
 Saves are written to `build_pc/saves` (copy the folder to back them up).
 
+### Settings
+
+Run `recvx-config.exe` (next to `recvx.exe`) to change the display settings, folders and
+key / controller bindings; it writes `recvx.ini`. "Save and play" starts the game.
+
 ### recvx.ini
 
-Optional, next to `recvx.exe`, one `key=value` per line:
+Optional, next to `recvx.exe`, one `key=value` per line (the settings app writes it too):
 
 | Key | Meaning |
 |---|---|
@@ -87,6 +93,11 @@ Optional, next to `recvx.exe`, one `key=value` per line:
 | `aspect=` | display aspect, e.g. `16:9` or `21:9` (default `4:3`) |
 | `window=` | window size, e.g. `1920x1080` (default: 960 pixels high at the chosen aspect) |
 | `fullscreen=` | `1` for exclusive fullscreen at the window size, `desktop` for borderless (default `0`) |
+| `key_<action>=` | keyboard key, by its SDL name (`Z`, `Return`, `Left Shift`, `Keypad 0`, `none`) |
+| `pad_<action>=` | controller button, by its SDL name (`a`, `b`, `leftshoulder`, `lefttrigger`, `dpup`, `none`) |
+
+Actions: `cross square circle triangle l1 r1 l2 r2 l3 r3 start select up down left right
+fastforward fullscreen` (defaults in `pc/include/pc_bindings.h`).
 
 With a widescreen `aspect=`, the 3D view is widened rather than stretched, and menus, text and
 movies stay at 4:3 in the middle of the screen. The internal resolution rises horizontally to

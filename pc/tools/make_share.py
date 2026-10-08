@@ -18,7 +18,7 @@ import common
 BUILD = common.BUILD
 OUT = os.path.join(BUILD, "share", "recvx-cvx-pc")
 
-PROGRAM = ["recvx.exe", "SDL2.dll"]
+PROGRAM = ["recvx.exe", "recvx-config.exe", "SDL2.dll"]
 SETUP = ["setup_game.py", "extract_iso.py", "convert_movies.py", "fetch_deps.py"]
 
 README = """Resident Evil Code: Veronica X - PC port (recvx-decomp)
@@ -37,18 +37,19 @@ Setup (once)
   Without step 2 you can also put your .iso next to recvx.exe (or set iso=C:\\path\\game.iso
   in recvx.ini); the game then runs straight from the image, but movies are skipped.
 
-Controls (keyboard; game controllers work too)
+Settings
+  Run recvx-config.exe to choose the resolution, widescreen, fullscreen, folders and the
+  keyboard / controller buttons. "Save and play" starts the game.
+
+Controls (defaults; keyboard and game controllers)
   Arrows = move, Z = Cross, X = Square, C = Circle, V = Triangle, A/S = L1/R1, Q/W = L2/R2,
-  Enter = Start, Backspace = Select. Hold Numpad 0 to fast-forward.
+  Enter = Start, Backspace = Select. Hold Numpad 0 to fast-forward, F11 = fullscreen.
 
 Saving: use the typewriters as usual. Saves are kept in the "saves" folder next to
 recvx.exe (copy that folder to back them up or move them to another PC). To keep them
-somewhere else, add  saves=C:\\path\\to\\folder  to recvx.ini.
+somewhere else, pick a folder in recvx-config.exe.
 
-Optional: HD textures from a PCSX2 texture pack - add  hd_textures=C:\\path\\to\\pack  to
-recvx.ini (create the file next to recvx.exe if needed).
-
-Not finished yet: sound reverb.
+Optional: HD textures from a PCSX2 texture pack - pick its folder in recvx-config.exe.
 """
 
 
