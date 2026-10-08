@@ -91,6 +91,10 @@ def main():
         return 1
 
     objs = [obj_path(s) for s in sources]
+    res = compile_res("recvx")
+    if res is None:
+        return 1
+    objs.append(res)
     rsp = os.path.join(common.BUILD, "link.rsp")
     with open(rsp, "w") as f:
         f.write("\n".join('"%s"' % o for o in objs))
@@ -114,12 +118,28 @@ def main():
     return build_config(sdl, opts.debug)
 
 
+def compile_res(name):
+    """pc/res/<name>.rc (icon, version information) -> .res for the linker; None on failure."""
+    rc = os.path.join(common.ROOT, "pc", "res", name + ".rc")
+    out = os.path.join(OBJ_DIR, name + ".res")
+    r = msvc.run(["rc", "/nologo", "/fo", out, rc], capture_output=True, text=True, errors="replace",
+                 cwd=os.path.dirname(rc))
+    if r.returncode != 0:
+        print("FAILED pc/res/" + name + ".rc")
+        print(r.stdout + r.stderr)
+        return None
+    return out
+
+
 def build_config(sdl, debug):
     """recvx-config.exe: the settings app (pc/config), a small Win32 program next to recvx.exe."""
     cfg = os.path.join(common.ROOT, "pc/config")
     srcs = [os.path.join(cfg, f) for f in ("recvx_config.c", "setup_game.c")]
     exe = os.path.join(common.BUILD, "recvx-config.exe")
-    deps = srcs + [os.path.join(cfg, "setup_game.h"), os.path.join(common.ROOT, "pc/include/pc_bindings.h")]
+    res_dir = os.path.join(common.ROOT, "pc", "res")
+    deps = srcs + [os.path.join(cfg, "setup_game.h"), os.path.join(common.ROOT, "pc/include/pc_bindings.h"),
+                   os.path.join(res_dir, "recvx-config.rc"), os.path.join(res_dir, "recvx-config.ico"),
+                   os.path.join(res_dir, "version.h")]
     if os.path.exists(exe) and os.path.getmtime(exe) >= max(os.path.getmtime(d) for d in deps):
         return 0
     objs = [os.path.join(OBJ_DIR, os.path.basename(s)[:-2] + ".obj") for s in srcs]
@@ -131,7 +151,10 @@ def build_config(sdl, debug):
         print("FAILED compiling recvx-config.exe (pc/config)")
         print(r.stdout + r.stderr)
         return 1
-    link = ["link", "/nologo", "/SUBSYSTEM:WINDOWS", "/MACHINE:X86", "/MANIFEST:EMBED", "/OUT:" + exe] + objs + [
+    res = compile_res("recvx-config")
+    if res is None:
+        return 1
+    link = ["link", "/nologo", "/SUBSYSTEM:WINDOWS", "/MACHINE:X86", "/MANIFEST:EMBED", "/OUT:" + exe] + objs + [res,
             "/LIBPATH:" + os.path.join(sdl, "lib", "x86"), "SDL2.lib", "user32.lib", "gdi32.lib"]
     r = msvc.run(link, capture_output=True, text=True, errors="replace", cwd=common.ROOT)
     if r.returncode != 0:

@@ -6,6 +6,7 @@
 #include "pc_os.h"
 
 #pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "user32.lib")
 
 typedef struct {
     void (*entry)(void*);
@@ -222,6 +223,24 @@ void pcOsOpenConsole(void)
         freopen("CONOUT$", "w", stdout);
         freopen("CONOUT$", "w", stderr);
         SetConsoleTitleA("recvx log");
+    }
+}
+
+void pcOsSetWindowIcon(void* hwnd)
+{
+    HICON big = (HICON)LoadImageA(GetModuleHandleA(NULL), MAKEINTRESOURCEA(1), IMAGE_ICON,
+                                  GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), 0);
+    HICON small = (HICON)LoadImageA(GetModuleHandleA(NULL), MAKEINTRESOURCEA(1), IMAGE_ICON,
+                                    GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0);
+
+    if (big != NULL)
+    {
+        SendMessageA((HWND)hwnd, WM_SETICON, ICON_BIG, (LPARAM)big);
+    }
+
+    if (small != NULL)
+    {
+        SendMessageA((HWND)hwnd, WM_SETICON, ICON_SMALL, (LPARAM)small);
     }
 }
 

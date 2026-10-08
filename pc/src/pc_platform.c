@@ -7,6 +7,7 @@
 #include <io.h>
 
 #include <SDL.h>
+#include <SDL_syswm.h>
 
 #include "pc_platform.h"
 #include "pc_os.h"
@@ -284,6 +285,17 @@ void pcVideoInit(void)
     if (window == NULL)
     {
         pcPlatformFatal("Could not create the window: %s", SDL_GetError());
+    }
+
+    {
+        SDL_SysWMinfo info;
+
+        SDL_VERSION(&info.version);
+
+        if (SDL_GetWindowWMInfo(window, &info))
+        {
+            pcOsSetWindowIcon(info.info.win.window);
+        }
     }
 
     gl_context = SDL_GL_CreateContext(window);

@@ -1035,7 +1035,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     wc.hInstance = inst;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = GetSysColorBrush(COLOR_WINDOW);
-    wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    wc.hIcon = LoadIcon(inst, MAKEINTRESOURCE(1));   /* pc/res/recvx-config.ico */
     wc.lpszClassName = "recvx_config";
     RegisterClassA(&wc);
 
