@@ -121,7 +121,6 @@ trace on crashes.
   by AshfordFamily and contributors, including the CRI and Katana header submodules.
 - [SDL2](https://www.libsdl.org/) (zlib), [pl_mpeg](https://github.com/phoboslab/pl_mpeg) (MIT),
   [xxHash](https://github.com/Cyan4973/xxHash) (BSD-2).
-- The PC port was written with AI assistance (Claude).
 
 The code is MIT licensed, like upstream. Resident Evil and Code: Veronica are trademarks of
 Capcom; this project is not affiliated with or endorsed by Capcom, and it contains none of the
