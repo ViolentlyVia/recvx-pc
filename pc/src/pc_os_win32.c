@@ -213,6 +213,18 @@ static DWORD WINAPI watchdog(LPVOID param)
     }
 }
 
+/* recvx.exe is a Windows (not console) program: the log goes to recvx.log, and a console
+ * window for it only opens when asked for */
+void pcOsOpenConsole(void)
+{
+    if (AllocConsole())
+    {
+        freopen("CONOUT$", "w", stdout);
+        freopen("CONOUT$", "w", stderr);
+        SetConsoleTitleA("recvx log");
+    }
+}
+
 void pcOsInstallDiagnostics(void)
 {
     if (main_thread != NULL)

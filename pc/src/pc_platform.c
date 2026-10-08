@@ -35,6 +35,11 @@ void pcLog(const char* fmt, ...)
     {
         char path[1024];
 
+        if (getenv("RECVX_CONSOLE") != NULL)
+        {
+            pcOsOpenConsole();
+        }
+
         pcPlatformExeDir(path, sizeof(path) - 16);
         strcat(path, "/recvx.log");
         log_file = fopen(path, "w");

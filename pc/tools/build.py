@@ -94,7 +94,8 @@ def main():
     rsp = os.path.join(common.BUILD, "link.rsp")
     with open(rsp, "w") as f:
         f.write("\n".join('"%s"' % o for o in objs))
-    link = ["link", "/nologo", "/DEBUG", "/SUBSYSTEM:CONSOLE", "/MACHINE:X86", "/OUT:" + EXE,
+    # a Windows program (no console window) that still starts at main(); RECVX_CONSOLE=1 opens one
+    link = ["link", "/nologo", "/DEBUG", "/SUBSYSTEM:WINDOWS", "/ENTRY:mainCRTStartup", "/MACHINE:X86", "/OUT:" + EXE,
             "/LIBPATH:" + os.path.join(sdl, "lib", "x86"), "SDL2.lib", "@" + rsp]
     r = msvc.run(link, capture_output=True, text=True, errors="replace", cwd=common.ROOT)
     out = r.stdout + r.stderr

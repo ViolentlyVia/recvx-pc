@@ -9,6 +9,7 @@ void  pcOsFiberDelete(void* fiber);
 double pcOsTime(void);          /* seconds, monotonic */
 void   pcOsSleep(double seconds);
 
+void pcOsOpenConsole(void);          /* a console window for stdout (RECVX_CONSOLE=1) */
 void pcOsInstallDiagnostics(void);   /* crash handler + hang watchdog (stack traces to the log) */
 void pcOsHeartbeat(void);            /* call once per presented frame */
 

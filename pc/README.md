@@ -71,6 +71,7 @@ Environment variables for testing:
 
 | Variable | Effect |
 |---|---|
+| `RECVX_CONSOLE=1` | open a console window showing the log (recvx.exe has none otherwise; the log is always in `recvx.log`) |
 | `RECVX_REPLAY=<file>` | replay a recorded input file |
 | `RECVX_RECORD=<file>` | record input to a specific file |
 | `RECVX_INPUT=<file>` | scripted button presses; `title+<n>` lines count from the title screen (format in `pc_platform.c`) |
