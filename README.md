@@ -113,8 +113,9 @@ match, so `scale=3` at 16:9 renders at 2560x1440.
 python pc/tools/make_share.py
 ```
 
-builds `build_pc/share/recvx-cvx-pc.zip` with just the program, the setup scripts and a README.
-It refuses to include game files; each recipient runs the setup with their own disc image.
+builds `build_pc/share/recvx-cvx-pc.zip` with just `recvx.exe`, `recvx-config.exe`, `SDL2.dll`
+and a README. It refuses to include game files; each recipient unzips it, runs
+`recvx-config.exe` and sets the game up from their own disc image (no Python needed).
 
 ## How it works
 

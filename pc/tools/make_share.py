@@ -3,9 +3,10 @@
 usage: python pc/tools/make_share.py
 
 Writes build_pc/share/recvx-cvx-pc/ and build_pc/share/recvx-cvx-pc.zip containing recvx.exe,
-SDL2.dll, the setup scripts and a README. Each recipient extracts their own disc image with
-setup\\setup_game.py. Deliberately left out: the ISO, extracted disc files (data/), converted
-movies, HD texture packs, recvx.ini (holds your local paths), saves, logs and input recordings.
+recvx-config.exe, SDL2.dll and a README. Nothing else is needed on the player's PC: the settings
+app sets the game up from their own disc image (no Python). Deliberately left out: the ISO,
+extracted disc files (data/), converted movies, HD texture packs, recvx.ini (holds your local
+paths), saves, logs and input recordings.
 """
 import os
 import shutil
@@ -19,7 +20,6 @@ BUILD = common.BUILD
 OUT = os.path.join(BUILD, "share", "recvx-cvx-pc")
 
 PROGRAM = ["recvx.exe", "recvx-config.exe", "SDL2.dll"]
-SETUP = ["setup_game.py", "extract_iso.py", "convert_movies.py", "fetch_deps.py"]
 
 README = """Resident Evil Code: Veronica X - PC port (recvx-decomp)
 =====================================================
@@ -27,29 +27,30 @@ README = """Resident Evil Code: Veronica X - PC port (recvx-decomp)
 This package contains only the PC program. It does NOT contain any of the game's files:
 you need your own copy of the US PlayStation 2 disc (SLUS-20184) as an .iso image.
 
-Setup (once)
-  1. Install Python 3 (https://www.python.org/downloads/) if you do not have it.
-  2. Run:   python setup\\setup_game.py "C:\\path\\to\\your\\game.iso"
-     This copies the files from your disc image into a "data" folder here and converts the
-     movies (it downloads FFmpeg into setup\\deps for that, about 100 MB).
-  3. Start recvx.exe. The ISO is no longer needed after setup.
-
-  Without step 2 you can also put your .iso next to recvx.exe (or set iso=C:\\path\\game.iso
-  in recvx.ini); the game then runs straight from the image, but movies are skipped.
+Getting started
+  1. Unzip this folder anywhere you like (it needs about 2.5 GB more once set up).
+  2. Run recvx-config.exe. The first time, it asks for your disc image and sets the game up:
+     it copies the game's files into a "data" folder here and converts the movies (it
+     downloads FFmpeg once for that, about 100 MB, into a "tools" folder here).
+     You can also drop the .iso onto recvx-config.exe.
+  3. Press "Save and play". After this you can start recvx.exe directly; the disc image is no
+     longer needed.
 
 Settings
-  Run recvx-config.exe to choose the resolution, widescreen, fullscreen, folders and the
-  keyboard / controller buttons. "Save and play" starts the game.
+  recvx-config.exe sets the resolution, widescreen, fullscreen, folders and the keyboard /
+  controller buttons. In the game, F11 or Alt+Enter switches between window and fullscreen.
 
 Controls (defaults; keyboard and game controllers)
-  Arrows = move, Z = Cross, X = Square, C = Circle, V = Triangle, A/S = L1/R1, Q/W = L2/R2,
-  Enter = Start, Backspace = Select. Hold Numpad 0 to fast-forward, F11 = fullscreen.
+  Arrows = move, Z = Cross, X = Square, C = Circle, V = Triangle, A/S = L1/R1,
+  Enter = Start, Backspace = Select. Hold Numpad 0 to fast-forward.
 
 Saving: use the typewriters as usual. Saves are kept in the "saves" folder next to
-recvx.exe (copy that folder to back them up or move them to another PC). To keep them
-somewhere else, pick a folder in recvx-config.exe.
+recvx.exe (copy that folder to back them up or move them to another PC).
 
 Optional: HD textures from a PCSX2 texture pack - pick its folder in recvx-config.exe.
+
+Problems: the game writes recvx.log next to recvx.exe, and last_run_input.txt records your
+last session. Include both when you report a problem.
 """
 
 
@@ -58,13 +59,11 @@ def main():
     if missing:
         print("build first (python pc/tools/build.py); missing: " + ", ".join(missing))
         return 1
-    if os.path.isdir(OUT):
-        shutil.rmtree(OUT)
-    os.makedirs(os.path.join(OUT, "setup"))
+    # a folder still open elsewhere (Explorer, OneDrive) may survive; the zip only holds files
+    shutil.rmtree(OUT, ignore_errors=True)
+    os.makedirs(OUT, exist_ok=True)
     for f in PROGRAM:
         shutil.copy2(os.path.join(BUILD, f), os.path.join(OUT, f))
-    for f in SETUP:
-        shutil.copy2(os.path.join(os.path.dirname(__file__), f), os.path.join(OUT, "setup", f))
     with open(os.path.join(OUT, "README.txt"), "w", newline="\r\n") as f:
         f.write(README)
 
