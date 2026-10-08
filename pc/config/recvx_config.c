@@ -266,6 +266,7 @@ static HWND h_key[PC_BINDING_COUNT], h_pad[PC_BINDING_COUNT];
 static HFONT font, bold_font;
 static float dpi = 1.0f;
 static int dirty;
+static int layout_h;    /* height of the laid out controls, unscaled */
 
 #define S(v) ((int)((v) * dpi + 0.5f))
 
@@ -299,6 +300,11 @@ static HWND combo(int x, int y, int w, int id)
 static void set_binding_text(int i)
 {
     char buf[96];
+
+    if (h_key[i] == NULL)
+    {
+        return;   /* hidden action */
+    }
 
     SetWindowTextA(h_key[i], (bind_key[i][0] != 0) ? bind_key[i] : "-");
     snprintf(buf, sizeof(buf), "%s", (bind_pad[i][0] != 0) ? pad_label(bind_pad[i]) : "-");
@@ -386,10 +392,10 @@ static void load_settings(void)
     sel = (v == NULL) ? 0 : (_stricmp(v, "desktop") == 0) ? 2 : (atoi(v) != 0) ? 1 : 0;
     SendMessageA(h_mode, CB_SETCURSEL, sel, 0);
 
+    fill_scale_combo();   /* the list must exist before an entry can be selected */
     v = ini_get("scale");
     sel = (v != NULL) ? atoi(v) - 1 : 2;
     SendMessageA(h_scale, CB_SETCURSEL, (sel < 0) ? 0 : (sel > 7) ? 7 : sel, 0);
-    fill_scale_combo();
 
     SetWindowTextA(h_hd, ((v = ini_get("hd_textures")) != NULL) ? v : "");
     SetWindowTextA(h_saves, ((v = ini_get("saves")) != NULL) ? v : "");
@@ -729,6 +735,11 @@ static void create_controls(void)
 
     for (i = 0; i < PC_BINDING_COUNT; i++)
     {
+        if (pc_binding_defs[i].hidden)
+        {
+            continue;   /* buttons the game does not use: not shown, kept as configured */
+        }
+
         if (i == PC_BINDING_PS2_BUTTONS)
         {
             y += 8;   /* gap before the port's own actions */
@@ -748,6 +759,7 @@ static void create_controls(void)
     make("BUTTON", "Save", BS_PUSHBUTTON | WS_TABSTOP, rx + 440 - 3 * 110 - 16, y, 100, 28, ID_SAVE);
     make("BUTTON", "Save and play", BS_DEFPUSHBUTTON | WS_TABSTOP, rx + 440 - 2 * 110 - 8, y, 110, 28, ID_PLAY);
     make("BUTTON", "Close", BS_PUSHBUTTON | WS_TABSTOP, rx + 440 - 100, y, 100, 28, ID_CLOSE);
+    layout_h = y + 28 + 16;
 }
 
 static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
@@ -758,6 +770,14 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         main_wnd = hwnd;
         create_controls();
         load_settings();
+
+        /* fit the window to the controls */
+        {
+            RECT rc = { 0, 0, S(876), S(layout_h) };
+
+            AdjustWindowRect(&rc, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
+            SetWindowPos(hwnd, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOMOVE | SWP_NOZORDER);
+        }
         return 0;
 
     case WM_CTLCOLORSTATIC:
