@@ -171,7 +171,24 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep)
 
     snprintf(why, sizeof(why), "crash: exception 0x%08lx at 0x%p", ep->ExceptionRecord->ExceptionCode,
              ep->ExceptionRecord->ExceptionAddress);
-    print_stack(GetCurrentThread(), ep->ContextRecord, why);
+    /* the stack walk updates the context it is given: walk a copy, keep the registers intact */
+    {
+        CONTEXT walk = *ep->ContextRecord;
+        const CONTEXT* c = ep->ContextRecord;
+
+        print_stack(GetCurrentThread(), &walk, why);
+
+        /* registers and, for access violations, the faulting address: names the bad pointer */
+        pcLog("  eax %08lx ebx %08lx ecx %08lx edx %08lx esi %08lx edi %08lx ebp %08lx esp %08lx",
+              c->Eax, c->Ebx, c->Ecx, c->Edx, c->Esi, c->Edi, c->Ebp, c->Esp);
+
+        if ((ep->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) &&
+            (ep->ExceptionRecord->NumberParameters >= 2))
+        {
+            pcLog("  %s address 0x%08lx", (ep->ExceptionRecord->ExceptionInformation[0] == 1) ? "writing" : "reading",
+                  (unsigned long)ep->ExceptionRecord->ExceptionInformation[1]);
+        }
+    }
 
     /* tell the player instead of just vanishing (scripted test runs stay unattended) */
     if ((getenv("RECVX_INPUT") == NULL) && (getenv("RECVX_REPLAY") == NULL))
