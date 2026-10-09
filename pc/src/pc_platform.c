@@ -16,6 +16,7 @@
 #include "pc_audio.h"
 
 static unsigned int frames;   /* frames presented */
+static struct { double last, sum, worst, swap; int n; } frame_time;
 
 #define PS2_WIDTH  640
 #define PS2_HEIGHT 480
@@ -24,6 +25,8 @@ static SDL_Window* window;
 static int pcPadFullscreenKey(void);
 static int pcPadFullscreenButton(void);
 static int title_event(const SDL_Event* ev);
+static void fps_tick(void);
+static void update_title(int force);
 static SDL_GLContext gl_context;
 static FILE* log_file;
 
@@ -592,7 +595,7 @@ static int pause_until_active(void)
         }
     }
 
-    SDL_SetWindowTitle(window, "Resident Evil Code: Veronica X");
+    update_title(1);
     pcAudioPause(0);
     return 1;
 }
@@ -678,6 +681,7 @@ void pcVideoPresent(void)
 
     pcPadUpdate();
     pcOsHeartbeat();
+    fps_tick();
 
     pcGsPresent();
 
@@ -707,13 +711,42 @@ void pcVideoPresent(void)
     }
 
 
-    SDL_GL_SwapWindow(window);
+    {
+        double t0 = pcOsTime();
+
+        SDL_GL_SwapWindow(window);
+        frame_time.swap += pcOsTime() - t0;
+    }
+
+    /* frame times for the periodic log line */
+    {
+        double now = pcOsTime();
+
+        if (frame_time.last > 0)
+        {
+            double d = now - frame_time.last;
+
+            frame_time.sum += d;
+            frame_time.n++;
+
+            if (d > frame_time.worst)
+            {
+                frame_time.worst = d;
+            }
+        }
+
+        frame_time.last = now;
+    }
 
     frames++;
 
     if (SDL_GetTicks() - last_report >= 5000)
     {
-        pcLog("frame %u", frames);
+        pcLog("frame %u: %.1f ms per frame (worst %.1f ms), %.1f ms waiting for the GPU", frames,
+              frame_time.n ? frame_time.sum * 1000 / frame_time.n : 0.0, frame_time.worst * 1000,
+              frame_time.n ? frame_time.swap * 1000 / frame_time.n : 0.0);
+        frame_time.sum = frame_time.swap = frame_time.worst = 0;
+        frame_time.n = 0;
         {
             extern void pcGameStateLog(void);
             extern void pcGsLogStats(void);
@@ -910,6 +943,49 @@ static int title_event(const SDL_Event* ev)
     }
 
     return open;
+}
+
+/* ------------------------------------------------------------------------------------------- */
+/* window title: the frame rate, and [FAST FORWARD] while that is held */
+
+static int title_fps;
+
+static void update_title(int force)
+{
+    extern int pcFastForward;
+    static char shown[128];
+    char text[128];
+
+    snprintf(text, sizeof(text), "Resident Evil Code: Veronica X  [%d FPS]%s", title_fps,
+             pcFastForward ? "  [FAST FORWARD]" : "");
+
+    if (force || (strcmp(text, shown) != 0))
+    {
+        SDL_SetWindowTitle(window, text);
+        snprintf(shown, sizeof(shown), "%s", text);
+    }
+}
+
+/* once per presented frame: frames per second over the last half second */
+static void fps_tick(void)
+{
+    static unsigned int count, since;
+    unsigned int now = SDL_GetTicks();
+
+    count++;
+
+    if (since == 0)
+    {
+        since = now;
+    }
+
+    if (now - since >= 500)
+    {
+        title_fps = (int)(count * 1000.0 / (now - since) + 0.5);
+        count = 0;
+        since = now;
+        update_title(0);
+    }
 }
 
 /* 1 once after the confirming press (the game asks only while a soft reset can be done; a
@@ -1126,8 +1202,8 @@ void pcPadUpdate(void)
 
         if (pcFastForward != shown)
         {
-            SDL_SetWindowTitle(window, pcFastForward ? "Resident Evil Code: Veronica X  [FAST FORWARD]" : "Resident Evil Code: Veronica X");
             shown = pcFastForward;
+            update_title(0);
         }
     }
 
