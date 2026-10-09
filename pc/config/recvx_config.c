@@ -260,11 +260,12 @@ enum {
     ID_RES = 100, ID_ASPECT, ID_MODE, ID_SCALE,
     ID_HD, ID_HD_BROWSE, ID_SAVES, ID_SAVES_BROWSE,
     ID_RESET, ID_SAVE, ID_PLAY, ID_CLOSE, ID_SETUP, ID_PAUSE, ID_UPSCALE, ID_MOVIES_HD,
+    ID_SKIP_DOORS,
     ID_KEY = 1000, ID_PAD = 1100,
 };
 
 static HWND main_wnd;
-static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game, h_pause, h_movies_hd;
+static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game, h_pause, h_movies_hd, h_skip_doors;
 static int loaded_res;   /* resolution entry when the settings were loaded */
 static HWND h_key[PC_BINDING_COUNT], h_pad[PC_BINDING_COUNT];
 static HFONT font, bold_font;
@@ -403,6 +404,9 @@ static void load_settings(void)
     v = ini_get("movies_hd");
     SendMessageA(h_movies_hd, BM_SETCHECK, ((v == NULL) || (atoi(v) != 0)) ? BST_CHECKED : BST_UNCHECKED, 0);
 
+    v = ini_get("skip_doors");
+    SendMessageA(h_skip_doors, BM_SETCHECK, ((v != NULL) && (atoi(v) != 0)) ? BST_CHECKED : BST_UNCHECKED, 0);
+
     fill_scale_combo();   /* the list must exist before an entry can be selected */
     v = ini_get("scale");
     sel = (v != NULL) ? atoi(v) - 1 : 2;
@@ -461,6 +465,7 @@ static int save_settings(void)
 
     ini_set("pause_unfocused", (SendMessageA(h_pause, BM_GETCHECK, 0, 0) == BST_CHECKED) ? NULL : "0");
     ini_set("movies_hd", (SendMessageA(h_movies_hd, BM_GETCHECK, 0, 0) == BST_CHECKED) ? NULL : "0");
+    ini_set("skip_doors", (SendMessageA(h_skip_doors, BM_GETCHECK, 0, 0) == BST_CHECKED) ? "1" : NULL);
 
     sel = (int)SendMessageA(h_scale, CB_GETCURSEL, 0, 0) + 1;
     snprintf(buf, sizeof(buf), "%d", sel);
@@ -828,9 +833,11 @@ static void create_controls(void)
     make("BUTTON", "Upscale movies (AI)...", BS_PUSHBUTTON | WS_TABSTOP, lx + 190, 64, 170, 28, ID_UPSCALE);
     h_movies_hd = make("BUTTON", "Use upscaled movies (when made)", BS_AUTOCHECKBOX | WS_TABSTOP,
                        lx, 98, cx + cw - lx, 24, ID_MOVIES_HD);
+    h_skip_doors = make("BUTTON", "Skip doors (press OK / Attack during a door)", BS_AUTOCHECKBOX | WS_TABSTOP,
+                        lx, 124, cx + cw - lx, 24, ID_SKIP_DOORS);
 
-    heading("Display", lx, 142, 200);
-    y = 168;
+    heading("Display", lx, 168, 200);
+    y = 194;
     label("Resolution", lx, y, cx - lx);
     h_res = combo(cx, y, cw, ID_RES);
     y += 32;
@@ -982,7 +989,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
             dirty = 1;
         }
-        else if ((code == EN_CHANGE) || (id == ID_PAUSE) || (id == ID_MOVIES_HD))
+        else if ((code == EN_CHANGE) || (id == ID_PAUSE) || (id == ID_MOVIES_HD) || (id == ID_SKIP_DOORS))
         {
             dirty = 1;
         }

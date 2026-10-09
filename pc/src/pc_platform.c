@@ -1204,6 +1204,13 @@ void pcPadUpdate(void)
     pcPadRecordReplay(r);
 }
 
+/* an OK button (Cross or Square, both OK / Attack in the game) held this frame, from the keyboard,
+ * controller, input script or replay: skipping doors */
+int pcPadOkDown(void)
+{
+    return (pad_report[3] & ((1 << 6) | (1 << 7))) != ((1 << 6) | (1 << 7));
+}
+
 void pcPadGetState(int port, unsigned char* rdata)
 {
     if (port == 0)

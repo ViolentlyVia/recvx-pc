@@ -108,6 +108,7 @@ Optional, next to `recvx.exe`, one `key=value` per line (the settings app writes
 | `fullscreen=` | `1` for exclusive fullscreen at the window size, `desktop` for borderless (default `0`) |
 | `pause_unfocused=` | `0` keeps the game running while its window is not active (default `1`) |
 | `movies_hd=` | `0` plays the original movies even when upscaled ones exist (default `1`) |
+| `skip_doors=` | `1` lets OK / Attack (Cross or Square) skip the door animations (default `0`) |
 | `window_pos=`, `window_max=` | written by the game: where the window was left, and if it was maximized |
 | `key_<action>=` | keyboard key, by its SDL name (`Z`, `Return`, `Left Shift`, `Keypad 0`, `none`) |
 | `pad_<action>=` | controller button, by its SDL name (`a`, `b`, `leftshoulder`, `lefttrigger`, `dpup`, `none`) |
