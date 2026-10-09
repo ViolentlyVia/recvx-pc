@@ -8953,8 +8953,15 @@ int bhSearchBullet()
     for (i = 0; i < max; i++)
     {
         y = ((st->pip + i)[2] >> 16) & 0xFF;
-        
+
+#ifdef TARGET_PC
+        /* items with no combination list (cmb -1, e.g. item 145) would read combidata[-1]: 0 in
+         * the PS2 executable (no match), arbitrary memory here, where it ran past the table and
+         * could "find" ammo for a weapon without a reload motion (crash in SetMtnFastHokan) */
+        if ((itemdata[y].type & 0x2) && (itemdata[y].cmb >= 0))
+#else
         if ((itemdata[y].type & 0x2))
+#endif
         {
             z = combidata[itemdata[y].cmb];
             
