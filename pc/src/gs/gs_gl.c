@@ -226,6 +226,8 @@ typedef struct {
     GLuint depth_attached;
     int vram_dirty;        /* GS memory was written inside this buffer */
     int rendered;          /* drawn into since it last matched GS memory */
+    int drawn_h;           /* rows (PS2 pixels) drawn into since then */
+    int load_y0, load_y1;  /* rows below those that GS memory changed in, to reload alone */
     unsigned int psm;      /* FRAME.PSM last drawn with */
     unsigned int last_use;
 } RenderTarget;
@@ -600,13 +602,14 @@ static int rt_overlaps(const RenderTarget* rt, unsigned int bp, unsigned int bw,
     return (lo < rt_hi) && (hi > rt_lo);
 }
 
-static void rt_load_from_vram(RenderTarget* rt)
+/* copies rows y0..y1-1 of GS memory into the render target */
+static void rt_load_rows(RenderTarget* rt, int y0, int y1)
 {
     double t0 = pcOsTime();
     int x, y, sx, sy;
-    unsigned int* buf = malloc(rt->w * rt->h * 4 * pcGsScaleX * pcGsScale);
+    unsigned int* buf = malloc(rt->w * (y1 - y0) * 4 * pcGsScaleX * pcGsScale);
 
-    for (y = 0; y < rt->h; y++)
+    for (y = y0; y < y1; y++)
     {
         for (x = 0; x < rt->w; x++)
         {
@@ -619,20 +622,43 @@ static void rt_load_from_vram(RenderTarget* rt)
             {
                 for (sx = 0; sx < pcGsScaleX; sx++)
                 {
-                    buf[(y * pcGsScale + sy) * rt->w * pcGsScaleX + x * pcGsScaleX + sx] = c;
+                    buf[((y - y0) * pcGsScale + sy) * rt->w * pcGsScaleX + x * pcGsScaleX + sx] = c;
                 }
             }
         }
     }
 
     glBindTexture(GL_TEXTURE_2D, rt->color);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, rt->w * pcGsScaleX, rt->h * pcGsScale, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, y0 * pcGsScale, rt->w * pcGsScaleX, (y1 - y0) * pcGsScale, GL_RGBA,
+                    GL_UNSIGNED_BYTE, buf);
     free(buf);
+
+    stats.rt_loads++;
+    stats.t_load += pcOsTime() - t0;
+}
+
+static void rt_load_from_vram(RenderTarget* rt)
+{
+    rt_load_rows(rt, 0, rt->h);
 
     rt->vram_dirty = 0;
     rt->rendered = 0;
-    stats.rt_loads++;
-    stats.t_load += pcOsTime() - t0;
+    rt->drawn_h = 0;
+    rt->load_y0 = rt->load_y1 = 0;
+}
+
+/* brings the render target up to date with GS memory before it is drawn into, sampled or shown */
+static void rt_sync(RenderTarget* rt)
+{
+    if (rt->vram_dirty)
+    {
+        rt_load_from_vram(rt);
+    }
+    else if (rt->load_y1 > rt->load_y0)
+    {
+        rt_load_rows(rt, rt->load_y0, rt->load_y1);
+        rt->load_y0 = rt->load_y1 = 0;
+    }
 }
 
 void gsXferDone(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int x, unsigned int y, unsigned int w, unsigned int h, int changed)
@@ -643,9 +669,42 @@ void gsXferDone(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int
 
     for (i = 0; i < MAX_RT; i++)
     {
-        if (rts[i].used && (changed || rts[i].rendered) && rt_overlaps(&rts[i], bp, bw, psm, y, h))
+        RenderTarget* rt = &rts[i];
+
+        if (rt->used && (changed || rt->rendered) && rt_overlaps(rt, bp, bw, psm, y, h))
         {
-            rts[i].vram_dirty = 1;
+            /* the rows of the render target the transfer touches (32-row bands of fbw pages) */
+            int band = rt->fbw * 32;
+            int lo = (int)(bp + (y / 32) * bw * 32) - (int)(rt->fbp * 32);
+            int hi = (int)(bp + ((y + h + 31) / 32) * (bw ? bw : 1) * 32) - (int)(rt->fbp * 32);
+            int y0 = (lo <= 0) ? 0 : (lo / band) * 32;
+            int y1 = ((hi + band - 1) / band) * 32;
+
+            if (y1 > rt->h)
+            {
+                y1 = rt->h;
+            }
+
+            /* GS memory changed only below what was drawn (a palette or texture stored right
+             * after a small render target, such as the in-game monitors' camera view): reload
+             * those rows instead of throwing the drawn picture away */
+            if (rt->rendered && (y0 >= rt->drawn_h) && (y1 > y0))
+            {
+                if (rt->load_y1 > rt->load_y0)
+                {
+                    rt->load_y0 = (y0 < rt->load_y0) ? y0 : rt->load_y0;
+                    rt->load_y1 = (y1 > rt->load_y1) ? y1 : rt->load_y1;
+                }
+                else
+                {
+                    rt->load_y0 = y0;
+                    rt->load_y1 = y1;
+                }
+            }
+            else
+            {
+                rt->vram_dirty = 1;
+            }
         }
     }
 }
@@ -664,9 +723,12 @@ void gsFlushLocalToLocal(unsigned int bp, unsigned int bw, unsigned int psm, uns
 
         if (rt->used && rt_overlaps(rt, bp, bw, psm, y, h))
         {
-            unsigned int* buf = malloc(rt->w * rt->h * 4 * pcGsScaleX * pcGsScale);
+            unsigned int* buf;
             int px, py;
             double t0 = pcOsTime();
+
+            rt_sync(rt);
+            buf = malloc(rt->w * rt->h * 4 * pcGsScaleX * pcGsScale);
 
             glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
             glPixelStorei(GL_PACK_ALIGNMENT, 4);
@@ -686,6 +748,7 @@ void gsFlushLocalToLocal(unsigned int bp, unsigned int bw, unsigned int psm, uns
             free(buf);
             rt->vram_dirty = 0;
             rt->rendered = 0;
+            rt->drawn_h = 0;
             stats.rt_reads++;
             stats.t_read += pcOsTime() - t0;
         }
@@ -934,15 +997,43 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
         if (full_clear)
         {
             rt->vram_dirty = 0;
-        }
-        else
-        {
-            rt_load_from_vram(rt);
+            rt->load_y0 = rt->load_y1 = 0;
         }
     }
 
+    rt_sync(rt);
+
     rt->rendered = 1;
     rt->psm = fpsm;
+
+    /* how far down this buffer has been drawn (within the scissor) */
+    {
+        int bottom = (int)GSF(st->scissor, 48, 11) + 1;
+        float ymax = 0;
+
+        for (i = 0; i < nverts; i++)
+        {
+            if (v[i].y > ymax)
+            {
+                ymax = v[i].y;
+            }
+        }
+
+        if ((int)ymax + 1 < bottom)
+        {
+            bottom = (int)ymax + 1;
+        }
+
+        if (bottom > rt->h)
+        {
+            bottom = rt->h;
+        }
+
+        if (bottom > rt->drawn_h)
+        {
+            rt->drawn_h = bottom;
+        }
+    }
 
     /* build GL vertices */
     if (st->type == 6)
@@ -1077,9 +1168,9 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
 
         if ((src != NULL) && (src != rt))
         {
-            if (src->vram_dirty)
+            if (src->vram_dirty || (src->load_y1 > src->load_y0))
             {
-                rt_load_from_vram(src);
+                rt_sync(src);
                 glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
             }
 
@@ -1215,9 +1306,9 @@ void gsRendererPresent(unsigned int dispfb_fbp, unsigned int dispfb_fbw)
         return;
     }
 
-    if (rt->vram_dirty)
+    if (rt->vram_dirty || (rt->load_y1 > rt->load_y0))
     {
-        rt_load_from_vram(rt);
+        rt_sync(rt);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
