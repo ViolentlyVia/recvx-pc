@@ -8,6 +8,11 @@
 #include "../../../ps2/veronica/prog/sub1.h"
 #include "../../../ps2/veronica/prog/main.h"
 
+#ifdef TARGET_PC
+/* PC: without a prototype MSVC passes the float priority as a double, which arrives as 0 */
+void bhDispFontEx(NJS_POINT2* pos, int code, unsigned int argb, float pri);
+#endif
+
 //#include <string.h>
 
 const int Type_Space[18][3] __attribute__((aligned(64))) = 

@@ -15,6 +15,13 @@
 #include "../../../ps2/veronica/prog/pwksub.h"
 #include "../../../ps2/veronica/prog/main.h"
 
+#ifdef TARGET_PC
+/* PC: called without a prototype, MSVC passed the float as a double and the function read
+ * 2.0 instead of the screen distance, so after drawing a camera view for an in-game monitor
+ * (bhDrawSmallScreenRenderTexture) the room itself was drawn tiny in the middle of the screen */
+void njSetScreenProjection(float dist);
+#endif
+
 unsigned int Ps2_rendertex_initflag;
 
 // 100% matching!
