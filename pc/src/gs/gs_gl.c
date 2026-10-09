@@ -249,6 +249,8 @@ static int dump_frame;
 
 /* per-interval statistics for the periodic log */
 static struct { unsigned int frames, draws, verts, rt_loads, rt_reads, tex_decodes, tex_texels; double t_load, t_read, t_decode; } stats;
+static int tex_cached;                     /* textures in the cache, decoded from GS memory */
+static double tex_cached_bytes;            /* their size */
 
 double pcOsTime(void);
 
@@ -259,6 +261,7 @@ void pcGsLogStats(void)
     pcLog("gs/frame: %u draws, %u verts, %.1f rt loads (%.1f ms), %.1f rt reads (%.1f ms), %.1f tex decodes (%u texels, %.1f ms)",
           stats.draws / f, stats.verts / f, (double)stats.rt_loads / f, stats.t_load * 1000 / f, (double)stats.rt_reads / f,
           stats.t_read * 1000 / f, (double)stats.tex_decodes / f, stats.tex_texels / f, stats.t_decode * 1000 / f);
+    pcLog("gs: %d textures cached (%.0f MB)", tex_cached, tex_cached_bytes / 1048576.0);
     memset(&stats, 0, sizeof(stats));
 }
 
@@ -389,6 +392,7 @@ typedef struct {
     int used;
     u64 key0, key1, key2;
     int w, h;
+    int rows, cols;      /* part decoded: the draws it serves never sample outside it */
     unsigned int page_lo, page_hi, clut_page;
     unsigned long long gen;
     GLuint tex;
@@ -443,20 +447,24 @@ static unsigned long long hash_page(unsigned int p)
     return page_hash[p];
 }
 
-static unsigned long long gen_sum(unsigned int lo, unsigned int hi)
+/* content hash of the pages holding a cols x rows corner of a texture */
+static unsigned long long gen_sum_rect(unsigned int page_lo, unsigned int stride, int bands, int page_cols)
 {
     unsigned long long s = 0;
-    unsigned int p;
+    int b, c;
 
-    for (p = lo; p <= hi; p++)
+    for (b = 0; b < bands; b++)
     {
-        s = (s * 0x100000001B3ULL) ^ hash_page(p);
+        for (c = 0; c < page_cols; c++)
+        {
+            s = (s * 0x100000001B3ULL) ^ hash_page(page_lo + b * stride + c);
+        }
     }
 
     return s;
 }
 
-static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h, int* hd)
+static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h, int rows, int cols, int* hd)
 {
     unsigned int psm = GSF(tex0, 20, 6);
     unsigned int tbp = GSF(tex0, 0, 14);
@@ -480,15 +488,44 @@ static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h, int* hd
     }
 
     page_lo = tbp >> 5;
-    page_hi = page_lo + ((h + ph - 1) / ph - 1) * stride + (w + pw - 1) / pw;
+    if ((rows <= 0) || (rows > h))
+    {
+        rows = h;
+    }
+    else
+    {
+        rows = ((rows + ph - 1) / ph) * ph;   /* whole pages, so draws that need a little more share it */
+
+        if (rows > h)
+        {
+            rows = h;
+        }
+    }
+
+    if ((cols <= 0) || (cols > w))
+    {
+        cols = w;
+    }
+    else
+    {
+        cols = ((cols + pw - 1) / pw) * pw;
+
+        if (cols > w)
+        {
+            cols = w;
+        }
+    }
+
+    page_hi = page_lo + ((rows + ph - 1) / ph - 1) * stride + (w + pw - 1) / pw;
     clut_page = GSF(tex0, 37, 14) >> 5;
-    gen = gen_sum(page_lo, page_hi);
+    gen = gen_sum_rect(page_lo, stride, (rows + ph - 1) / ph, (cols + pw - 1) / pw);
 
     for (i = 0; i < MAX_TEX; i++)
     {
         t = &texcache[i];
 
-        if (t->used && (t->gen == gen) && (t->key0 == key0) && (t->key1 == key1) && (t->key2 == key2) && (t->w == w) && (t->h == h))
+        if (t->used && (t->gen == gen) && (t->key0 == key0) && (t->key1 == key1) && (t->key2 == key2) && (t->w == w) && (t->h == h) &&
+            (t->rows == rows) && (t->cols == cols))
         {
             t->last_use = frame_counter;
             *hd = t->hd;
@@ -513,6 +550,8 @@ static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h, int* hd
         if (!texcache[slot].hd)
         {
             glDeleteTextures(1, &texcache[slot].tex);
+            tex_cached--;
+            tex_cached_bytes -= (double)texcache[slot].w * texcache[slot].h * 4;
         }
     }
 
@@ -523,6 +562,8 @@ static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h, int* hd
     t->key2 = key2;
     t->w = w;
     t->h = h;
+    t->rows = rows;
+    t->cols = cols;
     t->page_lo = page_lo;
     t->page_hi = page_hi;
     t->clut_page = clut_page;
@@ -545,9 +586,12 @@ static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h, int* hd
 
     *hd = 0;
     t->tex = make_texture(w, h, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST);
+    tex_cached++;
+    tex_cached_bytes += (double)w * h * 4;
 
-    { double t0 = pcOsTime(); gsDecodeTexture(tex0, texa, texclut, w, h, decode_buf); stats.tex_decodes++; stats.tex_texels += w * h; stats.t_decode += pcOsTime() - t0; }
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, decode_buf);
+    { double t0 = pcOsTime(); gsDecodeTexture(tex0, texa, texclut, cols, rows, decode_buf); stats.tex_decodes++; stats.tex_texels += cols * rows; stats.t_decode += pcOsTime() - t0; }
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cols, rows, GL_RGBA, GL_UNSIGNED_BYTE, decode_buf);
 
     return t->tex;
 }
@@ -710,9 +754,14 @@ void gsXferDone(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int
 }
 
 /* Before the GS memory of a render target is read (local->local / local->host transfers),
- * copy the rendered pixels back into GS memory. */
+ * copy the rendered pixels back into GS memory. Only what was drawn since the buffer last matched
+ * GS memory is read, and the GPU first shrinks it to the PS2 resolution: reading the whole
+ * upscaled buffer back (tens of MB at 8x) made effects that copy the screen into a texture every
+ * frame, such as the water ripple, run at a few frames per second. */
 void gsFlushLocalToLocal(unsigned int bp, unsigned int bw, unsigned int psm, unsigned int x, unsigned int y, unsigned int w, unsigned int h)
 {
+    static GLuint down_fbo, down_tex;
+    static int down_w, down_h;
     int i;
 
     gsRendererFlush();
@@ -724,21 +773,53 @@ void gsFlushLocalToLocal(unsigned int bp, unsigned int bw, unsigned int psm, uns
         if (rt->used && rt_overlaps(rt, bp, bw, psm, y, h))
         {
             unsigned int* buf;
-            int px, py;
-            double t0 = pcOsTime();
+            int px, py, rows;
+            double t0;
 
             rt_sync(rt);
-            buf = malloc(rt->w * rt->h * 4 * pcGsScaleX * pcGsScale);
 
-            glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
+            /* nothing drawn since it matched GS memory (or GS memory was newer and was just loaded) */
+            if (!rt->rendered)
+            {
+                continue;
+            }
+
+            t0 = pcOsTime();
+            rows = (rt->drawn_h > 0) ? rt->drawn_h : rt->h;
+
+            if ((down_w != rt->w) || (down_h != rt->h))
+            {
+                if (down_fbo != 0)
+                {
+                    glDeleteFramebuffers(1, &down_fbo);
+                    glDeleteTextures(1, &down_tex);
+                }
+
+                down_tex = make_texture(rt->w, rt->h, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST);
+                glGenFramebuffers(1, &down_fbo);
+                glBindFramebuffer(GL_FRAMEBUFFER, down_fbo);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, down_tex, 0);
+                down_w = rt->w;
+                down_h = rt->h;
+            }
+
+            /* one sample per PS2 pixel, as before, but picked on the GPU */
+            glDisable(GL_SCISSOR_TEST);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, rt->fbo);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, down_fbo);
+            glBlitFramebuffer(0, 0, rt->w * pcGsScaleX, rows * pcGsScale, 0, 0, rt->w, rows, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+            buf = malloc(rt->w * rows * 4);
+            glBindFramebuffer(GL_FRAMEBUFFER, down_fbo);
             glPixelStorei(GL_PACK_ALIGNMENT, 4);
-            glReadPixels(0, 0, rt->w * pcGsScaleX, rt->h * pcGsScale, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+            glReadPixels(0, 0, rt->w, rows, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+            glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
 
-            for (py = 0; py < rt->h; py++)
+            for (py = 0; py < rows; py++)
             {
                 for (px = 0; px < rt->w; px++)
                 {
-                    unsigned int c = buf[(py * pcGsScale) * rt->w * pcGsScaleX + px * pcGsScaleX];
+                    unsigned int c = buf[py * rt->w + px];
                     unsigned int a = ((c >> 24) * 128 + 127) / 255;
 
                     gsMemWrite(GS_PSMCT32, rt->fbp * 32, rt->fbw, px, py, (c & 0xFFFFFF) | (a << 24));
@@ -941,6 +1022,66 @@ static void setup_blend(const GsDrawState* st)
     /* the written alpha is As (never blended) */
     glBlendEquationSeparate(eq, GL_FUNC_ADD);
     glBlendFuncSeparate(src, dst, GL_ONE, GL_ZERO);
+}
+
+/* how many texture rows (vertical = 1) or columns a draw can sample, or size when it may wrap or the
+ * vertices do not tell */
+static int texture_extent(const GsDrawState* st, const GsVertex* v, int nverts, int size, int vertical)
+{
+    int wrap = vertical ? GSF(st->clamp, 2, 2) : GSF(st->clamp, 0, 2);
+    float lo = 1e30f, hi = -1e30f;
+    int i;
+
+    if (nverts == 0)
+    {
+        return size;
+    }
+
+    for (i = 0; i < nverts; i++)
+    {
+        float c;
+
+        if (st->fst)
+        {
+            c = vertical ? v[i].v : v[i].u;
+        }
+        else
+        {
+            if (v[i].q <= 0)
+            {
+                return size;
+            }
+
+            c = (vertical ? v[i].t : v[i].s) / v[i].q * size;
+        }
+
+        if (c < lo) lo = c;
+        if (c > hi) hi = c;
+    }
+
+    /* repeating textures can reach anything */
+    if (((wrap == 0) || (wrap == 3)) && ((lo < 0) || (hi > size)))
+    {
+        return size;
+    }
+
+    if (wrap == 2)   /* region clamp: up to MAXU / MAXV */
+    {
+        int maxc = (int)(vertical ? GSF(st->clamp, 34, 10) : GSF(st->clamp, 14, 10)) + 1;
+
+        if ((float)maxc < hi)
+        {
+            hi = (float)maxc;
+        }
+    }
+
+    /* one more for bilinear filtering */
+    if (hi + 2 >= size)
+    {
+        return size;
+    }
+
+    return (int)hi + 2;
 }
 
 void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
@@ -1193,7 +1334,8 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
         else
         {
             int hd = 0;
-            GLuint gt = get_texture(st->tex0, st->texa, st->texclut, tw, th, &hd);
+            GLuint gt = get_texture(st->tex0, st->texa, st->texclut, tw, th, texture_extent(st, v, nverts, th, 1),
+                                    texture_extent(st, v, nverts, tw, 0), &hd);
 
             glBindTexture(GL_TEXTURE_2D, gt);
             glUniform1i(U.texrt, 0);
@@ -1249,6 +1391,49 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
 }
 
 /* ------------------------------------------------------------------------------------------- */
+
+/* draws an RGBA image (top row first) from the PC port's overlays (pc_overlay.c) with its top left
+ * corner at x, y pixels of the current viewport (vw x vh); the present program is bound */
+static void draw_overlay(const unsigned char* img, int ow, int oh, int x, int y, int vw, int vh)
+{
+    static GLuint overlay_tex;
+    GlVertex q[6];
+    float x0 = 2.0f * x / vw - 1.0f, x1 = x0 + 2.0f * ow / vw;
+    float y0 = 1.0f - 2.0f * y / vh, y1 = y0 - 2.0f * oh / vh;
+    float px[4], py[4], ts[4] = { 0, 1, 0, 1 }, tt[4] = { 0, 0, 1, 1 };
+    int idx[6] = { 0, 1, 2, 1, 3, 2 };
+    int i;
+
+    px[0] = px[2] = x0;
+    px[1] = px[3] = x1;
+    py[0] = py[1] = y0;
+    py[2] = py[3] = y1;
+
+    memset(q, 0, sizeof(q));
+
+    for (i = 0; i < 6; i++)
+    {
+        q[i].x = px[idx[i]];
+        q[i].y = py[idx[i]];
+        q[i].s = ts[idx[i]];
+        q[i].t = tt[idx[i]];
+    }
+
+    if (overlay_tex == 0)
+    {
+        glGenTextures(1, &overlay_tex);
+    }
+
+    glBindTexture(GL_TEXTURE_2D, overlay_tex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, ow, oh, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(q), q, GL_STREAM_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
 
 void gsRendererPresent(unsigned int dispfb_fbp, unsigned int dispfb_fbw)
 {
@@ -1355,7 +1540,6 @@ void gsRendererPresent(unsigned int dispfb_fbp, unsigned int dispfb_fbw)
      * picture */
     {
         extern const unsigned char* pcOverlayImage(int height, int* w, int* h);
-        static GLuint overlay_tex;
         const unsigned char* img;
         int ow, oh;
 
@@ -1363,40 +1547,7 @@ void gsRendererPresent(unsigned int dispfb_fbp, unsigned int dispfb_fbw)
 
         if ((img != NULL) && (ow <= vw) && (oh <= vh))
         {
-            float x0 = 2.0f * ((vw - ow) / 2) / vw - 1.0f, x1 = x0 + 2.0f * ow / vw;
-            float y0 = 1.0f - 2.0f * ((vh - oh) / 2) / vh, y1 = y0 - 2.0f * oh / vh;
-            float px[4], py[4], ts[4] = { 0, 1, 0, 1 }, tt[4] = { 0, 0, 1, 1 };
-            int idx[6] = { 0, 1, 2, 1, 3, 2 };
-
-            px[0] = px[2] = x0;
-            px[1] = px[3] = x1;
-            py[0] = py[1] = y0;
-            py[2] = py[3] = y1;
-
-            memset(q, 0, sizeof(q));
-
-            for (i = 0; i < 6; i++)
-            {
-                q[i].x = px[idx[i]];
-                q[i].y = py[idx[i]];
-                q[i].s = ts[idx[i]];
-                q[i].t = tt[idx[i]];
-            }
-
-            if (overlay_tex == 0)
-            {
-                glGenTextures(1, &overlay_tex);
-            }
-
-            glBindTexture(GL_TEXTURE_2D, overlay_tex);
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, ow, oh, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(q), q, GL_STREAM_DRAW);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+            draw_overlay(img, ow, oh, (vw - ow) / 2, (vh - oh) / 2, vw, vh);
             return;
         }
     }
