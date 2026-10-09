@@ -1975,7 +1975,14 @@ void bhControlComEvtScript()
             ce->frm_no = *ce->scp++;
             break;
         case 240:
+#ifdef TARGET_PC
+            /* PC: low byte first, in the PS2 compiler's left-to-right order (MSVC read the high
+             * byte first and set the wrong event flag, so solved computer puzzles unlocked nothing) */
+            flgno = *ce->scp++;
+            flgno |= *ce->scp++ << 8;
+#else
             flgno = *ce->scp++ | (*ce->scp++ << 8);
+#endif
             
             bhStFlg(sys->ev_flg, flgno);
             break;
