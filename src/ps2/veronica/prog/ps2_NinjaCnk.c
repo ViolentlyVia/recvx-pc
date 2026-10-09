@@ -710,6 +710,20 @@ int njCnkDrawModelLocal(NJS_CNK_MODEL* pModel)
             
             fSX = Center.x * fZ;
             
+#ifdef TARGET_PC
+            {
+                /* widescreen: fSX is without the aspect, so the visible half width in these units
+                 * grows by 1 / pcVideoWideScale() (about 363 instead of 272 at 16:9; the PS2's 320
+                 * left some room at 4:3 but culls models still on screen in widescreen) */
+                extern float pcVideoWideScale(void);
+                float halfw = fNaViwHalfW / pcVideoWideScale();
+
+                if (((fSX + fRW) < -halfw) || (halfw < (fSX - fRW)))
+                {
+                    return 0;
+                }
+            }
+#else
             if ((fSX + fRW) < -fNaViwHalfW) 
             {
                 return 0;
@@ -719,6 +733,7 @@ int njCnkDrawModelLocal(NJS_CNK_MODEL* pModel)
             {
                 return 0;
             }
+#endif
             
             fSY = Center.y * fZ;
             
@@ -814,6 +829,20 @@ int njCnkDrawModelLocalMod(NJS_CNK_MODEL* pModel)
             
             fSX = Center.x * fZ;
             
+#ifdef TARGET_PC
+            {
+                /* widescreen: fSX is without the aspect, so the visible half width in these units
+                 * grows by 1 / pcVideoWideScale() (about 363 instead of 272 at 16:9; the PS2's 320
+                 * left some room at 4:3 but culls models still on screen in widescreen) */
+                extern float pcVideoWideScale(void);
+                float halfw = fNaViwHalfW / pcVideoWideScale();
+
+                if (((fSX + fRW) < -halfw) || (halfw < (fSX - fRW)))
+                {
+                    return 0;
+                }
+            }
+#else
             if ((fSX + fRW) < -fNaViwHalfW) 
             {
                 return 0;
@@ -823,6 +852,7 @@ int njCnkDrawModelLocalMod(NJS_CNK_MODEL* pModel)
             {
                 return 0;
             }
+#endif
             
             fSY = Center.y * fZ;
             
