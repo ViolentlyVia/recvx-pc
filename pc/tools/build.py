@@ -113,7 +113,11 @@ def main():
             with open(os.path.join(common.BUILD, "unresolved.txt"), "w") as f:
                 f.write("\n".join(unresolved) + "\n")
         return 1
-    shutil.copyfile(os.path.join(sdl, "lib", "x86", "SDL2.dll"), os.path.join(common.BUILD, "SDL2.dll"))
+    dll_src = os.path.join(sdl, "lib", "x86", "SDL2.dll")
+    dll_dst = os.path.join(common.BUILD, "SDL2.dll")
+    # only when it changed: a running recvx.exe or recvx-config.exe keeps it open
+    if not os.path.exists(dll_dst) or os.path.getsize(dll_dst) != os.path.getsize(dll_src):
+        shutil.copyfile(dll_src, dll_dst)
     print("built " + EXE)
     return build_config(sdl, opts.debug)
 
