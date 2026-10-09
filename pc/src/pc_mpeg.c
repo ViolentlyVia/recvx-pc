@@ -58,6 +58,19 @@ int pcMpegOpen(const char* path)
     return 1;
 }
 
+/* frame size of the open movie; 0 when none is open */
+int pcMpegSize(int* w, int* h)
+{
+    if (plm == NULL)
+    {
+        return 0;
+    }
+
+    *w = plm_get_width(plm);
+    *h = plm_get_height(plm);
+    return 1;
+}
+
 void pcMpegClose(void)
 {
     if (voice >= 0)

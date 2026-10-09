@@ -551,6 +551,41 @@ static GLuint get_texture(u64 tex0, u64 texa, u64 texclut, int w, int h, int* hd
 }
 
 /* ------------------------------------------------------------------------------------------- */
+/* upscaled movies (pc_movie.c): while one plays, textures at its TBP sample this frame instead
+ * of GS memory, like an HD texture. The frame sits at the top left of a texture that stands for
+ * the whole 512x512 texture area the PS2 player uses, at <scale> times its size. */
+
+static GLuint movie_tex;
+static unsigned int movie_tbp;
+static int movie_on, movie_size;
+
+void pcGsMovieFrame(unsigned int tbp, const unsigned char* rgba, int w, int h, int scale)
+{
+    if (rgba == NULL)
+    {
+        movie_on = 0;
+        return;
+    }
+
+    if ((movie_tex == 0) || (movie_size != 512 * scale))
+    {
+        if (movie_tex != 0)
+        {
+            glDeleteTextures(1, &movie_tex);
+        }
+
+        movie_size = 512 * scale;
+        movie_tex = make_texture(movie_size, movie_size, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, GL_LINEAR);
+    }
+
+    glBindTexture(GL_TEXTURE_2D, movie_tex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+    movie_tbp = tbp;
+    movie_on = 1;
+}
+
+/* ------------------------------------------------------------------------------------------- */
 /* GS memory <-> render targets */
 
 static int rt_overlaps(const RenderTarget* rt, unsigned int bp, unsigned int bw, unsigned int psm, unsigned int y, unsigned int h)
@@ -1055,6 +1090,14 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
             glUniform1i(U.hd, 0);
             glUniform2f(U.rtsize, (float)src->w, (float)src->h);
             glUniform3f(U.texa, (float)GSF(st->texa, 0, 8), (float)GSF(st->texa, 32, 8), (float)GSF(st->texa, 15, 1));
+        }
+        else if (movie_on && (GSF(st->tex0, 0, 14) == movie_tbp))
+        {
+            glBindTexture(GL_TEXTURE_2D, movie_tex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glUniform1i(U.texrt, 0);
+            glUniform1i(U.hd, 1);
         }
         else
         {

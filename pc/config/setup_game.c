@@ -6,6 +6,12 @@
  * for the game's MPEG-1 player. PSS audio is Sony "SShd"/"SSbd" PCM that FFmpeg cannot read, so
  * it is pulled out here into a WAV and FFmpeg (downloaded once into tools\ffmpeg, only used here)
  * writes MV_*.MPG: MPEG-1 video and MP2 audio. The work runs on a thread behind a progress window.
+ *
+ * "Upscale movies" (UpscaleMovies) makes MOVIE_HD/MV_*.MPG for the game to use instead: the disc
+ * movie's frames are enlarged 4x by Real-ESRGAN (its realesr-animevideov3 model, run on the GPU
+ * through Vulkan; downloaded once into tools\realesrgan) in batches, each batch is encoded as
+ * MPEG-1 (a complete MPEG file each, so they keep their timing), and the pieces are joined by FFmpeg's
+ * concat demuxer and given the converted movie's sound.
  */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -23,6 +29,8 @@
 #define SECTOR 2048
 #define EXPECTED_ID "SLUS_201.84"
 #define FFMPEG_URL "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+#define REALESRGAN_URL "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-windows.zip"
+#define UPSCALE_BATCH 500   /* frames enlarged at a time (keeps temporary files to a few GB) */
 
 #define WM_SETUP_PROGRESS (WM_APP + 1)   /* wparam: percent (or -1), lparam: unused */
 #define WM_SETUP_DONE     (WM_APP + 2)   /* wparam: 1 ok, 0 failed, -1 cancelled */
@@ -44,6 +52,7 @@ static struct {
     IsoFile* files;
     int nfiles, cap;
     int result;
+    int job;            /* 0: set up from the disc image, 1: upscale the movies */
 } su;
 
 static void set_status(const char* fmt, ...)
@@ -439,40 +448,41 @@ static int run_hidden(char* cmdline, const char* cwd)
     return (int)code;
 }
 
-static int get_ffmpeg(char* exe, int size)
+/* <exe>\tools\<folder> holds a downloaded tool: download the zip from url and unpack it there
+ * unless <name> is already in it; its full path goes to exe */
+static int get_tool(const char* url, const char* folder, const char* name, const char* what, char* exe, int size)
 {
     char tools[MAX_PATH], zip[MAX_PATH + 32], cmd[3 * MAX_PATH];
-    HINTERNET net, url;
+    HINTERNET net, inet;
     HANDLE out;
     unsigned char* buf;
     unsigned long long got = 0, total = 0;
     DWORD n, len = sizeof(DWORD), clen = 0;
 
-    snprintf(tools, sizeof(tools), "%s\\tools\\ffmpeg", su.exe_dir);
+    snprintf(tools, sizeof(tools), "%s\\tools\\%s", su.exe_dir, folder);
 
-    if (find_file(tools, "ffmpeg.exe", exe, size, 0))
+    if (find_file(tools, name, exe, size, 0))
     {
         return 1;
     }
 
-    set_status("Downloading FFmpeg (used once to convert the movies)...");
+    set_status("Downloading %s...", what);
     progress(0);
     snprintf(cmd, sizeof(cmd), "%s\\tools", su.exe_dir);
     CreateDirectoryA(cmd, NULL);
     CreateDirectoryA(tools, NULL);
-    snprintf(zip, sizeof(zip), "%s\\ffmpeg-download.zip", tools);
+    snprintf(zip, sizeof(zip), "%s\\download.zip", tools);
 
     net = InternetOpenA("recvx-config", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
-    url = net ? InternetOpenUrlA(net, FFMPEG_URL, NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_SECURE, 0) : NULL;
+    inet = net ? InternetOpenUrlA(net, url, NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_SECURE, 0) : NULL;
 
-    if (url == NULL)
+    if (inet == NULL)
     {
         if (net) InternetCloseHandle(net);
-        return fail("Could not download FFmpeg (needed once to convert the movies). Check the internet "
-                    "connection and try again.");
+        return fail("Could not download %s. Check the internet connection and try again.", what);
     }
 
-    if (HttpQueryInfoA(url, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, &clen, &len, NULL))
+    if (HttpQueryInfoA(inet, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, &clen, &len, NULL))
     {
         total = clen;
     }
@@ -480,45 +490,46 @@ static int get_ffmpeg(char* exe, int size)
     out = CreateFileA(zip, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     buf = (unsigned char*)malloc(1 << 20);
 
-    while (!su.cancel && InternetReadFile(url, buf, 1 << 20, &n) && (n > 0))
+    while (!su.cancel && InternetReadFile(inet, buf, 1 << 20, &n) && (n > 0))
     {
         DWORD wrote;
 
         WriteFile(out, buf, n, &wrote, NULL);
         got += n;
-        set_status("Downloading FFmpeg (used once to convert the movies): %.0f MB", got / 1e6);
+        set_status("Downloading %s: %.0f MB", what, got / 1e6);
         progress(total ? (int)(got * 100 / total) : -1);
     }
 
     free(buf);
     CloseHandle(out);
-    InternetCloseHandle(url);
+    InternetCloseHandle(inet);
     InternetCloseHandle(net);
 
     if (su.cancel || (got < (1 << 20)))
     {
         DeleteFileA(zip);
-        return su.cancel ? 0 : fail("The FFmpeg download failed. Try again later.");
+        return su.cancel ? 0 : fail("The %s download failed. Try again later.", what);
     }
 
-    /* tar.exe ships with Windows 10 and 11 and unpacks zip files */
-    set_status("Unpacking FFmpeg...");
+    /* tar.exe ships with Windows 10 and 11 and unpacks zip files. Its exit code is not trusted:
+     * it can complain about a zip it unpacked completely. */
+    set_status("Unpacking %s...", what);
     progress(-1);
     snprintf(cmd, sizeof(cmd), "tar.exe -xf \"%s\" -C \"%s\"", zip, tools);
-
-    if (run_hidden(cmd, tools) != 0)
-    {
-        return fail("Could not unpack FFmpeg (%s).", zip);
-    }
-
+    run_hidden(cmd, tools);
     DeleteFileA(zip);
 
-    if (!find_file(tools, "ffmpeg.exe", exe, size, 0))
+    if (!find_file(tools, name, exe, size, 0))
     {
-        return fail("ffmpeg.exe was not found in the FFmpeg download.");
+        return fail("Could not unpack %s (%s was not found in the download).", what, name);
     }
 
     return 1;
+}
+
+static int get_ffmpeg(char* exe, int size)
+{
+    return get_tool(FFMPEG_URL, "ffmpeg", "ffmpeg.exe", "FFmpeg (used once to convert the movies)", exe, size);
 }
 
 /* ------------------------------------------------------------------------------------------- */
@@ -770,6 +781,299 @@ static int convert_movies(const char* data_dir)
 
 /* ------------------------------------------------------------------------------------------- */
 
+/* deletes the files in dir that match pattern (e.g. "*.png") */
+static void clear_dir(const char* dir, const char* pattern)
+{
+    char p[MAX_PATH + 16], f[2 * MAX_PATH];
+    WIN32_FIND_DATAA fd;
+    HANDLE h;
+
+    snprintf(p, sizeof(p), "%s\\%s", dir, pattern);
+
+    if ((h = FindFirstFileA(p, &fd)) == INVALID_HANDLE_VALUE)
+    {
+        return;
+    }
+
+    do
+    {
+        snprintf(f, sizeof(f), "%s\\%s", dir, fd.cFileName);
+        DeleteFileA(f);
+    } while (FindNextFileA(h, &fd));
+
+    FindClose(h);
+}
+
+static int count_files(const char* dir, const char* pattern)
+{
+    char p[MAX_PATH + 16];
+    WIN32_FIND_DATAA fd;
+    HANDLE h;
+    int n = 0;
+
+    snprintf(p, sizeof(p), "%s\\%s", dir, pattern);
+
+    if ((h = FindFirstFileA(p, &fd)) == INVALID_HANDLE_VALUE)
+    {
+        return 0;
+    }
+
+    do n++; while (FindNextFileA(h, &fd));
+
+    FindClose(h);
+    return n;
+}
+
+/* one movie: disc frames -> 4x frames (in batches) -> MPEG-1 pieces -> joined, with the sound of
+ * the converted movie. Progress runs from done_frames to done_frames + its frames of all_frames. */
+static int upscale_one(const char* ffmpeg, const char* esrgan, const char* movie_dir, const char* hd_dir,
+                       const char* name, const char* work, int index, int count)
+{
+    char base[64], pss[MAX_PATH + 80], mpg[MAX_PATH + 80], out[MAX_PATH + 80], tmp_out[MAX_PATH + 96];
+    char src[MAX_PATH + 16], up[MAX_PATH + 16], esr_dir[MAX_PATH], list[MAX_PATH + 16], cmd[6 * MAX_PATH];
+    char* dot;
+    FILE* lf;
+    int frames, first, batch = 0;
+
+    snprintf(base, sizeof(base), "%s", name);
+
+    if ((dot = strrchr(base, '.')) != NULL)
+    {
+        *dot = 0;
+    }
+
+    snprintf(pss, sizeof(pss), "%s\\%s.PSS", movie_dir, base);
+    snprintf(mpg, sizeof(mpg), "%s\\%s.MPG", movie_dir, base);
+    snprintf(out, sizeof(out), "%s\\%s.MPG", hd_dir, base);
+    snprintf(tmp_out, sizeof(tmp_out), "%s\\%s.MPG.part", hd_dir, base);
+    snprintf(src, sizeof(src), "%s\\src", work);
+    snprintf(up, sizeof(up), "%s\\up", work);
+    snprintf(list, sizeof(list), "%s\\pieces.txt", work);
+    snprintf(esr_dir, sizeof(esr_dir), "%s", esrgan);
+
+    if ((dot = strrchr(esr_dir, '\\')) != NULL)
+    {
+        *dot = 0;   /* Real-ESRGAN finds its models next to it */
+    }
+
+    if (GetFileAttributesA(mpg) == INVALID_FILE_ATTRIBUTES)
+    {
+        return fail("%s has not been converted yet: set the game up first.", mpg);
+    }
+
+    CreateDirectoryA(src, NULL);
+    CreateDirectoryA(up, NULL);
+    clear_dir(src, "*.png");
+    clear_dir(up, "*.png");
+    clear_dir(work, "p*.mpg");
+
+    /* the disc movie's frames */
+    set_status("Upscaling movie %d of %d (%s): reading frames", index + 1, count, base);
+    progress(index * 100 / count);
+    snprintf(cmd, sizeof(cmd), "\"%s\" -hide_banner -loglevel error -y -i \"%s\" -map 0:v \"%s\\f%%06d.png\"", ffmpeg, pss, src);
+
+    if (run_hidden(cmd, work) != 0)
+    {
+        return su.cancel ? 0 : fail("Reading the frames of %s failed.", base);
+    }
+
+    frames = count_files(src, "*.png");
+
+    if (frames == 0)
+    {
+        return fail("%s has no frames.", base);
+    }
+
+    /* in batches: move a batch aside, enlarge it, encode it, throw the images away */
+    for (first = 1; (first <= frames) && !su.cancel; first += UPSCALE_BATCH, batch++)
+    {
+        char bdir[MAX_PATH + 16], piece[MAX_PATH + 32];
+        int k, last = first + UPSCALE_BATCH - 1;
+
+        if (last > frames)
+        {
+            last = frames;
+        }
+
+        snprintf(bdir, sizeof(bdir), "%s\\batch", work);
+        CreateDirectoryA(bdir, NULL);
+        clear_dir(bdir, "*.png");
+
+        for (k = first; k <= last; k++)
+        {
+            char a[MAX_PATH + 32], b[MAX_PATH + 32];
+
+            snprintf(a, sizeof(a), "%s\\f%06d.png", src, k);
+            snprintf(b, sizeof(b), "%s\\f%06d.png", bdir, k);
+            MoveFileA(a, b);
+        }
+
+        set_status("Upscaling movie %d of %d (%s): frames %d-%d of %d", index + 1, count, base, first, last, frames);
+        progress((index * 100 + (first - 1) * 100 / frames) / count);
+
+        snprintf(cmd, sizeof(cmd), "\"%s\" -i \"%s\" -o \"%s\" -n realesr-animevideov3 -s 4 -f png", esrgan, bdir, up);
+
+        if ((run_hidden(cmd, esr_dir) != 0) || (count_files(up, "*.png") != last - first + 1))
+        {
+            return su.cancel ? 0 : fail("Upscaling the frames of %s failed. Real-ESRGAN needs a graphics card "
+                                        "with Vulkan support and an up-to-date driver.", base);
+        }
+
+        snprintf(piece, sizeof(piece), "%s\\p%04d.mpg", work, batch);
+        snprintf(cmd, sizeof(cmd), "\"%s\" -hide_banner -loglevel error -y -framerate 30000/1001 -start_number %d "
+                 "-i \"%s\\f%%06d.png\" -c:v mpeg1video -q:v 3 -g 15 -f mpeg \"%s\"", ffmpeg, first, up, piece);
+
+        if (run_hidden(cmd, work) != 0)
+        {
+            return su.cancel ? 0 : fail("Encoding the upscaled frames of %s failed.", base);
+        }
+
+        clear_dir(bdir, "*.png");
+        clear_dir(up, "*.png");
+    }
+
+    if (su.cancel)
+    {
+        return 0;
+    }
+
+    /* the pieces in order, for FFmpeg's concat demuxer (it keeps the timestamps running on) */
+    if ((lf = fopen(list, "w")) == NULL)
+    {
+        return fail("Could not write %s.", list);
+    }
+
+    {
+        int b;
+
+        for (b = 0; b < batch; b++)
+        {
+            fprintf(lf, "file 'p%04d.mpg'\n", b);
+        }
+    }
+
+    fclose(lf);
+
+    /* with the converted movie's sound; written under another name until complete */
+    set_status("Upscaling movie %d of %d (%s): finishing", index + 1, count, base);
+    snprintf(cmd, sizeof(cmd), "\"%s\" -hide_banner -loglevel error -y -f concat -safe 0 -i \"%s\" "
+             "-i \"%s\" -map 0:v -map 1:a -c copy -f mpeg \"%s\"", ffmpeg, list, mpg, tmp_out);
+
+    if (run_hidden(cmd, work) != 0)
+    {
+        DeleteFileA(tmp_out);
+        return su.cancel ? 0 : fail("Writing the upscaled %s failed.", base);
+    }
+
+    DeleteFileA(out);
+
+    if (!MoveFileA(tmp_out, out))
+    {
+        return fail("Could not write %s.", out);
+    }
+
+    clear_dir(work, "p*.mpg");
+    DeleteFileA(list);
+    return 1;
+}
+
+static int upscale_movies(const char* data_dir)
+{
+    char ffmpeg[MAX_PATH], esrgan[MAX_PATH], movie_dir[MAX_PATH + 8], hd_dir[MAX_PATH + 16], work[MAX_PATH];
+    char pattern[MAX_PATH + 16], names[128][64];
+    int count = 0, i, ok = 1;
+    WIN32_FIND_DATAA fd;
+    HANDLE h;
+
+    snprintf(movie_dir, sizeof(movie_dir), "%s\\MOVIE", data_dir);
+    snprintf(hd_dir, sizeof(hd_dir), "%s\\MOVIE_HD", data_dir);
+    snprintf(pattern, sizeof(pattern), "%s\\*.PSS", movie_dir);
+
+    if ((h = FindFirstFileA(pattern, &fd)) != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            if (count < 128)
+            {
+                snprintf(names[count++], sizeof(names[0]), "%s", fd.cFileName);
+            }
+        } while (FindNextFileA(h, &fd));
+
+        FindClose(h);
+    }
+
+    if (count == 0)
+    {
+        return fail("No movies were found. Set the game up from the disc image first.");
+    }
+
+    {
+        ULARGE_INTEGER avail;
+        char root[MAX_PATH], t[MAX_PATH];
+
+        snprintf(root, sizeof(root), "%s\\", data_dir);
+        GetTempPathA(sizeof(t), t);
+
+        if ((GetDiskFreeSpaceExA(root, &avail, NULL, NULL) && (avail.QuadPart < (3ull << 30))) ||
+            (GetDiskFreeSpaceExA(t, &avail, NULL, NULL) && (avail.QuadPart < (5ull << 30))))
+        {
+            return fail("Not enough free disk space: upscaling needs about 2 GB next to the game and "
+                        "5 GB of temporary space while it works.");
+        }
+    }
+
+    if (!get_ffmpeg(ffmpeg, sizeof(ffmpeg)) ||
+        !get_tool(REALESRGAN_URL, "realesrgan", "realesrgan-ncnn-vulkan.exe", "Real-ESRGAN (the AI upscaler)", esrgan, sizeof(esrgan)))
+    {
+        return 0;
+    }
+
+    CreateDirectoryA(hd_dir, NULL);
+    GetTempPathA(sizeof(work), work);
+    strncat(work, "recvx_upscale", sizeof(work) - strlen(work) - 1);
+    CreateDirectoryA(work, NULL);
+
+    for (i = 0; (i < count) && ok && !su.cancel; i++)
+    {
+        char pss[MAX_PATH + 80], out[MAX_PATH + 80], base[64];
+        WIN32_FILE_ATTRIBUTE_DATA a_pss, a_out;
+        char* dot;
+
+        snprintf(base, sizeof(base), "%s", names[i]);
+
+        if ((dot = strrchr(base, '.')) != NULL)
+        {
+            *dot = 0;
+        }
+
+        snprintf(pss, sizeof(pss), "%s\\%s", movie_dir, names[i]);
+        snprintf(out, sizeof(out), "%s\\%s.MPG", hd_dir, base);
+
+        /* done in an earlier run (upscaling can be stopped and continued) */
+        if (GetFileAttributesExA(out, GetFileExInfoStandard, &a_out) && GetFileAttributesExA(pss, GetFileExInfoStandard, &a_pss) &&
+            (CompareFileTime(&a_out.ftLastWriteTime, &a_pss.ftLastWriteTime) >= 0) && (a_out.nFileSizeLow > 0))
+        {
+            continue;
+        }
+
+        ok = upscale_one(ffmpeg, esrgan, movie_dir, hd_dir, names[i], work, i, count);
+    }
+
+    {
+        char d[MAX_PATH + 16];
+
+        snprintf(d, sizeof(d), "%s\\src", work); clear_dir(d, "*.png"); RemoveDirectoryA(d);
+        snprintf(d, sizeof(d), "%s\\up", work); clear_dir(d, "*.png"); RemoveDirectoryA(d);
+        snprintf(d, sizeof(d), "%s\\batch", work); clear_dir(d, "*.png"); RemoveDirectoryA(d);
+        clear_dir(work, "p*.mpg");
+        clear_dir(work, "pieces.txt");
+        RemoveDirectoryA(work);
+    }
+
+    progress(100);
+    return ok && !su.cancel;
+}
+
 static DWORD WINAPI worker(LPVOID param)
 {
     char data_dir[MAX_PATH + 8];
@@ -778,7 +1082,7 @@ static DWORD WINAPI worker(LPVOID param)
     (void)param;
     snprintf(data_dir, sizeof(data_dir), "%s\\data", su.exe_dir);
 
-    ok = extract(data_dir) && convert_movies(data_dir);
+    ok = (su.job == 1) ? upscale_movies(data_dir) : (extract(data_dir) && convert_movies(data_dir));
 
     PostMessageA(su.wnd, WM_SETUP_DONE, su.cancel ? (WPARAM)-1 : (WPARAM)ok, 0);
     return 0;
@@ -841,7 +1145,21 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     return DefWindowProcA(hwnd, msg, wp, lp);
 }
 
+static int run_job(HWND owner, HFONT font, float dpi, const char* exe_dir, const char* iso_path, int job,
+                   const char* title, char* error, int error_size);
+
 int SetupGameFromIso(HWND owner, HFONT font, float dpi, const char* exe_dir, const char* iso_path, char* error, int error_size)
+{
+    return run_job(owner, font, dpi, exe_dir, iso_path, 0, "Setting up the game", error, error_size);
+}
+
+int UpscaleMovies(HWND owner, HFONT font, float dpi, const char* exe_dir, char* error, int error_size)
+{
+    return run_job(owner, font, dpi, exe_dir, "", 1, "Upscaling the movies", error, error_size);
+}
+
+static int run_job(HWND owner, HFONT font, float dpi, const char* exe_dir, const char* iso_path, int job,
+                   const char* title, char* error, int error_size)
 {
     WNDCLASSA wc;
     RECT r;
@@ -853,7 +1171,8 @@ int SetupGameFromIso(HWND owner, HFONT font, float dpi, const char* exe_dir, con
     InitializeCriticalSection(&su.lock);
     snprintf(su.iso, sizeof(su.iso), "%s", iso_path);
     snprintf(su.exe_dir, sizeof(su.exe_dir), "%s", exe_dir);
-    snprintf(su.status, sizeof(su.status), "Reading the disc image...");
+    snprintf(su.status, sizeof(su.status), job ? "Getting ready..." : "Reading the disc image...");
+    su.job = job;
 
     memset(&wc, 0, sizeof(wc));
     wc.lpfnWndProc = wnd_proc;
@@ -864,7 +1183,7 @@ int SetupGameFromIso(HWND owner, HFONT font, float dpi, const char* exe_dir, con
     RegisterClassA(&wc);
 
     GetWindowRect(owner, &r);
-    su.wnd = CreateWindowExA(WS_EX_DLGMODALFRAME, "recvx_setup", "Setting up the game",
+    su.wnd = CreateWindowExA(WS_EX_DLGMODALFRAME, "recvx_setup", title,
                              WS_POPUP | WS_CAPTION | WS_VISIBLE, (r.left + r.right - w) / 2, (r.top + r.bottom - h) / 2,
                              w, h, owner, NULL, wc.hInstance, NULL);
     su.text = CreateWindowExA(0, "STATIC", su.status, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS,

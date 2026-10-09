@@ -7,6 +7,11 @@
  * extracted data folder, decoded by pc_mpeg.c; they are uploaded and drawn with the same GS
  * packets as on the PS2. Without converted movies (e.g. playing from the ISO) a movie reports
  * PREP -> PLAYING -> PLAYEND at once so the game moves on.
+ *
+ * Upscaled movies (MOVIE_HD/MV_*.MPG, made by recvx-config.exe's "Upscale movies") are used when
+ * present and movies_hd= is not 0 in recvx.ini. Their frames are 4x the originals and do not fit
+ * in GS memory: the game still draws its sprite as on the PS2, and the renderer samples the
+ * upscaled frame instead (pcGsMovieFrame), the way HD texture packs replace textures.
  */
 #include "../../include/ps2/veronica/prog/ps2_MovieFunc.h"
 #include "../../include/ps2/veronica/prog/main.h"
@@ -36,19 +41,39 @@ void pcMpegClose(void);
 void pcMpegPause(int on);
 void pcMpegSetVolume(int vol);
 int pcMpegUpdate(unsigned char* rgba, int max_bytes, int* w, int* h);
+int pcMpegSize(int* w, int* h);
+void pcGsMovieFrame(unsigned int tbp, const unsigned char* rgba, int w, int h, int scale);
+void gsRendererFlush(void);
 const char* pcCdDataDir(void);
 void gsGifTransfer(const void* data, int qwc);
 
 static int playing;                 /* a converted movie is open */
 static int image_w, image_h, image_new;
 static unsigned char* image;        /* RGBA, 16 bytes of GIF tags in front */
-#define IMAGE_MAX (512 * 512 * 4)
+static int image_cap = 512 * 512 * 4;
+#define IMAGE_MAX image_cap
+#define HD_SCALE 4                  /* upscaled movies are 4x the originals */
+static int hd;                      /* playing an upscaled movie */
+static int hd_w, hd_h;              /* its frame size */
 
 void initAll()
 {
     rmi.iMovieState = MOVIE_STATE_PREP;
     rmi.iMovieFrame = Ps2_vcount;
     playing = 0;
+}
+
+static int file_exists(const char* path)
+{
+    FILE* f = fopen(path, "rb");
+
+    if (f == NULL)
+    {
+        return 0;
+    }
+
+    fclose(f);
+    return 1;
 }
 
 /* called by ps2mwPlyStartFname with the movie's name ("MV_000.PSS") */
@@ -64,7 +89,9 @@ void pcMovieStart(const char* name)
         return;
     }
 
-    snprintf(path, sizeof(path), "%s/MOVIE/%s", dir, name);
+    /* the upscaled version first (unless turned off), then the converted original */
+    hd = 0;
+    snprintf(path, sizeof(path), "%s/MOVIE_HD/%s", dir, name);
     n = strlen(path);
 
     if ((n > 4) && (_stricmp(path + n - 4, ".PSS") == 0))
@@ -72,10 +99,36 @@ void pcMovieStart(const char* name)
         strcpy(path + n - 4, ".MPG");
     }
 
-    if (!pcMpegOpen(path))
+    if ((pcIniGetInt("movies_hd", 1) != 0) && file_exists(path) && pcMpegOpen(path))
+    {
+        hd = 1;
+    }
+    else
+    {
+        snprintf(path, sizeof(path), "%s/MOVIE/%s", dir, name);
+        n = strlen(path);
+
+        if ((n > 4) && (_stricmp(path + n - 4, ".PSS") == 0))
+        {
+            strcpy(path + n - 4, ".MPG");
+        }
+    }
+
+    if (!hd && !pcMpegOpen(path))
     {
         pcLog("movie: %s not found, skipped (run pc/tools/convert_movies.py)", path);
         return;
+    }
+
+    {
+        int w, h;
+
+        if (pcMpegSize(&w, &h) && (w * h * 4 > image_cap))
+        {
+            free(image);
+            image = NULL;
+            image_cap = w * h * 4;
+        }
     }
 
     if (image == NULL)
@@ -109,6 +162,15 @@ void readMpeg()
 
     r = pcMpegUpdate(image + 16, IMAGE_MAX, &image_w, &image_h);
 
+    if ((r > 0) && hd)
+    {
+        /* the game's sprite keeps the original frame size; the renderer gets the big one */
+        hd_w = image_w;
+        hd_h = image_h;
+        image_w /= HD_SCALE;
+        image_h /= HD_SCALE;
+    }
+
     if (r < 0)
     {
         rmi.iMovieState = MOVIE_STATE_END;
@@ -125,6 +187,13 @@ void termAll()
     {
         pcMpegClose();
         playing = 0;
+    }
+
+    if (hd)
+    {
+        gsRendererFlush();
+        pcGsMovieFrame(0, NULL, 0, 0, 0);
+        hd = 0;
     }
 }
 
@@ -143,6 +212,13 @@ void setImageTag(unsigned int* tags, void* unused)
     }
 
     image_new = 0;
+
+    if (hd)
+    {
+        gsRendererFlush();   /* the previous frame's sprite may still be queued */
+        pcGsMovieFrame(MOVIE_TBP, image + 16, hd_w, hd_h, HD_SCALE);
+        return;
+    }
 
     gif[0] = SCE_GIF_SET_TAG(4, SCE_GS_TRUE, SCE_GS_FALSE, 0, SCE_GIF_PACKED, 1);
     gif[1] = SCE_GIF_PACKED_AD;

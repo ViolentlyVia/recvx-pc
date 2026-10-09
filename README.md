@@ -22,6 +22,7 @@ graveyard), saving and loading. Report problems with a `last_run_input.txt` reco
 | Settings app (`recvx-config.exe`): display, folders, key and controller bindings | done |
 | PCSX2-format HD texture packs (`.dds`) | done |
 | Movies (converted once from the disc with FFmpeg) | done |
+| AI-upscaled movies (optional, 4x with Real-ESRGAN on the player's GPU) | done |
 | Music and voices (CRI ADX) | done |
 | Sound effects with room reverb (Tamsoft sound driver replacement) | done |
 | Saving and loading (to a `saves` folder, no memory card screens) | done |
@@ -63,6 +64,16 @@ Alternatives:
   image; movies are skipped in that mode.
 - Keep the extracted data elsewhere and point to it with `data=` in `recvx.ini`.
 
+### Upscaled movies (optional)
+
+"Upscale movies (AI)..." in `recvx-config.exe` enlarges the movies 4x (to 1280x1408) with
+Real-ESRGAN's `realesr-animevideov3` model, which runs on the graphics card through Vulkan. It
+downloads the upscaler once (about 45 MB, into `tools\realesrgan`), takes about 45 minutes on a
+recent GPU (several hours on a slow one), and writes `data\MOVIE_HD`, about 1.6 GB. It works in
+batches of 500 frames, so it needs about 5 GB of temporary space at most; it can be stopped and
+continued, and finished movies are kept. The game plays the upscaled movies while "Use upscaled
+movies" is ticked (`movies_hd=0` in `recvx.ini` turns them off) and the original ones otherwise.
+
 ## Running
 
 Start `build_pc/recvx.exe` (or "Save and play" in `recvx-config.exe`). It is a normal Windows
@@ -96,6 +107,7 @@ Optional, next to `recvx.exe`, one `key=value` per line (the settings app writes
 | `window=` | window size, e.g. `1920x1080` (default: 960 pixels high at the chosen aspect) |
 | `fullscreen=` | `1` for exclusive fullscreen at the window size, `desktop` for borderless (default `0`) |
 | `pause_unfocused=` | `0` keeps the game running while its window is not active (default `1`) |
+| `movies_hd=` | `0` plays the original movies even when upscaled ones exist (default `1`) |
 | `window_pos=`, `window_max=` | written by the game: where the window was left, and if it was maximized |
 | `key_<action>=` | keyboard key, by its SDL name (`Z`, `Return`, `Left Shift`, `Keypad 0`, `none`) |
 | `pad_<action>=` | controller button, by its SDL name (`a`, `b`, `leftshoulder`, `lefttrigger`, `dpup`, `none`) |

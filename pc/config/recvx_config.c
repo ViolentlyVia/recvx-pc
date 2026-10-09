@@ -259,12 +259,12 @@ static const char* pad_label(const char* name)
 enum {
     ID_RES = 100, ID_ASPECT, ID_MODE, ID_SCALE,
     ID_HD, ID_HD_BROWSE, ID_SAVES, ID_SAVES_BROWSE,
-    ID_RESET, ID_SAVE, ID_PLAY, ID_CLOSE, ID_SETUP, ID_PAUSE,
+    ID_RESET, ID_SAVE, ID_PLAY, ID_CLOSE, ID_SETUP, ID_PAUSE, ID_UPSCALE, ID_MOVIES_HD,
     ID_KEY = 1000, ID_PAD = 1100,
 };
 
 static HWND main_wnd;
-static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game, h_pause;
+static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game, h_pause, h_movies_hd;
 static int loaded_res;   /* resolution entry when the settings were loaded */
 static HWND h_key[PC_BINDING_COUNT], h_pad[PC_BINDING_COUNT];
 static HFONT font, bold_font;
@@ -400,6 +400,9 @@ static void load_settings(void)
     v = ini_get("pause_unfocused");
     SendMessageA(h_pause, BM_SETCHECK, ((v == NULL) || (atoi(v) != 0)) ? BST_CHECKED : BST_UNCHECKED, 0);
 
+    v = ini_get("movies_hd");
+    SendMessageA(h_movies_hd, BM_SETCHECK, ((v == NULL) || (atoi(v) != 0)) ? BST_CHECKED : BST_UNCHECKED, 0);
+
     fill_scale_combo();   /* the list must exist before an entry can be selected */
     v = ini_get("scale");
     sel = (v != NULL) ? atoi(v) - 1 : 2;
@@ -457,6 +460,7 @@ static int save_settings(void)
     ini_set("fullscreen", (sel == 1) ? "1" : (sel == 2) ? "desktop" : NULL);
 
     ini_set("pause_unfocused", (SendMessageA(h_pause, BM_GETCHECK, 0, 0) == BST_CHECKED) ? NULL : "0");
+    ini_set("movies_hd", (SendMessageA(h_movies_hd, BM_GETCHECK, 0, 0) == BST_CHECKED) ? NULL : "0");
 
     sel = (int)SendMessageA(h_scale, CB_GETCURSEL, 0, 0) + 1;
     snprintf(buf, sizeof(buf), "%d", sel);
@@ -731,6 +735,44 @@ static int game_ready(void)
 
 static char cmd_iso[MAX_PATH];   /* a disc image given on the command line (or dropped on the exe) */
 
+/* the movies enlarged by AI (setup_game.c); the game uses them while "Use upscaled movies" is on */
+static void upscale_movies(void)
+{
+    char data[MAX_PATH + 8], error[1024];
+    int r;
+
+    if (!SetupGameIsReady(exe_dir, data, sizeof(data)))
+    {
+        MessageBoxA(main_wnd, "Set the game up from your disc image first.", APP_TITLE, MB_ICONINFORMATION);
+        return;
+    }
+
+    if (MessageBoxA(main_wnd,
+                    "This enlarges the game's movies 4x with an AI upscaler (Real-ESRGAN) running on your "
+                    "graphics card. It downloads the upscaler once (about 45 MB).\n\n"
+                    "It takes about 45 minutes on a fast graphics card and can take several hours on a slow "
+                    "one. It needs about 2 GB next to the game and 5 GB of temporary space while it works. "
+                    "You can stop it and continue later; finished movies are kept.\n\n"
+                    "Start now?", APP_TITLE, MB_OKCANCEL | MB_ICONQUESTION) != IDOK)
+    {
+        return;
+    }
+
+    SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);   /* no sleep while it works */
+    r = UpscaleMovies(main_wnd, font, dpi, exe_dir, error, sizeof(error));
+    SetThreadExecutionState(ES_CONTINUOUS);
+
+    if (r > 0)
+    {
+        MessageBoxA(main_wnd, "The movies are upscaled. The game uses them while \"Use upscaled movies\" is on.",
+                    APP_TITLE, MB_ICONINFORMATION);
+    }
+    else if (r == 0)
+    {
+        MessageBoxA(main_wnd, (error[0] != 0) ? error : "Upscaling the movies failed.", APP_TITLE, MB_ICONERROR);
+    }
+}
+
 static void setup_game(const char* given)
 {
     char iso[MAX_PATH] = "", error[1024];
@@ -775,6 +817,7 @@ static void setup_game(const char* given)
 
 static void create_controls(void)
 {
+    int left_end;
     int y, i;
     const int lx = 16, cx = 150, cw = 230;     /* left column: labels, inputs */
     const int rx = 420;                        /* right column: controls */
@@ -782,9 +825,12 @@ static void create_controls(void)
     heading("Game", lx, 14, 200);
     h_game = make("STATIC", "", SS_LEFT | SS_PATHELLIPSIS, lx, 40, cx + cw - lx, 20, -1);
     make("BUTTON", "Set up from disc image...", BS_PUSHBUTTON | WS_TABSTOP, lx, 64, 180, 28, ID_SETUP);
+    make("BUTTON", "Upscale movies (AI)...", BS_PUSHBUTTON | WS_TABSTOP, lx + 190, 64, 170, 28, ID_UPSCALE);
+    h_movies_hd = make("BUTTON", "Use upscaled movies (when made)", BS_AUTOCHECKBOX | WS_TABSTOP,
+                       lx, 98, cx + cw - lx, 24, ID_MOVIES_HD);
 
-    heading("Display", lx, 112, 200);
-    y = 138;
+    heading("Display", lx, 142, 200);
+    y = 168;
     label("Resolution", lx, y, cx - lx);
     h_res = combo(cx, y, cw, ID_RES);
     y += 32;
@@ -817,6 +863,7 @@ static void create_controls(void)
     y += 30;
     make("STATIC", "Leave empty for no HD textures / the \"saves\" folder next to the game.",
          SS_LEFT, lx, y, cx + cw - lx, 36, -1);
+    left_end = y + 36;
 
     for (i = 0; i < NASPECTS; i++)
     {
@@ -855,6 +902,12 @@ static void create_controls(void)
     make("STATIC", "Click a button, then press the new key or controller button.", SS_LEFT, rx, y, 440, 20, -1);
 
     y += 34;
+
+    if (y < left_end + 12)
+    {
+        y = left_end + 12;   /* the bottom buttons go below whichever column is longer */
+    }
+
     make("BUTTON", "Reset controls", BS_PUSHBUTTON | WS_TABSTOP, lx, y, 120, 28, ID_RESET);
     make("BUTTON", "Save", BS_PUSHBUTTON | WS_TABSTOP, rx + 440 - 3 * 110 - 16, y, 100, 28, ID_SAVE);
     make("BUTTON", "Save and play", BS_DEFPUSHBUTTON | WS_TABSTOP, rx + 440 - 2 * 110 - 8, y, 110, 28, ID_PLAY);
@@ -929,7 +982,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
             dirty = 1;
         }
-        else if ((code == EN_CHANGE) || (id == ID_PAUSE))
+        else if ((code == EN_CHANGE) || (id == ID_PAUSE) || (id == ID_MOVIES_HD))
         {
             dirty = 1;
         }
@@ -948,6 +1001,10 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         else if (id == ID_SETUP)
         {
             setup_game(NULL);
+        }
+        else if (id == ID_UPSCALE)
+        {
+            upscale_movies();
         }
         else if (id == ID_SAVE)
         {
