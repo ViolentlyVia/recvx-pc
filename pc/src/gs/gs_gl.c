@@ -1257,6 +1257,59 @@ void gsRendererPresent(unsigned int dispfb_fbp, unsigned int dispfb_fbw)
 
     glUseProgram(present_prog);
     glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+    /* a notice from the PC port (pc_overlay.c) in the middle of a black screen, instead of the
+     * picture */
+    {
+        extern const unsigned char* pcOverlayImage(int height, int* w, int* h);
+        static GLuint overlay_tex;
+        const unsigned char* img;
+        int ow, oh;
+
+        img = pcOverlayImage(vh / 14, &ow, &oh);
+
+        if ((img != NULL) && (ow <= vw) && (oh <= vh))
+        {
+            float x0 = 2.0f * ((vw - ow) / 2) / vw - 1.0f, x1 = x0 + 2.0f * ow / vw;
+            float y0 = 1.0f - 2.0f * ((vh - oh) / 2) / vh, y1 = y0 - 2.0f * oh / vh;
+            float px[4], py[4], ts[4] = { 0, 1, 0, 1 }, tt[4] = { 0, 0, 1, 1 };
+            int idx[6] = { 0, 1, 2, 1, 3, 2 };
+
+            px[0] = px[2] = x0;
+            px[1] = px[3] = x1;
+            py[0] = py[1] = y0;
+            py[2] = py[3] = y1;
+
+            memset(q, 0, sizeof(q));
+
+            for (i = 0; i < 6; i++)
+            {
+                q[i].x = px[idx[i]];
+                q[i].y = py[idx[i]];
+                q[i].s = ts[idx[i]];
+                q[i].t = tt[idx[i]];
+            }
+
+            if (overlay_tex == 0)
+            {
+                glGenTextures(1, &overlay_tex);
+            }
+
+            glBindTexture(GL_TEXTURE_2D, overlay_tex);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, ow, oh, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(q), q, GL_STREAM_DRAW);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            return;
+        }
+    }
+
     glBindTexture(GL_TEXTURE_2D, rt->color);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

@@ -30,6 +30,7 @@ static const PcBindingDef pc_binding_defs[] = {
     { "right",       "Turn right",          "Right",     "dpright",       0 },
     { "fastforward", "Fast-forward (hold)", "Keypad 0",  "",              0 },
     { "fullscreen",  "Fullscreen on/off",   "F11",       "",              0 },
+    { "title",       "Back to title (x2)",  "F9",        "",              0 },
 };
 
 #define PC_BINDING_COUNT ((int)(sizeof(pc_binding_defs) / sizeof(pc_binding_defs[0])))

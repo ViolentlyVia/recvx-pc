@@ -2179,9 +2179,31 @@ void bhSysCallMonitor()
     } 
 }
 
+#ifdef TARGET_PC
+/* PC: back to the title screen (F9, pc_platform.c) through the game's soft reset is offered only
+ * while playing (the game tasks running, not in a movie), where bhSysCallSndMonitor does the
+ * reset; at the title screen and in movies bhCheckSoftReset would end the program instead */
+int pcTitleAllowed(void)
+{
+    return ((sys->tk_flg & 0x40)) && (!(sys->tk_flg & 0x3F)) && (!(sys->ss_flg & 0x520000));
+}
+#endif
+
 // 100% matching! 
 void bhSysCallSndMonitor()
 {
+#ifdef TARGET_PC
+    {
+        extern int pcTitleAllowed(void);
+        extern int pcTitleRequested(void);
+
+        if ((pcTitleAllowed() != 0) && (pcTitleRequested() != 0))
+        {
+            SoftResetFlag = 1;
+        }
+    }
+#endif
+
     if (((!(sys->ss_flg & 0x120000)) && (!(sys->tk_flg & 0x3F))) && (SoftResetFlag == 1)) 
     {
         if ((sys->ss_flg & 0x400000))

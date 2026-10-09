@@ -70,7 +70,7 @@ def pc_sources():
 NATIVE_LONG = {
     "pc/src/pc_os_win32.c", "pc/src/pc_platform.c", "pc/src/pc_audio.c", "pc/src/pc_kernel.c",
     "pc/src/pc_cdvd.c", "pc/src/pc_iop.c", "pc/src/pc_iop_tsnddrv.c", "pc/src/pc_sce_misc.c", "pc/src/pc_mpeg.c",
-    "pc/src/pc_mc.c",
+    "pc/src/pc_mc.c", "pc/src/pc_overlay.c",
 }
 
 

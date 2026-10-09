@@ -23,6 +23,7 @@ static unsigned int frames;   /* frames presented */
 static SDL_Window* window;
 static int pcPadFullscreenKey(void);
 static int pcPadFullscreenButton(void);
+static int title_event(const SDL_Event* ev);
 static SDL_GLContext gl_context;
 static FILE* log_file;
 
@@ -650,6 +651,11 @@ int pcVideoPumpEvents(void)
         {
             toggle_fullscreen();
         }
+
+        if (!title_event(&ev))
+        {
+            return 0;
+        }
     }
 
     return 1;
@@ -700,6 +706,7 @@ void pcVideoPresent(void)
         }
     }
 
+
     SDL_GL_SwapWindow(window);
 
     frames++;
@@ -744,6 +751,7 @@ static const struct { int byte, bit, pressure; } pad_bits[PC_BINDING_PS2_BUTTONS
 static PadMap pad_map[PC_BINDING_COUNT];
 #define PAD_FASTFORWARD PC_BINDING_PS2_BUTTONS
 #define PAD_FULLSCREEN  (PC_BINDING_PS2_BUTTONS + 1)
+#define PAD_TITLE       (PC_BINDING_PS2_BUTTONS + 2)
 
 static void load_bindings(void)
 {
@@ -815,6 +823,107 @@ static int pcPadFullscreenButton(void)
 {
     load_bindings();
     return pad_map[PAD_FULLSCREEN].button;
+}
+
+/* ------------------------------------------------------------------------------------------- */
+/* back to the title screen: the "title" binding (F9), like the PC versions of the classic games.
+ * The game pauses on a black screen asking to confirm; pressing it again confirms, any other key
+ * or button goes back to the game. The game takes the request (pcTitleRequested, from
+ * bhSysCallSndMonitor) and does its own soft reset. */
+
+static unsigned int title_request;   /* SDL ticks of the confirming press, 0 = none */
+
+static int is_title_key(const SDL_Event* ev)
+{
+    load_bindings();
+
+    return ((ev->type == SDL_KEYDOWN) && !ev->key.repeat && (ev->key.keysym.scancode != SDL_SCANCODE_UNKNOWN) &&
+            (ev->key.keysym.scancode == pad_map[PAD_TITLE].key)) ||
+           ((ev->type == SDL_CONTROLLERBUTTONDOWN) && (ev->cbutton.button == pad_map[PAD_TITLE].button));
+}
+
+/* the question on a black screen, the game and its sound held meanwhile; returns 0 when the
+ * window was closed */
+static int title_event(const SDL_Event* ev)
+{
+    extern void pcOverlayNotice(const char* text);
+    extern int pcTitleAllowed(void);
+    SDL_Event e;
+    char text[200];
+    int answer = -1, open = 1;
+
+    if (!is_title_key(ev) || !pcTitleAllowed())
+    {
+        return 1;   /* also: not at the title screen and its menus, nor in a movie */
+    }
+
+    snprintf(text, sizeof(text), "Return to the title screen?\n%s: yes      any other key: no",
+             (pad_map[PAD_TITLE].key != SDL_SCANCODE_UNKNOWN) ? SDL_GetScancodeName(pad_map[PAD_TITLE].key) : "Again");
+    pcOverlayNotice(text);
+    pcAudioPause(1);
+
+    while (answer < 0)
+    {
+        pcOsHeartbeat();   /* paused on purpose, not hung */
+        pcGsPresent();
+        SDL_GL_SwapWindow(window);
+
+        if (!SDL_WaitEventTimeout(&e, 100))
+        {
+            continue;
+        }
+
+        if (e.type == SDL_QUIT)
+        {
+            open = 0;
+            break;
+        }
+
+        if ((e.type == SDL_WINDOWEVENT) && ((e.window.event == SDL_WINDOWEVENT_MOVED) ||
+                                            (e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)))
+        {
+            track_window();
+        }
+
+        if ((e.type == SDL_CONTROLLERDEVICEADDED) || (e.type == SDL_CONTROLLERDEVICEREMOVED))
+        {
+            pcPadInit();
+        }
+
+        if (is_title_key(&e))
+        {
+            answer = 1;
+        }
+        else if (((e.type == SDL_KEYDOWN) && !e.key.repeat) || (e.type == SDL_CONTROLLERBUTTONDOWN))
+        {
+            answer = 0;
+        }
+    }
+
+    pcOverlayNotice(NULL);
+    pcAudioPause(0);
+
+    if (answer == 1)
+    {
+        title_request = SDL_GetTicks() | 1;
+        pcLog("back to the title screen requested");
+    }
+
+    return open;
+}
+
+/* 1 once after the confirming press (the game asks only while a soft reset can be done; a
+ * request it could not take within a second is dropped) */
+int pcTitleRequested(void)
+{
+    if ((title_request == 0) || (SDL_GetTicks() - title_request > 1000))
+    {
+        title_request = 0;
+        return 0;
+    }
+
+    title_request = 0;
+    return 1;
 }
 
 void pcPadInit(void)

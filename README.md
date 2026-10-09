@@ -83,7 +83,8 @@ its window is not active (can be turned off in the settings app).
 
 Keyboard: arrows = move, Z = Cross, X = Square, C = Circle, V = Triangle, A / S = L1 / R1,
 Enter = Start, Backspace = Select, hold Numpad 0 = fast-forward, F11 or Alt+Enter =
-fullscreen on/off. Game controllers are picked up automatically.
+fullscreen on/off, F9 = back to the title screen (pauses and asks; F9 again to confirm). Game
+controllers are picked up automatically.
 
 Saves are written to `build_pc/saves` (copy the folder to back them up).
 
