@@ -1577,6 +1577,14 @@ void DisplayTitleBg()
 
     qp = &Qtex[1];
     
+#ifdef TARGET_PC
+    {
+        /* PC: the build number is shown at the bottom of the title screen (pc_overlay.c) */
+        extern void pcOverlayTitleShown(void);
+
+        pcOverlayTitleShown();
+    }
+#endif
     AdvDwawOnePictureEx(0, 0xFFFFFFFF); 
 
     SetQuadPos(20.0f, 396.0f, 352.0f, 54.0f, qp); 

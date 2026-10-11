@@ -1,20 +1,26 @@
-/* PC port: a notice shown instead of the game picture (the "return to the title screen?"
- * question). The text is drawn with Windows' own font into a bitmap, which the renderer shows
- * in the middle of a black screen (gsRendererPresent). */
+/* PC port: text drawn with Windows' own font into bitmaps that the renderer shows
+ * (gsRendererPresent): a notice instead of the game picture (the "return to the title screen?"
+ * question), and the build number at the bottom of the title screen. */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "../res/version.h"
+
 #pragma comment(lib, "gdi32.lib")
 
-static char notice[256];
+typedef struct {
+    unsigned char* rgba;              /* top row first */
+    int w, h;
+    char text[256];                   /* what it was drawn from */
+    int height;
+} OverlayImage;
 
-static unsigned char* image;
-static int image_w, image_h;
-static char image_text[256];
-static int image_height;
+static char notice[256];
+static OverlayImage notice_image, build_image;
+static int title_frames;              /* presents left that show the build number */
 
 /* shows text (lines separated by \n) until called with NULL */
 void pcOverlayNotice(const char* text)
@@ -22,9 +28,16 @@ void pcOverlayNotice(const char* text)
     snprintf(notice, sizeof(notice), "%s", (text != NULL) ? text : "");
 }
 
-/* draws text white on black, centred, with lines line_h pixels apart, into image (RGBA, top row
- * first) */
-static int render(const char* text, int line_h)
+/* the title screen was drawn this frame (DisplayTitleBg): show the build number for the next
+ * few presents, so it stays up however often the game draws */
+void pcOverlayTitleShown(void)
+{
+    title_frames = 4;
+}
+
+/* draws text centred, with lines line_h pixels apart, into out: white on black, or grey text
+ * premultiplied by its coverage (transparent, for blending over the picture) */
+static int render(OverlayImage* out, const char* text, int line_h, int transparent)
 {
     HDC dc = CreateCompatibleDC(NULL);
     HFONT font, old_font;
@@ -76,17 +89,33 @@ static int render(const char* text, int line_h)
     DrawTextA(dc, text, -1, &rc, DT_CENTER | DT_NOPREFIX);
     GdiFlush();
 
-    free(image);
-    image = malloc(w * height * 4);
+    free(out->rgba);
+    out->rgba = malloc(w * height * 4);
 
-    if (image != NULL)
+    if (out->rgba != NULL)
     {
+        unsigned char* image = out->rgba;
+
         for (i = 0; i < w * height; i++)
         {
-            image[i * 4 + 0] = bits[i * 4 + 2];
-            image[i * 4 + 1] = bits[i * 4 + 1];
-            image[i * 4 + 2] = bits[i * 4 + 0];
-            image[i * 4 + 3] = 255;
+            if (transparent)
+            {
+                /* grey text premultiplied by its coverage (the renderer adds it over the picture,
+                 * so black is see-through) */
+                unsigned char a = (unsigned char)(bits[i * 4 + 1] * 200 / 235);
+
+                image[i * 4 + 0] = a;
+                image[i * 4 + 1] = a;
+                image[i * 4 + 2] = a;
+                image[i * 4 + 3] = a;
+            }
+            else
+            {
+                image[i * 4 + 0] = bits[i * 4 + 2];
+                image[i * 4 + 1] = bits[i * 4 + 1];
+                image[i * 4 + 2] = bits[i * 4 + 0];
+                image[i * 4 + 3] = 255;
+            }
         }
     }
 
@@ -96,9 +125,28 @@ static int render(const char* text, int line_h)
     DeleteObject(font);
     DeleteDC(dc);
 
-    image_w = w;
-    image_h = height;
-    return image != NULL;
+    out->w = w;
+    out->h = height;
+    return out->rgba != NULL;
+}
+
+/* img drawn from text at height, redrawn when either changed */
+static const unsigned char* cached(OverlayImage* img, const char* text, int height, int transparent, int* w, int* h)
+{
+    if ((img->rgba == NULL) || (height != img->height) || (strcmp(img->text, text) != 0))
+    {
+        if (!render(img, text, height, transparent))
+        {
+            return NULL;
+        }
+
+        img->height = height;
+        snprintf(img->text, sizeof(img->text), "%s", text);
+    }
+
+    *w = img->w;
+    *h = img->h;
+    return img->rgba;
 }
 
 /* the notice as an RGBA image (top row first) with lines height pixels apart, or NULL when there
@@ -110,18 +158,17 @@ const unsigned char* pcOverlayImage(int height, int* w, int* h)
         return NULL;
     }
 
-    if ((image == NULL) || (height != image_height) || (strcmp(image_text, notice) != 0))
-    {
-        if (!render(notice, height))
-        {
-            return NULL;
-        }
+    return cached(&notice_image, notice, height, 0, w, h);
+}
 
-        image_height = height;
-        snprintf(image_text, sizeof(image_text), "%s", notice);
+/* "build x.y.z" as a transparent RGBA image while the title screen is showing, else NULL */
+const unsigned char* pcOverlayBuildImage(int height, int* w, int* h)
+{
+    if ((title_frames <= 0) || (height < 8))
+    {
+        return NULL;
     }
 
-    *w = image_w;
-    *h = image_h;
-    return image;
+    title_frames--;
+    return cached(&build_image, "build " RECVX_VERSION_STR, height, 1, w, h);
 }

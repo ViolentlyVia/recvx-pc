@@ -1560,6 +1560,27 @@ void gsRendererPresent(unsigned int dispfb_fbp, unsigned int dispfb_fbw)
     glBufferData(GL_ARRAY_BUFFER, sizeof(q), q, GL_STREAM_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
+    /* the build number at the bottom of the title screen (pc_overlay.c), below the copyright
+     * lines (they end at line 450 of 480) */
+    {
+        extern const unsigned char* pcOverlayBuildImage(int height, int* w, int* h);
+        const unsigned char* img;
+        int ow, oh;
+
+        img = pcOverlayBuildImage(vh / 26, &ow, &oh);
+
+        if ((img != NULL) && (ow <= vw) && (oh <= vh))
+        {
+            /* the present shader writes alpha 1, so blend the premultiplied text as a screen:
+             * text + picture * (1 - text) */
+            glEnable(GL_BLEND);
+            glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
+            glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_COLOR, GL_ZERO, GL_ONE);
+            draw_overlay(img, ow, oh, (vw - ow) / 2, vh * 465 / 480 - oh / 2, vw, vh);
+            glDisable(GL_BLEND);
+        }
+    }
+
     (void)dispfb_fbw;
 }
 
