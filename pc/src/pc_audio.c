@@ -165,7 +165,13 @@ int pcAudioOpenVoice(void)
 
     unlock();
 
-    return (v < MAX_VOICES) ? v : -1;
+    if (v >= MAX_VOICES)
+    {
+        pcLog("audio: all %d mixer voices are in use", MAX_VOICES);
+        return -1;
+    }
+
+    return v;
 }
 
 void pcAudioCloseVoice(int voice)

@@ -25,6 +25,7 @@ static int volume;              /* 0 .. -960 (0.1 dB) */
 static double video_time;       /* time of the newest decoded frame, from the first frame */
 static double base_time;
 static int ended;
+static double audio_fed;        /* seconds of sound queued for the open movie */
 
 void pcMpegClose(void);
 
@@ -52,8 +53,14 @@ int pcMpegOpen(const char* path)
     paused_total = 0;
     video_time = -1;
     ended = 0;
+    audio_fed = 0;
+
+    /* each movie starts at full volume, as with a new Sofdec player on the PS2; the game only
+     * lowers it while fading a skipped movie out, and that must not carry over to the next one */
+    volume = 0;
 
     pcLog("movie: %s (%dx%d, %.1f s)", path, plm_get_width(plm), plm_get_height(plm), plm_get_duration(plm));
+    pcLog("movie: %d audio stream(s), mixer voice %d, volume %d", plm_get_num_audio_streams(plm), voice, volume);
 
     return 1;
 }
@@ -73,6 +80,12 @@ int pcMpegSize(int* w, int* h)
 
 void pcMpegClose(void)
 {
+    if (plm != NULL)
+    {
+        pcLog("movie: closed after %.1f s, %.1f s of sound queued, volume %d", pcOsTime() - start_time - paused_total,
+              audio_fed, volume);
+    }
+
     if (voice >= 0)
     {
         pcAudioCloseVoice(voice);
@@ -129,6 +142,7 @@ static void feed_audio(double ahead)
         }
 
         pcAudioQueue(voice, left, right, (int)s->count, rate, volume, -15, 15);
+        audio_fed += (double)s->count / rate;
     }
 }
 
