@@ -378,6 +378,7 @@ static void pc_snap_uv(unsigned int* v, unsigned int num)
 }
 
 int pcWide2DUnclipped;   /* widescreen: 2D drawn into the side areas on purpose (backgrounds) */
+int pcWide2DFullWidth;   /* widescreen: full-width 2D that covers the picture (screen filters) */
 int pcWide2DTrimRight;   /* widescreen: leave out the piece's last texel column (a screen-edge border) */
 
 /* widescreen: clip a 2D rectangle (sprite, or quad with two distinct x values) to the 4:3
@@ -565,7 +566,7 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
 
             if ((x0 <= 1728.0f + 1.0f) && (x1 >= 2368.0f - 1.0f))
             {
-                if (!(prim & 0x8000000000000) ||
+                if (pcWide2DFullWidth || !(prim & 0x8000000000000) ||
                     ((prim & 0x20000000000000) && (y0 <= 1808.0f + 1.0f) && (y1 >= 2288.0f - 1.0f)))
                 {
                     wide_2d = 1.0f;
