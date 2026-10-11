@@ -21,7 +21,8 @@
  * Each sample's SPU attribute byte routes its voice dry and/or into the reverb of SPU core 0 or 1;
  * reverb (cmd 0x44) emulates the SPU reverberator with the Hall preset, the only one the game uses.
  *
- * Debug: RECVX_SNDLOG=1 logs sequence starts and reverb changes, RECVX_SEDUMP=<file> dumps the mix.
+ * Debug: RECVX_SNDLOG=1 logs sequence starts (and ones not found), sequence uploads and reverb changes,
+ * RECVX_SEDUMP=<file> dumps the mix.
  */
 #include <math.h>
 #include <stdio.h>
@@ -46,7 +47,7 @@
 #define SE_PORTS     5
 #define SE_CHANNELS  16
 #define MIDI_BANKS   4
-#define MIDI_PORTS   8
+#define MIDI_PORTS   10       /* sdMidiPlay rotates the door sound slot through ports 2, 8 and 9 */
 #define MAX_VOICES   48
 
 typedef struct {
@@ -616,6 +617,11 @@ typedef struct {
     int program[16], volume[16], pan[16], bend[16];
     float port_vol;
     int port_pan, port_pitch;
+    int nrpn;                     /* last NRPN number (CC 99): 0 loop start, 1 loop end */
+    int loop_set;                 /* a loop start was seen */
+    unsigned int loop_pos;        /* read position just after the loop start event */
+    int loop_running, loop_implied;
+    int loops_done;
 } MidiPort;
 
 static MidiPort midi[MIDI_PORTS];
@@ -686,6 +692,7 @@ static void midi_play(int port, int bank, int vol, int seq)
 
     if ((bank >= MIDI_BANKS) || (sq->data == NULL) || (sq->size < 0x40))
     {
+        if (getenv("RECVX_SNDLOG")) pcLog("snd: midi port %d bank %d seq %d: no sequence data for that bank", port, bank, seq);
         return;
     }
 
@@ -695,6 +702,8 @@ static void midi_play(int port, int bank, int vol, int seq)
 
     if ((block == 0xFFFFFFFF) || (block + 8 > sq->size))
     {
+        if (getenv("RECVX_SNDLOG")) pcLog("snd: midi port %d bank %d seq %d: sequence not in the bank (%u in it)", port, bank, seq,
+                                          (chunk + 16 <= sq->size) ? rd32(sq->data + chunk + 12) + 1 : 0);
         return;
     }
 
@@ -703,6 +712,7 @@ static void midi_play(int port, int bank, int vol, int seq)
     memset(m, 0, sizeof(*m));
     m->active = 1;
     m->bank = bank;
+    m->nrpn = -1;
     m->data = sq->data + block + rd32(sq->data + block);
     m->len = (end > block + rd32(sq->data + block)) ? end - (block + rd32(sq->data + block)) : 0;
     m->division = rd16(sq->data + block + 4);
@@ -726,11 +736,13 @@ static void midi_play(int port, int bank, int vol, int seq)
 }
 
 /* Sony's compressed MIDI: note-off has no velocity; a last data byte with bit 7 set means the
- * next event follows with no delta time. */
+ * next event follows with no delta time. Loops are marked with NRPN: CC 99 = 0 then data entry
+ * (CC 6) marks the loop start, CC 99 = 1 then CC 6 = count (0 = forever) the loop end. Looping
+ * room sounds (alarms, machinery) rely on them. */
 static void midi_event(int port)
 {
     MidiPort* m = &midi[port];
-    int status_byte, ch, implied = 0;
+    int status_byte, ch, implied = 0, jump = 0;
     unsigned char a = 0, b = 0;
 
     if (m->pos >= m->len)
@@ -847,6 +859,22 @@ static void midi_event(int port)
 
             if (a == 7) m->volume[ch] = b;
             if (a == 10) m->pan[ch] = b;
+            if (a == 99) m->nrpn = b;
+
+            if ((a == 6) && (m->nrpn == 0))
+            {
+                m->loop_set = 1;
+                m->loop_pos = m->pos;
+                m->loop_running = m->running;
+                m->loop_implied = implied;
+                m->loops_done = 0;
+            }
+            else if ((a == 6) && (m->nrpn == 1) && m->loop_set && ((b == 0) || (++m->loops_done < b)))
+            {
+                jump = 1;
+            }
+
+            if (a == 6) m->nrpn = -1;
             break;
         case 0xC0:
             a = m->data[m->pos++];
@@ -868,6 +896,14 @@ static void midi_event(int port)
             midi_stop(port);
             return;
         }
+    }
+
+    /* loop end: go on from just after the loop start event, with its delta time */
+    if (jump)
+    {
+        m->pos = m->loop_pos;
+        m->running = m->loop_running;
+        implied = m->loop_implied;
     }
 
     m->wait += implied ? 0 : read_vlq(m) * m->samples_per_tick;
@@ -1447,6 +1483,15 @@ static void request_rpc(unsigned int fno, void* send, int ssize, void* receive, 
 
                 midi_sq[port].size = 0;
                 blob_store(&midi_sq[port], DATA_ADDR, 0, size);
+
+                if (getenv("RECVX_SNDLOG"))
+                {
+                    const Blob* sq = &midi_sq[port];
+                    u_int chunk = (sq->size >= 0x40) ? rd32(sq->data + 0x10 + 0x14) : 0xFFFFFFFF;
+
+                    pcLog("snd: sequences for bank %d: %u bytes, %u blocks", port, size,
+                          ((chunk != 0xFFFFFFFF) && (chunk + 16 <= sq->size)) ? rd32(sq->data + chunk + 12) + 1 : 0);
+                }
             }
         }
         else if (cd == 0x42)

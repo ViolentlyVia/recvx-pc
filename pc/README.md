@@ -83,7 +83,7 @@ Environment variables for testing:
 | `RECVX_GSDUMP=<frame>` | log every GS draw of that frame |
 | `RECVX_DATA`, `RECVX_ISO`, `RECVX_SAVES`, `RECVX_HDTEX` | override the `recvx.ini` paths |
 | `RECVX_SEDUMP=<file>` | write the sound effect mix as raw 16-bit stereo 48 kHz |
-| `RECVX_SNDLOG=1` | log sound sequence starts and reverb changes |
+| `RECVX_SNDLOG=1` | log sound sequence starts, rejected sequences, sequence uploads and reverb changes |
 | `RECVX_MCLOG=1` | log save-folder (memory card) calls |
 
 ## Tools
