@@ -1427,7 +1427,19 @@ void bhDraw138(O_WRK* op)
     p[3].x = 0;
     p[3].y = 480.0f;
     
+#ifdef TARGET_PC
+    {
+        /* PC: the panel is 4:3 art (translucent, so the widescreen rule would take it for a
+         * screen filter and stretch it): keep it 4:3 under the gauges, fills and digits */
+        extern int pcWide2DKeep43;
+
+        pcWide2DKeep43 = 1;
+        njDrawPolygon2D(&p2c, 4, -3.0f, 0x80000060);
+        pcWide2DKeep43 = 0;
+    }
+#else
     njDrawPolygon2D(&p2c, 4, -3.0f, 0x80000060);
+#endif
     
     njTextureFilterMode(0);
     
