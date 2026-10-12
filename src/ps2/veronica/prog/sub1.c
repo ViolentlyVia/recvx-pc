@@ -7886,18 +7886,21 @@ void ItemBoxChange(S_WORK* st, unsigned short ibcsr)
 
     if ((itemdata[id2].type & 0x100)) 
     {
-        if (lt_c == 1) 
+        if (lt_c == 1)
         {
-            if (bmax >= 2) 
+            if (bmax >= 2)
             {
                 lt_c3 = max + 1;
                 lt_c2 = lt_c;
-                
+
+#ifdef TARGET_PC
+                itemid2 = itemid3;   /* the box item goes to the slot after the list (see below) */
+#endif
                 itemid3 = 0;
-                
+
                 chk2 = 1;
             }
-        } 
+        }
         else 
         {
             if ((itemdata[id1].type & 0x100)) 
@@ -7919,35 +7922,61 @@ void ItemBoxChange(S_WORK* st, unsigned short ibcsr)
     } 
     else 
     {
-        if (lt_c == 1) 
+        if (lt_c == 1)
         {
-            if ((id2 != standard[sys->ply_id][0]) && (id2 != standard[sys->ply_id][1])) 
+            if ((id2 != standard[sys->ply_id][0]) && (id2 != standard[sys->ply_id][1]))
             {
-                if ((bmax >= 1) || (!id2)) 
+#ifdef TARGET_PC
+                /* as the PS2 code: with room in the list the box item goes after it; with no
+                 * room only an empty box slot can be swapped with the standard slot */
+                if (bmax >= 1)
                 {
                     lt_c3 = max + 1;
                     lt_c2 = lt_c;
-                    
+
+                    itemid2 = itemid3;
                     itemid3 = 0;
-                    
+
                     chk2 = 1;
                 }
-            } 
-            else 
+                else if (!id2)
+                {
+                    chk2 = 1;
+                }
+#else
+                if ((bmax >= 1) || (!id2))
+                {
+                    lt_c3 = max + 1;
+                    lt_c2 = lt_c;
+
+                    itemid3 = 0;
+
+                    chk2 = 1;
+                }
+#endif
+            }
+            else
             {
                 chk2 = 1;
             }
-        } 
-        else 
+        }
+        else
         {
             chk2 = 1;
-            
-            if ((id2 == standard[sys->ply_id][0]) || (id2 == standard[sys->ply_id][1])) 
+
+            if ((id2 == standard[sys->ply_id][0]) || (id2 == standard[sys->ply_id][1]))
             {
                 lt_c3 = lt_c;
                 lt_c2 = 1;
-                
+
+#ifdef TARGET_PC
+                /* a standard item (lighter) taken out onto another slot goes to the standard
+                 * slot, the cursor slot's item into the box, and the cursor slot is left empty:
+                 * the PS2 code goes ahead with this (the decompiled chk2 = 0 refused it) */
+                itemid2 = 0;
+#else
                 chk2 = 0;
+#endif
             }
         }
     }
@@ -7995,12 +8024,60 @@ void ItemBoxChange(S_WORK* st, unsigned short ibcsr)
         st->bxp[ibcsr] = st->pip[lt_c];
         st->pip[num1]  = itemid3;
 
-        if (lt_c3) 
+#ifdef TARGET_PC
+        /* PC port: this part follows the PS2 code (the decompile of this function is unreliable).
+         * Storing an item from above the equipped weapon (into an empty box slot, or swapping it
+         * for a standard item) moves the equipped slot up by one, as the list closes up; the
+         * decompiled version only did that when the box item was a standard one. The equipped
+         * slot then pointed at the wrong item: storing the weapon later did not unequip it, and
+         * it stayed in the player's hand, usable, while in the box. */
+        if (lt_c3)
+        {
+            st->pip[lt_c3] = itemid2;
+        }
+
+        if (*st->pip > 1)
+        {
+            if (itemid1 != 1)
+            {
+                if ((!id2) || (id2 == standard[sys->ply_id][0]) || (id2 == standard[sys->ply_id][1]))
+                {
+                    if (itemid1 < *st->pip)
+                    {
+                        *st->pip -= 1;
+                    }
+                }
+                else if (id1)
+                {
+                    if ((itemdata[id2].type & 0x100))
+                    {
+                        if ((!(itemdata[id1].type & 0x100)) && (!(itemdata[arms].type & 0x100)) && (*st->pip < itemid1))
+                        {
+                            *st->pip += 1;
+                        }
+                    }
+                    else if (((itemdata[id1].type & 0x100)) && (itemid1 < *st->pip) && ((itemdata[arms].type & 0x100)))
+                    {
+                        *st->pip -= 1;
+                    }
+                }
+                else if (((itemdata[id2].type & 0x100)) && (!(itemdata[arms].type & 0x100)))
+                {
+                    *st->pip += 1;
+                }
+            }
+            else if ((itemdata[id2].type & 0x100) && (!(itemdata[(st->pip[*st->pip] >> 16) & 0xFF].type & 0x100)))
+            {
+                *st->pip += 1;
+            }
+        }
+#else
+        if (lt_c3)
         {
             st->pip[lt_c3] = 2;
         }
 
-        if (*st->pip > 1) 
+        if (*st->pip > 1)
         {
             if (itemid1 != 1) 
             {
@@ -8033,10 +8110,11 @@ void ItemBoxChange(S_WORK* st, unsigned short ibcsr)
                 }
             }
         } 
-        else if ((*st->pip > 1) && (itemid1 == 1) && ((itemdata[id2].type & 0x100))) 
+        else if ((*st->pip > 1) && (itemid1 == 1) && ((itemdata[id2].type & 0x100)))
         {
             *st->pip += 1;
         }
+#endif
 
         if ((itemid1 != 1) && ((st->listcsr_0 > sakai) || (((st->listcsr_2 & 0x1)) && (st->listcsr_0 == (sakai - 1))))) 
         {
