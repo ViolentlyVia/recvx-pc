@@ -33,6 +33,7 @@
 #include "pc_platform.h"
 #include "pc_iop.h"
 #include "pc_audio.h"
+#include "pc_spu_gauss.h"
 
 /* IOP memory layout used by this driver */
 #define STATUS_ADDR 0x1000    /* SND_STATUS */
@@ -119,7 +120,8 @@ typedef struct {
     short block[28];
     int block_pos;
     int hist1, hist2;
-    unsigned int frac;                /* 16.16 position within the decoded block */
+    unsigned int frac;                /* 16.16 position between the last two samples */
+    short hist[4];                    /* the 4 most recent samples, newest last */
     unsigned int step;                /* 16.16 source samples per output sample */
     double base_step;
     int bend_up, bend_down;           /* bend range in 1/128 semitone */
@@ -959,7 +961,7 @@ static const unsigned short rev_hall[32] = {
 typedef struct {
     int mode;
     float depth;                      /* output volume (EVOL) */
-    short buf[REV_HALL_SIZE];
+    float buf[REV_HALL_SIZE];         /* float, not the SPU's 16 bits: see rev_write */
     int pos;
     float in_l, in_r;                 /* input of the current tick */
     float out_l, out_r, prev_l, prev_r;
@@ -974,16 +976,19 @@ static float rev_vol(int reg)
 }
 
 /* work area sample at register offset reg (in 8-byte units) plus delta samples */
-static short* rev_at(Reverb* rv, int reg, int delta)
+static float* rev_at(Reverb* rv, int reg, int delta)
 {
     int i = (rv->pos + rev_hall[reg] * 4 + delta) % REV_HALL_SIZE;
 
     return &rv->buf[(i < 0) ? i + REV_HALL_SIZE : i];
 }
 
+/* The SPU saturates its 16-bit work area, but its voices reach it at about half the level of
+ * this driver's (SPU voice volume tops out near 0.5), so here the summed input often went past
+ * 16 bits; clamping inside the feedback loops crackled. The work area is float instead. */
 static void rev_write(Reverb* rv, int reg, float x)
 {
-    *rev_at(rv, reg, 0) = (short)((x > 32767) ? 32767 : (x < -32768) ? -32768 : x);
+    *rev_at(rv, reg, 0) = x;
 }
 
 static float rev_read(Reverb* rv, int reg)
@@ -1149,16 +1154,31 @@ static void render(void)
                 continue;
             }
 
-            while ((v->block_pos >= 28) && v->active)
+            /* take in the source samples the pitch counter has passed */
+            while ((v->frac >= 0x10000) && v->active)
             {
-                if (v->addr == 0xFFFFFFFF)
+                while ((v->block_pos >= 28) && v->active)
                 {
-                    voice_free(v);
+                    if (v->addr == 0xFFFFFFFF)
+                    {
+                        voice_free(v);
+                        break;
+                    }
+
+                    decode_block(v);
+                    v->block_pos -= 28;
+                }
+
+                if (!v->active)
+                {
                     break;
                 }
 
-                decode_block(v);
-                v->block_pos -= 28;
+                v->hist[0] = v->hist[1];
+                v->hist[1] = v->hist[2];
+                v->hist[2] = v->hist[3];
+                v->hist[3] = v->block[v->block_pos++];
+                v->frac -= 0x10000;
             }
 
             if (!v->active)
@@ -1174,7 +1194,15 @@ static void render(void)
                 continue;
             }
 
-            s = v->block[v->block_pos] * (v->env / 32767.0f);
+            /* the SPU's 4-point interpolation between the last samples (nearest-sample playback
+             * turned pitched-down sounds into steps that crackled) */
+            {
+                int g = (v->frac >> 8) & 0xFF;
+                int x = ((spu_gauss[0xFF - g] * v->hist[0]) >> 15) + ((spu_gauss[0x1FF - g] * v->hist[1]) >> 15) +
+                        ((spu_gauss[0x100 + g] * v->hist[2]) >> 15) + ((spu_gauss[g] * v->hist[3]) >> 15);
+
+                s = x * (v->env / 32767.0f);
+            }
 
             {
                 int attr = v->spu_attr, core = (attr & SPU_ATTR_CORE1) ? 1 : 0;
@@ -1192,8 +1220,6 @@ static void render(void)
             }
 
             v->frac += v->step;
-            v->block_pos += v->frac >> 16;
-            v->frac &= 0xFFFF;
         }
 
         reverb_sample(&reverb[0], wet[0][0], wet[0][1], &l, &r);
