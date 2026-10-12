@@ -332,6 +332,17 @@ void bhSysCallWarning()
     
     if (Adv_FirstWarningMessage() != 0)
     { 
+#ifdef TARGET_PC
+        /* skip_intro=1: no Capcom logo and opening movie at startup, straight to the title (the
+         * title screen's own demo loop still shows them) */
+        extern int pcIniGetInt(const char* key, int def);
+
+        if (pcIniGetInt("skip_intro", 0) != 0)
+        {
+            sys->tk_flg = 0x300008;
+            return;
+        }
+#endif
         sys->tk_flg = 0x300004; 
     }
 } 
@@ -561,6 +572,22 @@ void bhCheckSubTask()
 {
     if ((!(sys->ss_flg & 0x80000000)) && (!(sys->st_flg & 0x1C040008)) && (!(sys->cb_flg & 0x3)) && ((sys->ts_flg & 0x1000)))
     { 
+#ifdef TARGET_PC
+        {
+            /* PC debug: save anywhere (F5 with debug_save=1). The typewriter's event script sets
+             * 0x200000 after the ink ribbon question; set it here, only while the player could
+             * open the status screen, and the save screen opens as at a typewriter. */
+            extern int pcSaveAnywhereRequested(void);
+            extern void pcLog(const char* fmt, ...);
+
+            if ((plp->mode0 == 1) && !(plp->flg & 0x6) && !(sys->st_flg & 0x4) && !(sys->cb_flg & 0x4) &&
+                pcSaveAnywhereRequested())
+            {
+                sys->cb_flg |= 0x200000;
+                pcLog("save anywhere: opening the save screen");
+            }
+        }
+#endif
         if (((plp->flg & 0x6)) && (!(sys->cb_flg & 0x4))) 
         {
             return; 

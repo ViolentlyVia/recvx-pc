@@ -103,12 +103,14 @@ Optional, next to `recvx.exe`, one `key=value` per line (the settings app writes
 | `iso=` | disc image to run from instead of extracted data |
 | `saves=` | save folder (default: `saves` next to the exe) |
 | `hd_textures=` | folder of a PCSX2 texture replacement pack (`.dds` files) |
+| `debug_save=1` | debug: the "Save anywhere" key (F5) opens the typewriter's save screen anywhere in normal play, without an ink ribbon |
 | `scale=` | internal resolution multiplier, 1 to 8 (default 3: 1920x1440 at 4:3) |
 | `aspect=` | display aspect, e.g. `16:9` or `21:9` (default `4:3`) |
 | `window=` | window size, e.g. `1920x1080` (default: 960 pixels high at the chosen aspect) |
 | `fullscreen=` | `1` for exclusive fullscreen at the window size, `desktop` for borderless (default `0`) |
 | `pause_unfocused=` | `0` keeps the game running while its window is not active (default `1`) |
 | `movies_hd=` | `0` plays the original movies even when upscaled ones exist (default `1`) |
+| `skip_intro=` | `1` starts at the title screen, without the warning screens, Capcom logo and opening movie (default `0`) |
 | `skip_doors=` | `1` lets OK / Attack (Cross or Square) skip the door animations (default `0`) |
 | `window_pos=`, `window_max=` | written by the game: where the window was left, and if it was maximized |
 | `key_<action>=` | keyboard key, by its SDL name (`Z`, `Return`, `Left Shift`, `Keypad 0`, `none`) |

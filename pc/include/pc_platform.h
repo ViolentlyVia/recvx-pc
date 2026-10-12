@@ -4,6 +4,7 @@
 #include "pc_kernel.h"
 
 void pcLog(const char* fmt, ...);
+void pcLogFlush(void);
 void pcPlatformFatal(const char* fmt, ...);
 /* The game files are missing: offer to open recvx-config.exe to set the game up, then quit. */
 void pcPlatformNotSetUp(void);

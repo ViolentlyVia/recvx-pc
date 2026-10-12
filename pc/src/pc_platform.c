@@ -25,10 +25,141 @@ static SDL_Window* window;
 static int pcPadFullscreenKey(void);
 static int pcPadFullscreenButton(void);
 static int title_event(const SDL_Event* ev);
+static void save_event(const SDL_Event* ev);
+static void save_tick(void);
 static void fps_tick(void);
 static void update_title(int force);
 static SDL_GLContext gl_context;
 static FILE* log_file;
+
+/* ------------------------------------------------------------------------------------------- */
+/* file output on a thread of its own: recvx.log and the input recording are written there, so a
+ * write that blocks (OneDrive or a virus scanner holding the file, a slow disk) never holds up a
+ * frame. Writes to one file stay in order. */
+
+typedef struct
+{
+    FILE* f;
+    char* buf;
+    size_t len, cap;
+} OutQueue;
+
+static SDL_mutex* out_lock;
+static SDL_cond* out_wake;
+static OutQueue out_q[2];   /* 0 = log, 1 = input recording */
+static int out_busy;
+
+static int out_thread(void* param)
+{
+    (void)param;
+
+    for (;;)
+    {
+        int i;
+
+        SDL_LockMutex(out_lock);
+
+        while ((out_q[0].len == 0) && (out_q[1].len == 0))
+        {
+            SDL_CondWait(out_wake, out_lock);
+        }
+
+        out_busy = 1;
+
+        for (i = 0; i < 2; i++)
+        {
+            OutQueue* q = &out_q[i];
+
+            if (q->len != 0)
+            {
+                char* buf = q->buf;
+                size_t len = q->len;
+                FILE* f = q->f;
+
+                q->buf = NULL;
+                q->len = q->cap = 0;
+                SDL_UnlockMutex(out_lock);
+
+                fwrite(buf, 1, len, f);
+                fflush(f);
+                free(buf);
+
+                SDL_LockMutex(out_lock);
+            }
+        }
+
+        out_busy = 0;
+        SDL_UnlockMutex(out_lock);
+    }
+}
+
+static void out_write(int which, FILE* f, const char* text, size_t len)
+{
+    OutQueue* q = &out_q[which];
+
+    if (out_lock == NULL)
+    {
+        out_lock = SDL_CreateMutex();
+        out_wake = SDL_CreateCond();
+        SDL_DetachThread(SDL_CreateThread(out_thread, "file output", NULL));
+        atexit(pcLogFlush);
+    }
+
+    SDL_LockMutex(out_lock);
+
+    if (q->len + len > q->cap)
+    {
+        size_t cap = (q->cap != 0) ? q->cap : 4096;
+        char* buf;
+
+        while (q->len + len > cap)
+        {
+            cap *= 2;
+        }
+
+        if ((buf = (char*)realloc(q->buf, cap)) == NULL)
+        {
+            SDL_UnlockMutex(out_lock);
+            return;
+        }
+
+        q->buf = buf;
+        q->cap = cap;
+    }
+
+    q->f = f;
+    memcpy(q->buf + q->len, text, len);
+    q->len += len;
+    SDL_CondSignal(out_wake);
+    SDL_UnlockMutex(out_lock);
+}
+
+/* waits (at most 3 seconds) until everything queued is in the files: before exiting, and on crashes */
+void pcLogFlush(void)
+{
+    Uint32 start = SDL_GetTicks();
+
+    if (out_lock == NULL)
+    {
+        return;
+    }
+
+    while (SDL_GetTicks() - start < 3000)
+    {
+        int done;
+
+        SDL_LockMutex(out_lock);
+        done = (out_q[0].len == 0) && (out_q[1].len == 0) && !out_busy;
+        SDL_UnlockMutex(out_lock);
+
+        if (done)
+        {
+            break;
+        }
+
+        SDL_Delay(5);
+    }
+}
 
 /* ------------------------------------------------------------------------------------------- */
 /* logging */
@@ -58,11 +189,20 @@ void pcLog(const char* fmt, ...)
 
     if (log_file != NULL)
     {
+        char line[4096];
+        int n;
+
         va_start(ap, fmt);
-        vfprintf(log_file, fmt, ap);
+        n = vsnprintf(line, sizeof(line) - 1, fmt, ap);
         va_end(ap);
-        fprintf(log_file, "\n");
-        fflush(log_file);
+
+        if ((n < 0) || (n > (int)sizeof(line) - 2))
+        {
+            n = (int)strlen(line);
+        }
+
+        line[n++] = '\n';
+        out_write(0, log_file, line, (size_t)n);
     }
 }
 
@@ -76,6 +216,7 @@ void pcPlatformFatal(const char* fmt, ...)
     va_end(ap);
 
     pcLog("FATAL: %s", msg);
+    pcLogFlush();
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Resident Evil Code: Veronica X", msg, window);
     exit(1);
 }
@@ -655,6 +796,8 @@ int pcVideoPumpEvents(void)
             toggle_fullscreen();
         }
 
+        save_event(&ev);
+
         if (!title_event(&ev))
         {
             return 0;
@@ -739,6 +882,7 @@ void pcVideoPresent(void)
     }
 
     frames++;
+    save_tick();
 
     if (SDL_GetTicks() - last_report >= 5000)
     {
@@ -801,6 +945,7 @@ static PadMap pad_map[PC_BINDING_COUNT];
 #define PAD_FASTFORWARD PC_BINDING_PS2_BUTTONS
 #define PAD_FULLSCREEN  (PC_BINDING_PS2_BUTTONS + 1)
 #define PAD_TITLE       (PC_BINDING_PS2_BUTTONS + 2)
+#define PAD_SAVE        (PC_BINDING_PS2_BUTTONS + 3)
 
 static void load_bindings(void)
 {
@@ -966,14 +1111,26 @@ static int title_event(const SDL_Event* ev)
 
 static int title_fps;
 
+static const char* title_notice;     /* shown in the title bar for a few seconds */
+static unsigned int title_notice_until;
+
+static void title_notice_show(const char* text)
+{
+    title_notice = text;
+    title_notice_until = SDL_GetTicks() + 4000;
+    update_title(0);
+}
+
 static void update_title(int force)
 {
     extern int pcFastForward;
-    static char shown[128];
-    char text[128];
+    static char shown[192];
+    char text[192];
+    int notice = (title_notice != NULL) && ((int)(title_notice_until - SDL_GetTicks()) > 0);
 
-    snprintf(text, sizeof(text), "Resident Evil Code: Veronica X  [%d FPS]%s", title_fps,
-             pcFastForward ? "  [FAST FORWARD]" : "");
+    snprintf(text, sizeof(text), "Resident Evil Code: Veronica X  [%d FPS]%s%s%s%s", title_fps,
+             pcFastForward ? "  [FAST FORWARD]" : "", notice ? "  [" : "", notice ? title_notice : "",
+             notice ? "]" : "");
 
     if (force || (strcmp(text, shown) != 0))
     {
@@ -1002,6 +1159,64 @@ static void fps_tick(void)
         since = now;
         update_title(0);
     }
+}
+
+/* save anywhere (debug, debug_save=1 in recvx.ini): the "save" binding (F5) opens the
+ * typewriter's save screen without a typewriter or an ink ribbon. The game takes the request
+ * (pcSaveAnywhereRequested, from bhCheckSubTask) only while the player could open the status
+ * screen; a request it could not take within a second is dropped. */
+
+static unsigned int save_request;    /* SDL ticks of the press, 0 = none */
+
+static void save_event(const SDL_Event* ev)
+{
+    static int enabled = -1;
+
+    if (enabled < 0)
+    {
+        enabled = pcIniGetInt("debug_save", 0) != 0;
+    }
+
+    load_bindings();
+
+    if (((ev->type == SDL_KEYDOWN) && !ev->key.repeat && (ev->key.keysym.scancode != SDL_SCANCODE_UNKNOWN) &&
+         (ev->key.keysym.scancode == pad_map[PAD_SAVE].key)) ||
+        ((ev->type == SDL_CONTROLLERBUTTONDOWN) && (ev->cbutton.button == pad_map[PAD_SAVE].button)))
+    {
+        if (!enabled)
+        {
+            title_notice_show("Save anywhere is off: turn it on in recvx-config.exe");
+            pcLog("save anywhere key pressed, but debug_save is off");
+            return;
+        }
+
+        save_request = SDL_GetTicks() | 1;
+        pcLog("save anywhere requested");
+    }
+}
+
+/* once per frame: a request the game did not take within a second is dropped, and the player
+ * is told (cutscenes, doors, menus and enemy grabs do not allow it) */
+static void save_tick(void)
+{
+    if ((save_request != 0) && (SDL_GetTicks() - save_request > 1000))
+    {
+        save_request = 0;
+        title_notice_show("Save anywhere: not possible right now");
+        pcLog("save anywhere: not taken (not in normal play within a second)");
+    }
+}
+
+/* 1 once after the press, if it was within the last second */
+int pcSaveAnywhereRequested(void)
+{
+    if ((save_request == 0) || (SDL_GetTicks() - save_request > 1000))
+    {
+        return 0;
+    }
+
+    save_request = 0;
+    return 1;
 }
 
 /* 1 once after the confirming press (the game asks only while a soft reset can be done; a
@@ -1140,8 +1355,10 @@ static void pcPadRecordReplay(unsigned char* r)
 
         if ((buttons != last_buttons) || (axes != last_axes))
         {
-            fprintf(f, "%u %04x %u %u %u %u\n", frames, buttons, r[4], r[5], r[6], r[7]);
-            fflush(f);
+            char line[64];
+            int n = snprintf(line, sizeof(line), "%u %04x %u %u %u %u\n", frames, buttons, r[4], r[5], r[6], r[7]);
+
+            out_write(1, f, line, (size_t)n);
             last_buttons = buttons;
             last_axes = axes;
         }

@@ -1331,6 +1331,20 @@ int Adv_FirstWarningMessage()
             SetAdjustDisplay(); 
         }
 
+#ifdef TARGET_PC
+        {
+            /* skip_intro=1: the setup above (font, system data, options) is done; the two
+             * warning pictures are left out */
+            extern int pcIniGetInt(const char* key, int def);
+
+            if (pcIniGetInt("skip_intro", 0) != 0)
+            {
+                ap->Mode = -1;
+                break;
+            }
+        }
+#endif
+
         RequestAdvFade(2, GetSamurai(50)); 
         
         ap->Count = 0; 

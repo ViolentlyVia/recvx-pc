@@ -98,6 +98,7 @@ void pcOsSleep(double seconds)
 /* diagnostics: stack traces on crashes and when the game stops presenting frames */
 
 #include <dbghelp.h>
+#include <stdarg.h>
 #include <stdio.h>
 
 #pragma comment(lib, "dbghelp.lib")
@@ -108,6 +109,32 @@ static volatile LONG watchdog_reported;
 static CRITICAL_SECTION sym_lock;
 
 void pcLog(const char* fmt, ...);
+void pcLogFlush(void);
+
+/* the watchdog walks the main thread's stack while that thread is suspended: it may hold the
+ * heap or the log's lock then, so the lines are collected here and logged after it resumes */
+static char stack_text[8192];
+static size_t stack_len;
+static int stack_collect;
+
+static void stack_line(const char* fmt, ...)
+{
+    va_list ap;
+    char line[512];
+
+    va_start(ap, fmt);
+    vsnprintf(line, sizeof(line), fmt, ap);
+    va_end(ap);
+
+    if (!stack_collect)
+    {
+        pcLog("%s", line);
+    }
+    else if (stack_len + strlen(line) + 2 < sizeof(stack_text))
+    {
+        stack_len += (size_t)snprintf(stack_text + stack_len, sizeof(stack_text) - stack_len, "%s\n", line);
+    }
+}
 
 static void print_stack(HANDLE thread, CONTEXT* ctx, const char* why)
 {
@@ -125,7 +152,7 @@ static void print_stack(HANDLE thread, CONTEXT* ctx, const char* why)
     frame.AddrStack.Offset = ctx->Esp;
     frame.AddrStack.Mode = AddrModeFlat;
 
-    pcLog("---- %s ----", why);
+    stack_line("---- %s ----", why);
 
     for (depth = 0; depth < 40; depth++)
     {
@@ -149,16 +176,16 @@ static void print_stack(HANDLE thread, CONTEXT* ctx, const char* why)
         {
             if (SymGetLineFromAddr64(process, frame.AddrPC.Offset, &ldisp, &line))
             {
-                pcLog("  %s  %s:%lu", sym->Name, line.FileName, line.LineNumber);
+                stack_line("  %s  %s:%lu", sym->Name, line.FileName, line.LineNumber);
             }
             else
             {
-                pcLog("  %s+0x%llx", sym->Name, disp);
+                stack_line("  %s+0x%llx", sym->Name, disp);
             }
         }
         else
         {
-            pcLog("  0x%08llx", frame.AddrPC.Offset);
+            stack_line("  0x%08llx", frame.AddrPC.Offset);
         }
     }
 
@@ -190,6 +217,8 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep)
         }
     }
 
+    pcLogFlush();
+
     /* tell the player instead of just vanishing (scripted test runs stay unattended) */
     if ((getenv("RECVX_INPUT") == NULL) && (getenv("RECVX_REPLAY") == NULL))
     {
@@ -211,7 +240,7 @@ static DWORD WINAPI watchdog(LPVOID param)
 
     for (;;)
     {
-        Sleep(1000);
+        Sleep(250);
 
         if (heartbeat != last)
         {
@@ -220,22 +249,33 @@ static DWORD WINAPI watchdog(LPVOID param)
             continue;
         }
 
-        if ((++stalled == 5) && !watchdog_reported)
+        /* checked 4 times a second: a stall of 2 seconds logs the main thread's stack */
+        if ((++stalled == 8) && !watchdog_reported)
         {
             CONTEXT ctx;
 
             watchdog_reported = 1;
 
+            stack_len = 0;
+            stack_text[0] = 0;
+            stack_collect = 1;
             SuspendThread(main_thread);
             memset(&ctx, 0, sizeof(ctx));
             ctx.ContextFlags = CONTEXT_FULL;
 
             if (GetThreadContext(main_thread, &ctx))
             {
-                print_stack(main_thread, &ctx, "watchdog: no frame presented for 5 seconds");
+                print_stack(main_thread, &ctx, "watchdog: no frame presented for 2 seconds");
             }
 
             ResumeThread(main_thread);
+            stack_collect = 0;
+
+            if (stack_len != 0)
+            {
+                stack_text[stack_len - 1] = 0;   /* pcLog adds the last line break */
+                pcLog("%s", stack_text);
+            }
         }
     }
 }

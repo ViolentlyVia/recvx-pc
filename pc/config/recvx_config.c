@@ -261,11 +261,13 @@ enum {
     ID_HD, ID_HD_BROWSE, ID_SAVES, ID_SAVES_BROWSE,
     ID_RESET, ID_SAVE, ID_PLAY, ID_CLOSE, ID_SETUP, ID_PAUSE, ID_UPSCALE, ID_MOVIES_HD,
     ID_SKIP_DOORS,
+    ID_SAVE_ANYWHERE,
+    ID_SKIP_INTRO,
     ID_KEY = 1000, ID_PAD = 1100,
 };
 
 static HWND main_wnd;
-static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game, h_pause, h_movies_hd, h_skip_doors;
+static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game, h_pause, h_movies_hd, h_skip_doors, h_save_anywhere, h_skip_intro;
 static int loaded_res;   /* resolution entry when the settings were loaded */
 static HWND h_key[PC_BINDING_COUNT], h_pad[PC_BINDING_COUNT];
 static HFONT font, bold_font;
@@ -407,6 +409,12 @@ static void load_settings(void)
     v = ini_get("skip_doors");
     SendMessageA(h_skip_doors, BM_SETCHECK, ((v != NULL) && (atoi(v) != 0)) ? BST_CHECKED : BST_UNCHECKED, 0);
 
+    v = ini_get("skip_intro");
+    SendMessageA(h_skip_intro, BM_SETCHECK, ((v != NULL) && (atoi(v) != 0)) ? BST_CHECKED : BST_UNCHECKED, 0);
+
+    v = ini_get("debug_save");
+    SendMessageA(h_save_anywhere, BM_SETCHECK, ((v != NULL) && (atoi(v) != 0)) ? BST_CHECKED : BST_UNCHECKED, 0);
+
     fill_scale_combo();   /* the list must exist before an entry can be selected */
     v = ini_get("scale");
     sel = (v != NULL) ? atoi(v) - 1 : 2;
@@ -466,6 +474,8 @@ static int save_settings(void)
     ini_set("pause_unfocused", (SendMessageA(h_pause, BM_GETCHECK, 0, 0) == BST_CHECKED) ? NULL : "0");
     ini_set("movies_hd", (SendMessageA(h_movies_hd, BM_GETCHECK, 0, 0) == BST_CHECKED) ? NULL : "0");
     ini_set("skip_doors", (SendMessageA(h_skip_doors, BM_GETCHECK, 0, 0) == BST_CHECKED) ? "1" : NULL);
+    ini_set("skip_intro", (SendMessageA(h_skip_intro, BM_GETCHECK, 0, 0) == BST_CHECKED) ? "1" : NULL);
+    ini_set("debug_save", (SendMessageA(h_save_anywhere, BM_GETCHECK, 0, 0) == BST_CHECKED) ? "1" : NULL);
 
     sel = (int)SendMessageA(h_scale, CB_GETCURSEL, 0, 0) + 1;
     snprintf(buf, sizeof(buf), "%d", sel);
@@ -835,9 +845,13 @@ static void create_controls(void)
                        lx, 98, cx + cw - lx, 24, ID_MOVIES_HD);
     h_skip_doors = make("BUTTON", "Skip doors (press OK / Attack during a door)", BS_AUTOCHECKBOX | WS_TABSTOP,
                         lx, 124, cx + cw - lx, 24, ID_SKIP_DOORS);
+    h_skip_intro = make("BUTTON", "Skip the intro (start at the title screen)", BS_AUTOCHECKBOX | WS_TABSTOP,
+                        lx, 150, cx + cw - lx, 24, ID_SKIP_INTRO);
+    h_save_anywhere = make("BUTTON", "Save anywhere (debug; set its key under Controls)",
+                           BS_AUTOCHECKBOX | WS_TABSTOP, lx, 176, cx + cw - lx, 24, ID_SAVE_ANYWHERE);
 
-    heading("Display", lx, 168, 200);
-    y = 194;
+    heading("Display", lx, 220, 200);
+    y = 246;
     label("Resolution", lx, y, cx - lx);
     h_res = combo(cx, y, cw, ID_RES);
     y += 32;
@@ -989,7 +1003,8 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
             dirty = 1;
         }
-        else if ((code == EN_CHANGE) || (id == ID_PAUSE) || (id == ID_MOVIES_HD) || (id == ID_SKIP_DOORS))
+        else if ((code == EN_CHANGE) || (id == ID_PAUSE) || (id == ID_MOVIES_HD) || (id == ID_SKIP_DOORS) ||
+                 (id == ID_SAVE_ANYWHERE) || (id == ID_SKIP_INTRO))
         {
             dirty = 1;
         }
