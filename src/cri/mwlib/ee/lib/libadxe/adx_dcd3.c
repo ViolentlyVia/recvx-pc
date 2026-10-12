@@ -1,6 +1,18 @@
 #include "../../../cri/mwlib/ee/lib/libadxe/adx_dcd3.h"
 #include "../../../cri/mwlib/ee/lib/libadxe/adx_qtbl.h"
 
+#ifdef TARGET_PC
+/* PC: float -> int as the PS2 FPU does it (saturating). x86 gives INT_MIN for any value out of
+ * range, so a loud peak just past full scale became a -32768 spike: crackling in hot music. */
+static Sint32 pc_adx_f2i(Float32 x)
+{
+    return (x >= 2147483520.0f) ? 0x7FFFFFFF : (x <= -2147483648.0f) ? (Sint32)0x80000000 : (Sint32)x;
+}
+#define ADX_F2I(x) pc_adx_f2i(x)
+#else
+#define ADX_F2I(x) ((Sint32)(x))
+#endif
+
 Sint32 adx_decode_output_mono_flag = 0;
 
 // 100% matching!
@@ -58,7 +70,7 @@ Sint32 ADX_DecodeMonoFloat(Sint8 *ibuf, Sint32 nblk, Sint16 *obuf_l, Sint16 *dly
             d1_l = d0_l;
             d0_l = dt_l;
             
-            dt16 = d0_l;
+            dt16 = ADX_F2I(d0_l);
             
             *obuf_l++ = dt16 >> 16;
             
@@ -69,14 +81,14 @@ Sint32 ADX_DecodeMonoFloat(Sint8 *ibuf, Sint32 nblk, Sint16 *obuf_l, Sint16 *dly
             d1_l = d0_l;
             d0_l = dt_l;
             
-            dt16 = d0_l;
+            dt16 = ADX_F2I(d0_l);
             
             *obuf_l++ = dt16 >> 16;
         }
     }
     
-    dly_l[0] = (Sint32)d0_l >> 16;
-    dly_l[1] = (Sint32)d1_l >> 16;
+    dly_l[0] = ADX_F2I(d0_l) >> 16;
+    dly_l[1] = ADX_F2I(d1_l) >> 16;
     
     return nblk;
 }
@@ -161,11 +173,11 @@ Sint32 ADX_DecodeSteFloatAsSte(Sint8 *ibuf, Sint32 nblk, Sint16 *obuf_l, Sint16 
             d1_r = d0_r;
             d0_r = dt_r;
             
-            dt16 = d0_l;
+            dt16 = ADX_F2I(d0_l);
             
             *obuf_l++ = dt16 >> 16;
             
-            dt16 = d0_r;
+            dt16 = ADX_F2I(d0_r);
             
             *obuf_r++ = dt16 >> 16;
 
@@ -182,21 +194,21 @@ Sint32 ADX_DecodeSteFloatAsSte(Sint8 *ibuf, Sint32 nblk, Sint16 *obuf_l, Sint16 
             d1_r = d0_r;
             d0_r = dt_r;
             
-            dt16 = d0_l;
+            dt16 = ADX_F2I(d0_l);
             
             *obuf_l++ = dt16 >> 16;
             
-            dt16 = d0_r;
+            dt16 = ADX_F2I(d0_r);
             
             *obuf_r++ = dt16 >> 16;
         }
     }
     
-    dly_l[0] = (Sint32)d0_l >> 16;
-    dly_l[1] = (Sint32)d1_l >> 16;
+    dly_l[0] = ADX_F2I(d0_l) >> 16;
+    dly_l[1] = ADX_F2I(d1_l) >> 16;
     
-    dly_r[0] = (Sint32)d0_r >> 16;
-    dly_r[1] = (Sint32)d1_r >> 16;
+    dly_r[0] = ADX_F2I(d0_r) >> 16;
+    dly_r[1] = ADX_F2I(d1_r) >> 16;
     
     return nblk;
 }
@@ -281,7 +293,7 @@ Sint32 ADX_DecodeSteFloatAsMono(Sint8 *ibuf, Sint32 nblk, Sint16 *obuf_l, Sint16
             d1_r = d0_r;
             d0_r = dt_r;
             
-            dt16 = (Sint32)((d0_l + d0_r) * 0.7f) >> 16;
+            dt16 = ADX_F2I((d0_l + d0_r) * 0.7f) >> 16;
             
             *obuf_l++ = *obuf_r++ = dt16;
             
@@ -298,17 +310,17 @@ Sint32 ADX_DecodeSteFloatAsMono(Sint8 *ibuf, Sint32 nblk, Sint16 *obuf_l, Sint16
             d1_r = d0_r;
             d0_r = dt_r;
             
-            dt16 = (Sint32)((d0_l + d0_r) * 0.7f) >> 16;
+            dt16 = ADX_F2I((d0_l + d0_r) * 0.7f) >> 16;
             
             *obuf_l++ = *obuf_r++ = dt16;
         }
     }
     
-    dly_l[0] = (Sint32)d0_l >> 16;
-    dly_l[1] = (Sint32)d1_l >> 16;
+    dly_l[0] = ADX_F2I(d0_l) >> 16;
+    dly_l[1] = ADX_F2I(d1_l) >> 16;
     
-    dly_r[0] = (Sint32)d0_r >> 16;
-    dly_r[1] = (Sint32)d1_r >> 16;
+    dly_r[0] = ADX_F2I(d0_r) >> 16;
+    dly_r[1] = ADX_F2I(d1_r) >> 16;
     
     return nblk;
 }
