@@ -748,6 +748,22 @@ void pcVideoPresent(void)
         frame_time.sum = frame_time.swap = frame_time.worst = 0;
         frame_time.n = 0;
         {
+            extern long pcAudioStarved(int v);
+            static long starved_seen[16];
+            int v;
+
+            for (v = 0; v < 16; v++)
+            {
+                long now = pcAudioStarved(v);
+
+                if (now != starved_seen[v])
+                {
+                    pcLog("audio: voice %d ran dry %ld time(s)", v, now - starved_seen[v]);
+                    starved_seen[v] = now;
+                }
+            }
+        }
+        {
             extern void pcGameStateLog(void);
             extern void pcGsLogStats(void);
 

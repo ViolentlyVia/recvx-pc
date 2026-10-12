@@ -5,6 +5,8 @@
  * clock so the game (which waits for streams to finish) keeps running.
  */
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <SDL.h>
@@ -28,6 +30,8 @@ typedef struct {
 } Voice;
 
 static Voice voices[MAX_VOICES];
+static volatile long starved[MAX_VOICES]; /* times a playing voice had too little for a pass */
+static int was_full[MAX_VOICES];          /* the voice filled the whole previous pass */
 static SDL_AudioDeviceID device;
 static int init_done;
 
@@ -69,6 +73,19 @@ static void SDLCALL callback(void* userdata, Uint8* stream, int len)
 
         step = (double)vc->sfreq / OUT_RATE;
 
+        /* a voice that filled the last pass and cannot fill this one has run dry (a gap or a
+         * click): once when a sound ends, again and again when a stream is not fed in time */
+        {
+            int full = (double)(vc->head - vc->tail) >= frames * step + 2;
+
+            if (was_full[v] && !full)
+            {
+                starved[v]++;
+            }
+
+            was_full[v] = full;
+        }
+
         for (i = 0; i < frames; i++)
         {
             float* a;
@@ -87,6 +104,7 @@ static void SDLCALL callback(void* userdata, Uint8* stream, int len)
             out[i * 2 + 0] += a[0] + (b[0] - a[0]) * t;
             out[i * 2 + 1] += a[1] + (b[1] - a[1]) * t;
 
+
             vc->frac += step;
 
             while (vc->frac >= 1.0)
@@ -94,6 +112,49 @@ static void SDLCALL callback(void* userdata, Uint8* stream, int len)
                 vc->frac -= 1.0;
                 vc->tail++;
             }
+        }
+    }
+
+    /* limiter: voices, music, sound effects and reverb together can go past full scale (loud
+     * scenes, cutscenes), and hard clipping crackles. Above LIMIT the whole mix is turned down at
+     * once and comes back up over about 0.2 s; below it the mix is untouched. */
+    {
+        static float gain = 1.0f;
+        const float LIMIT = 0.95f, release = 1.0f - 1.0f / (0.2f * OUT_RATE);
+
+        for (i = 0; i < frames; i++)
+        {
+            float l = out[i * 2 + 0], r = out[i * 2 + 1];
+            float peak = fmaxf(fabsf(l), fabsf(r));
+
+            if (peak * gain > LIMIT)
+            {
+                gain = LIMIT / peak;
+            }
+
+            out[i * 2 + 0] = l * gain;
+            out[i * 2 + 1] = r * gain;
+
+            gain = 1.0f - (1.0f - gain) * release;
+        }
+    }
+
+    /* debug: RECVX_MIXDUMP=<file> writes the final mix as played, before the safety clip (float32 stereo 48 kHz) */
+    {
+        static FILE* dump;
+        static int checked;
+
+        if (!checked)
+        {
+            const char* e = getenv("RECVX_MIXDUMP");
+
+            checked = 1;
+            dump = (e != NULL) ? fopen(e, "wb") : NULL;
+        }
+
+        if (dump != NULL)
+        {
+            fwrite(out, sizeof(float), frames * 2, dump);
         }
     }
 
@@ -296,4 +357,10 @@ int pcAudioQueuedSamples(int voice)
     unlock();
 
     return n;
+}
+
+/* times voice v ran dry since the start (see the mixer) */
+long pcAudioStarved(int v)
+{
+    return ((v >= 0) && (v < MAX_VOICES)) ? starved[v] : 0;
 }
