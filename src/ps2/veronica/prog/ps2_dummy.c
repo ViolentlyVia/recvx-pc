@@ -381,6 +381,7 @@ int pcWide2DUnclipped;   /* widescreen: 2D drawn into the side areas on purpose 
 int pcWide2DFullWidth;   /* widescreen: full-width 2D that covers the picture (screen filters) */
 int pcWide2DKeep43;      /* widescreen: full screen 2D that is 4:3 art although translucent */
 int pcWide2DTrimRight;   /* widescreen: leave out the piece's last texel column (a screen-edge border) */
+int pcWide2DStretch;     /* widescreen: 2D that is the 3D view itself (drawn back from a render texture) */
 
 /* widescreen: clip a 2D rectangle (sprite, or quad with two distinct x values) to the 4:3
  * frame, 1728..2368 in GS coordinates. Vertices are 3 qwords: ST/Q (or UV), RGBA, XYZ. */
@@ -565,7 +566,13 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
                 if (vy > y1) y1 = vy;
             }
 
-            if ((x0 <= 1728.0f + 1.0f) && (x1 >= 2368.0f - 1.0f) && !pcWide2DKeep43)
+            if (pcWide2DStretch)
+            {
+                /* the room drawn into a texture already has the wider view, squeezed into the 640
+                 * wide frame like the screen itself: stretched back, whatever its outline */
+                wide_2d = 1.0f;
+            }
+            else if ((x0 <= 1728.0f + 1.0f) && (x1 >= 2368.0f - 1.0f) && !pcWide2DKeep43)
             {
                 if (pcWide2DFullWidth || !(prim & 0x8000000000000) ||
                     ((prim & 0x20000000000000) && (y0 <= 1808.0f + 1.0f) && (y1 >= 2288.0f - 1.0f)))

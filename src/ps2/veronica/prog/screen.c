@@ -864,6 +864,15 @@ void bhDrawFullScreenRenderTexture()
     
     njTextureFilterMode(0);
     
+#ifdef TARGET_PC
+    {
+        /* PC: the strips are the room itself, rippled (the gas trap, water): in widescreen they
+         * span the whole width; squeezed into 4:3 like 2D art, the screen went 4:3 */
+        extern int pcWide2DStretch;
+
+        pcWide2DStretch = 1;
+    }
+#endif
     for (i = 0; i < 15; i++)
     {
         y = i * 16;
@@ -920,6 +929,13 @@ void bhDrawFullScreenRenderTexture()
         njDrawTextureH(tvh, 32, 1, 0);
     } 
     
+#ifdef TARGET_PC
+    {
+        extern int pcWide2DStretch;
+
+        pcWide2DStretch = 0;
+    }
+#endif
     njTextureFilterMode(1);
 }
 
