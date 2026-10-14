@@ -1,0 +1,23 @@
+# Build output
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Local copy of the BioRand release (reference only, about 3 GB)
+biorand/
+
+# Game data must never be committed
+*.iso
+*.ISO
+*.AFS
+*.afs
+*.RDX
+*.rdx
+*.RDT
+data_extracted/
+out/
+
+# Local Claude Code settings
+.claude/

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>cvx-rando</AssemblyName>
+    <RootNamespace>Cvx.Rando.App</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cvx.Rando\Cvx.Rando.csproj" />
+    <ProjectReference Include="..\Cvx.Formats\Cvx.Formats.csproj" />
+  </ItemGroup>
+
+</Project>
