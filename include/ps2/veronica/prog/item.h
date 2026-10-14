@@ -20,7 +20,12 @@ typedef struct DSP_WORK
     short hide; // offset 0x6, size 0x2
 } DSP_WORK;
 
+#ifdef TARGET_PC
+/* writable on PC: the randomizer sets pickup amounts (pc_rando.c) */
+extern unsigned int getbulletmax[156][4];
+#else
 extern const unsigned int getbulletmax[156][4];
+#endif
 extern const NJS_POINT3 hoseipos[10];
 extern const unsigned short idsettbl[16];
 extern const unsigned short getmestbl[16];
@@ -30,7 +35,12 @@ extern const unsigned short mestbl[14];
 extern const short c_a[14][6];
 extern const unsigned char curedata[10];
 extern const DSP_WORK dsptbl[160];
+#ifdef TARGET_PC
+/* writable on PC: the randomizer can change item types (pc_rando.c) */
+extern ITEM_WORK itemdata[156];
+#else
 extern const ITEM_WORK itemdata[156];
+#endif
 extern const short combidata[410];
 
 #endif

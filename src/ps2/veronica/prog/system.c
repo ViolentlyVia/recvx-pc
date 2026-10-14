@@ -508,6 +508,21 @@ void bhFirstGameStart()
             sys->rcase = 0;
             
             sys->ply_id = 0;
+#ifdef TARGET_PC
+            {
+                extern int pcWarpGet(int* stage, int* room, int* pos, int* rcase, int* player);
+                int stage, room, pos, rcase, player = 0;
+
+                if (pcWarpGet(&stage, &room, &pos, &rcase, &player))
+                {
+                    sys->stg_no = stage;
+                    sys->rom_no = room;
+                    sys->pos_no = pos;
+                    sys->rcase = rcase;
+                    sys->ply_id = player;
+                }
+            }
+#endif
         }
         else 
         {

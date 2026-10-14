@@ -1115,6 +1115,13 @@ unsigned int bhBgmOn()
     bhScePtr++;
     bhScePtr++;
     
+#ifdef TARGET_PC
+    {
+        extern int pcRandoBgm(int bgm_no);
+
+        v0 = pcRandoBgm(v0);   /* randomizer: bgm_map (pc_rando.c) */
+    }
+#endif
     PlayBgm(v0, v1);
     
     return 1;
@@ -2608,6 +2615,13 @@ unsigned int bhSetNextRoomBgm()
     bhScePtr += 2;
     
     NextSoundInfo.NextBgmNo = *bhScePtr;
+#ifdef TARGET_PC
+    {
+        extern int pcRandoBgm(int bgm_no);
+
+        NextSoundInfo.NextBgmNo = pcRandoBgm(NextSoundInfo.NextBgmNo);   /* randomizer: bgm_map */
+    }
+#endif
     
     bhScePtr++;
     
@@ -6675,6 +6689,13 @@ unsigned int bhBgmOn2()
         v2 = -45;
     }
     
+#ifdef TARGET_PC
+    {
+        extern int pcRandoBgm(int bgm_no);
+
+        v0 = pcRandoBgm(v0);   /* randomizer: bgm_map (pc_rando.c) */
+    }
+#endif
     PlayBgm2(v0, v2);
     
     return 1;
@@ -7048,6 +7069,13 @@ unsigned int bhBgmOnEx()
 
     bhScePtr++;
 
+#ifdef TARGET_PC
+    {
+        extern int pcRandoBgm(int bgm_no);
+
+        v0 = pcRandoBgm(v0);   /* randomizer: bgm_map (pc_rando.c) */
+    }
+#endif
     PlayBgmEx(v0, v1, v2);
 
     return 1;
@@ -7070,6 +7098,13 @@ unsigned int bhBgmOn2Ex()
 
     bhScePtr += 2;
 
+#ifdef TARGET_PC
+    {
+        extern int pcRandoBgm(int bgm_no);
+
+        v0 = pcRandoBgm(v0);   /* randomizer: bgm_map (pc_rando.c) */
+    }
+#endif
     PlayBgm2(v0, v1);
 
     return 1;

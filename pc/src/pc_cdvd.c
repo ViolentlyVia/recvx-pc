@@ -8,15 +8,21 @@
  *    or a "data" folder next to the executable, holding the disc's files and files.idx (start
  *    sector, size, path of each file); sector reads are served from those files, or
  *  - the ISO image: RECVX_ISO, an "iso=" line in recvx.ini or the first *.iso next to the exe.
+ *
+ * With the data folder, a mod folder (RECVX_MOD or "mod=" in recvx.ini, relative to the exe) can
+ * replace any of its files: a file there with the same relative path is read instead (the
+ * randomizer writes RDX_LNK.AFS there). See mod_open().
  */
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 
 #include "sce_pc.h"
 #include "pc_platform.h"
+#include "pc_rando.h"
 
 #define SECTOR 2048
 
@@ -33,12 +39,14 @@ static int st_active;
 typedef struct {
     u_int lsn, size, sectors;
     char path[200];
+    char* mod_path;   /* full path of the mod folder's replacement, or NULL */
     FILE* f;
 } DataFile;
 
 static DataFile* data_files;
 static int data_count;
 static char data_dir[1024];
+static char mod_dir[1024];
 
 static DataFile* data_file_at(u_int lsn)
 {
@@ -87,7 +95,14 @@ static int data_read_sectors(u_int lsn, u_int count, unsigned char* buf)
         {
             char path[1300];
 
-            snprintf(path, sizeof(path), "%s/%s", data_dir, d->path);
+            if (d->mod_path != NULL)
+            {
+                snprintf(path, sizeof(path), "%s", d->mod_path);
+            }
+            else
+            {
+                snprintf(path, sizeof(path), "%s/%s", data_dir, d->path);
+            }
 
             if ((d->f = fopen(path, "rb")) == NULL)
             {
@@ -124,6 +139,103 @@ static int data_read_sectors(u_int lsn, u_int count, unsigned char* buf)
     }
 
     return 1;
+}
+
+static int by_lsn(const void* a, const void* b)
+{
+    u_int x = ((const DataFile*)a)->lsn, y = ((const DataFile*)b)->lsn;
+
+    return (x > y) - (x < y);
+}
+
+/* Point data_files at the mod folder's replacements. The game finds files by name and reads
+ * them by sector, so a replacement keeps its sector range when it fits and otherwise moves past
+ * the last file (the ranges are only keys for data_file_at). Then loads the folder's rando.ini. */
+static void mod_open(const char* exe_dir)
+{
+    const char* env = getenv("RECVX_MOD");
+    u_int next = 0;
+    int i, replaced = 0, moved = 0;
+    struct _stat64 st;
+
+    mod_dir[0] = 0;
+
+    if ((env != NULL) && (env[0] != 0))
+    {
+        snprintf(mod_dir, sizeof(mod_dir), "%s", env);
+    }
+    else if (!pcIniGet("mod", mod_dir, sizeof(mod_dir)) || (mod_dir[0] == 0))
+    {
+        return;
+    }
+
+    /* relative to the exe, not the working directory */
+    if (!((mod_dir[0] == '\\') || (mod_dir[0] == '/') || ((mod_dir[0] != 0) && (mod_dir[1] == ':'))))
+    {
+        char rel[1024];
+
+        snprintf(rel, sizeof(rel), "%s", mod_dir);
+        snprintf(mod_dir, sizeof(mod_dir), "%s/%s", exe_dir, rel);
+    }
+
+    if ((_stat64(mod_dir, &st) != 0) || !(st.st_mode & _S_IFDIR))
+    {
+        pcLog("mod: folder %s not found, playing without it", mod_dir);
+        mod_dir[0] = 0;
+        return;
+    }
+
+    for (i = 0; i < data_count; i++)
+    {
+        if (data_files[i].lsn + data_files[i].sectors > next)
+        {
+            next = data_files[i].lsn + data_files[i].sectors;
+        }
+    }
+
+    for (i = 0; i < data_count; i++)
+    {
+        DataFile* d = &data_files[i];
+        char path[1300];
+        u_int sectors;
+
+        snprintf(path, sizeof(path), "%s/%s", mod_dir, d->path);
+
+        if ((_stat64(path, &st) != 0) || (st.st_mode & _S_IFDIR) || (st.st_size > 0xFFFFFFFFll))
+        {
+            continue;
+        }
+
+        sectors = (u_int)((st.st_size + SECTOR - 1) / SECTOR);
+
+        if (sectors == 0)
+        {
+            sectors = 1;
+        }
+
+        if (sectors > d->sectors)
+        {
+            d->lsn = next;
+            next += sectors;
+            moved = 1;
+        }
+
+        pcLog("mod: %s replaces %s (%lld bytes, was %u)", path, d->path, st.st_size, d->size);
+
+        d->size = (u_int)st.st_size;
+        d->sectors = sectors;
+        d->mod_path = _strdup(path);
+        replaced++;
+    }
+
+    if (moved)
+    {
+        qsort(data_files, data_count, sizeof(*data_files), by_lsn);
+    }
+
+    pcLog("mod: using %s (%d file(s) replaced)", mod_dir, replaced);
+
+    pcRandoInit(mod_dir);
 }
 
 static int data_open(void)
@@ -182,6 +294,11 @@ static int data_open(void)
     fclose(f);
 
     pcLog("disc: using extracted files in %s (%d files)", data_dir, data_count);
+
+    if (data_count > 0)
+    {
+        mod_open(dir);
+    }
 
     return data_count > 0;
 }

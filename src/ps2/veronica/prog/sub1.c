@@ -8681,6 +8681,17 @@ void AllItemInit()
         swork.pip[2] = 0x220190;
     }
     
+#ifdef TARGET_PC
+    if (sys->gm_mode != 3)
+    {
+        extern void pcRandoStartItems(int player, unsigned int* pip);
+
+        /* randomizer: start_items_claire / start_items_chris (pc_rando.c) */
+        pcRandoStartItems(0, &sys->itm[0]);
+        pcRandoStartItems(1, &sys->itm[16]);
+    }
+    
+#endif
     sys->itm[383] = 1;
 }
 

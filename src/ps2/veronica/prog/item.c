@@ -106,7 +106,11 @@ const short combidata[410] =
       142,     1,     1,    12,
       131,     0
 };
+#ifdef TARGET_PC
+ITEM_WORK itemdata[156] =
+#else
 const ITEM_WORK itemdata[156] = 
+#endif
 {
     {   0,   -1,     0 },
     {   1,   -1,  3329 },
@@ -536,7 +540,11 @@ const NJS_POINT3 hoseipos[10] =
     { 0.05f,  0.12f,  -0.28f },
     { 0.13f,  0.07f,   0.19f }
 };
+#ifdef TARGET_PC
+unsigned int getbulletmax[156][4] =
+#else
 const unsigned int getbulletmax[156][4] = 
+#endif
 {
     {   0,   0,   0,         0 },
     {   1,   1,   1,         1 },

@@ -16,6 +16,9 @@ void pcPlatformExeDir(char* out, int size);
  * Returns 0 (out untouched) when the key is missing. */
 int pcIniGet(const char* key, char* out, int size);
 int pcIniGetInt(const char* key, int def);
+/* The same for any ini file (full path). */
+int pcIniFileGet(const char* ini, const char* key, char* out, int size);
+int pcIniFileGetInt(const char* ini, const char* key, int def);
 /* Set (or with value NULL remove) "key=value" in recvx.ini, keeping every other line. */
 void pcIniSet(const char* key, const char* value);
 

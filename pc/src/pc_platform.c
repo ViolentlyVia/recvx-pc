@@ -285,13 +285,20 @@ void pcPlatformExeDir(char* out, int size)
 
 int pcIniGet(const char* key, char* out, int size)
 {
-    char dir[1024], ini[1100], line[1300];
-    size_t klen = strlen(key);
-    int found = 0;
-    FILE* f;
+    char dir[1024], ini[1100];
 
     pcPlatformExeDir(dir, sizeof(dir));
     snprintf(ini, sizeof(ini), "%s/recvx.ini", dir);
+
+    return pcIniFileGet(ini, key, out, size);
+}
+
+int pcIniFileGet(const char* ini, const char* key, char* out, int size)
+{
+    char line[4200];
+    size_t klen = strlen(key);
+    int found = 0;
+    FILE* f;
 
     if ((f = fopen(ini, "r")) == NULL)
     {
@@ -394,6 +401,13 @@ int pcIniGetInt(const char* key, int def)
     char v[64];
 
     return pcIniGet(key, v, sizeof(v)) ? atoi(v) : def;
+}
+
+int pcIniFileGetInt(const char* ini, const char* key, int def)
+{
+    char v[64];
+
+    return pcIniFileGet(ini, key, v, sizeof(v)) ? atoi(v) : def;
 }
 
 int pcPlatformFindFile(const char* dir, const char* ext, char* out, int size)

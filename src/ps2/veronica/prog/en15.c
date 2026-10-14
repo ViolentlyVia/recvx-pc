@@ -2573,6 +2573,12 @@ static void PoisonAttack(O_WRK* op)
         {
             if (njRandom() < 0.6)
             {
+#ifdef TARGET_PC
+                extern int pcRandoNoNosferatuPoison(void);
+
+                /* randomizer: no_nosferatu_poison=1 (pc_rando.c) */
+                if (!pcRandoNoNosferatuPoison())
+#endif
                 plp->stflg |= 0x200000;
             }  
         }
