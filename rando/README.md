@@ -7,6 +7,22 @@ the original room files. Your game data is never changed.
 
 Work in progress. See [PLAN.md](PLAN.md) for the roadmap.
 
+## Using it
+
+Put `cvx-rando.exe` next to `recvx.exe` (the recvx-pc share zip does), or start it and choose
+the game folder. Pick the options, then **Generate** (or **Generate and play**):
+
+- the seed is written to `rando\<seed>` in the game folder;
+- `recvx.ini` gets `mod=rando\<seed>` and `saves=saves_rando\<seed>`, so the seed has its own
+  saves; your own `saves=` is kept as `saves_normal=` (`*` when you had none);
+- **Play normal game** (here or in `recvx-config.exe`) removes `mod=` and gives you your own
+  saves back.
+
+The share code (`CVX1-...`) holds the seed and every option: paste one to play someone else's
+seed. **Spoiler log** opens `spoiler.txt` (where everything is). **Delete old seeds** removes
+seed folders other than the one being played; their saves are kept. The app remembers your
+choices in `cvx-rando.json` next to it.
+
 ## Projects
 
 | Project | What it is |

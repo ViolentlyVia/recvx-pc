@@ -413,13 +413,22 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
 - **Not verified:** that the swapped enemy sounds are right (needs listening); bats were never caught on camera in the sweeps; difficulty balance.
 - **Later:** more rooms could change if an event's enemy kept its type while the rest change (done) and if more kinds were checked (Moth, Albinoid, Spotter); BioRand's 50 extra stage-1 positions (`enemy.json`) are not used.
 
-### Phase 8: done (2026-10-14), not committed yet
+### Phase 8: done (2026-10-14), committed `b61e581`
 - **How music plays:** room scripts ask for a track (`bgm_on`, `bgm_on_2`, `bgm_on_ex`, `bgm_on_2_ex`: byte 1; `set_next_room_bgm`: byte 6) and the track number is an entry of BGM1.AFS (rooms of stages 0-5) or BGM2.AFS (stages 6-9). Each disc's archive only holds its own tracks; the others are 72-byte placeholders. recvx-pc already remaps the requests (Phase 2, `bgm_map`).
 - **Catalog** (`data/music.json`, `dump-music`): every track's discs, length, whether it loops (ADX header) and the rooms that ask for it. One-shot tracks are stingers and event music and stay. Looping ones are sorted into Area (18), Save room (1: only typewriter rooms ask for it), Tension (12 short loops in enemy rooms) and Boss (13). BioRand never randomized Code: Veronica's music, so the categories are new; listen and move tracks between lists to refine them.
 - **Shuffle** (`Music/MusicRandomizer`): a random permutation within each category, where a track only becomes one that every disc it is on also has (scripts only ask for tracks their disc has: tested). The swaps go to rando.ini `bgm_map`; no game file changes.
 - CLI `generate --music`; spoiler section; 3 tests.
 - **Not verified in play:** listening (the categories come from the scripts, not from hearing every track).
 - **Fix found by the owner's playthrough:** BioRand's item-mode tweaks made RM_0010 and RM_0050 always load RM_0021/RM_0031, which skipped the graveyard explosion and zombies rising (RM_0020) and the RM_0030 event. The game loads those event versions once the RM_0080 pickup is taken (item flag 4, kept by the item rando since the flag belongs to the spot) and returns to RM_0021/RM_0031 after; the tweaks are no longer applied (random doors never had them).
+
+### Phase 9: done (2026-10-14), not committed yet
+- **Window** (`src/Cvx.Rando.App`, `MainForm`): the game folder (this program's folder, the last one used, or chosen), whether the data is set up and whether a seed is active; the seed with a Random button; the share code with Copy and Paste; tabs Items, Inventory, Enemies, Doors, Music; Generate, Generate and play, Play normal game, Open folder, Spoiler log (asks first), Delete old seeds (keeps the active one and every save folder); a status line with each step, and About with the BioRand/kapdap credit. Built in code with auto-sizing layout panels, so it scales with the display.
+- **Game folder** (`Setup/GameFolder`): recvx.ini edited with recvx-config's rules (lines kept, last value wins, a key's last line replaced and the others removed). Generating writes `rando\<seed>` and sets `mod=rando\<seed>`, `saves=saves_rando\<seed>`, keeping the player's own `saves=` in `saves_normal=` (`*` for none) once; Play normal game puts it back. Generation runs on a background task; the app refuses to rewrite the seed the running game is playing.
+- **Share code** (`Setup/ShareCode`): `CVX1-` and the settings that differ from the defaults, as deflated JSON in base64url (about 40 characters for a plain seed).
+- **Settings** are remembered in `cvx-rando.json` next to the program (AppData when that folder is read-only).
+- **recvx-pc:** `saves=` and `data=` are now relative to the exe like `mod=` (they were relative to the folder the game was started from), and every level of the save folder is created (`saves_rando\<seed>`).
+- 5 tests (recvx.ini round trip back to the player's saves, share codes). In a test game folder, Generate wrote seed 77 (items, enemies, music) in 78 s and set recvx.ini as above.
+- **Later:** QR code for share codes; rendering graph.dot with Graphviz when installed.
 
 ## Risks / open items for the executing agent
 - **Don't copy BioRand's CV item writes as-is**: it writes `type` and relies on its executable patch; we write `id` (see Key facts). Treat every BioRand CV write as unverified until it is checked against the game's C code.

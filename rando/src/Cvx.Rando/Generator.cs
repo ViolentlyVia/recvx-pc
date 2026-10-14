@@ -58,7 +58,8 @@ public static class Generator
         return result;
     }
 
-    public static GenerationResult Generate(RandoSettings settings, RandoData data, RoomArchive archive)
+    /// <param name="progress">Told what step is running (for a status line).</param>
+    public static GenerationResult Generate(RandoSettings settings, RandoData data, RoomArchive archive, IProgress<string>? progress = null)
     {
         // Random doors need random items: with the game's own, keys end up behind the doors
         // they open.
@@ -86,6 +87,7 @@ public static class Generator
         if (settings.RandomDoors)
         {
             saveRooms = SaveRoomKeys(data);
+            progress?.Report("Making the door layout...");
             var layout = MakeDoors(settings, data, claireWeapons);
             (doors, graph, doorAttempts) = (layout.Plan, layout.Graph, layout.Attempts);
             if (settings.RandomItems)
@@ -93,15 +95,19 @@ public static class Generator
         }
         else if (settings.RandomItems)
         {
+            progress?.Report("Placing items...");
             graph = ItemGraph.Build(data, settings);
             items = PlaceItems(data, settings, graph, claireWeapons);
         }
         if (items != null)
         {
+            progress?.Report("Patching rooms...");
             patcher.Apply(items, settings);
             RoomTweaks.Apply(patcher, settings, data);
         }
 
+        if (settings.RandomEnemies)
+            progress?.Report("Choosing enemies...");
         var enemies = settings.RandomEnemies
             ? new EnemyRandomizer(data, archive, settings, Rng.For(settings.Seed, "enemies")).Apply(patcher)
             : [];
@@ -193,10 +199,11 @@ public static class Generator
     /// Writes the mod folder recvx-pc loads (mod= in recvx.ini): the changed room archive,
     /// rando.ini, rando_doors.txt, the spoiler log and the room graph.
     /// </summary>
-    public static void WriteMod(GenerationResult result, RoomArchive archive, string directory)
+    public static void WriteMod(GenerationResult result, RoomArchive archive, string directory, IProgress<string>? progress = null)
     {
         Directory.CreateDirectory(directory);
         var afs = Path.Combine(directory, GameData.RoomArchiveName);
+        progress?.Report($"Writing {result.ChangedRooms.Count} rooms...");
         if (result.ChangedRooms.Count != 0)
             archive.WriteModified(afs, result.ChangedRooms);
         else if (File.Exists(afs))
@@ -212,7 +219,11 @@ public static class Generator
         }
         Write("rando.ini", RandoIni(result));
         if (archive.Data is { } data)
+        {
+            if (result.Enemies.Count != 0)
+                progress?.Report("Writing enemy sounds...");
             EnemySounds.Write(data, result.Enemies, directory);
+        }
         Write(DoorTable.FileName, result.DoorTable);
         Write("spoiler.txt", result.Spoiler);
         Write("graph.dot", result.GraphDot);
