@@ -28,6 +28,7 @@ graveyard), saving and loading. Report problems with a `last_run_input.txt` reco
 | Saving and loading (to a `saves` folder, no memory card screens) | done |
 | Keyboard and game controllers (SDL2) | done |
 | Fast-forward (hold Numpad 0) | done |
+| Randomizer support (mod folder, `rando.ini`) for the separate `cvx-rando.exe` | done |
 
 ## Building
 
@@ -112,6 +113,8 @@ Optional, next to `recvx.exe`, one `key=value` per line (the settings app writes
 | `movies_hd=` | `0` plays the original movies even when upscaled ones exist (default `1`) |
 | `skip_intro=` | `1` starts at the title screen, without the warning screens, Capcom logo and opening movie (default `0`) |
 | `skip_doors=` | `1` lets OK / Attack (Cross or Square) skip the door animations (default `0`) |
+| `mod=` | folder whose files replace the data folder's files of the same name (relative to the exe; see [Randomizer](#randomizer)) |
+| `saves_normal=` | written by the randomizer: your own `saves=` while a randomized game is active (`*` = none) |
 | `window_pos=`, `window_max=` | written by the game: where the window was left, and if it was maximized |
 | `key_<action>=` | keyboard key, by its SDL name (`Z`, `Return`, `Left Shift`, `Keypad 0`, `none`) |
 | `pad_<action>=` | controller button, by its SDL name (`a`, `b`, `leftshoulder`, `lefttrigger`, `dpup`, `none`) |
@@ -123,15 +126,38 @@ With a widescreen `aspect=`, the 3D view is widened rather than stretched, and m
 movies stay at 4:3 in the middle of the screen. The internal resolution rises horizontally to
 match, so `scale=3` at 16:9 renders at 2560x1440.
 
+### Randomizer
+
+The randomizer, `cvx-rando.exe`, is a separate program (the CVXRandomizer project).
+"Randomizer..." in `recvx-config.exe` starts it when it is next to the exe. It writes the files
+it changes (the room archive `RDX_LNK.AFS`) to a folder such as `rando\<seed>` and points `mod=`
+at it. A file in the `mod=` folder is read instead of the data folder's file with the same path,
+so the game data itself is never changed. The randomizer also sets `saves=` to a save folder for
+that seed. "Play normal game" (in either program) removes `mod=` and puts your own `saves=` back.
+
+Changes that need code rather than files are read from `rando.ini` in the mod folder (format
+in `pc/src/pc_rando.c`):
+
+| Key | Meaning |
+|---|---|
+| `version=` | format version (1); the game refuses a newer one |
+| `seed=` | shown in `recvx.log` and the settings app |
+| `pickup_amounts=<id>:<n>,...` | how much a pickup of item `<id>` gives |
+| `fix_rifle_stacking=1` | rifle and assault rifle bullets add to ammo you already carry |
+| `no_nosferatu_poison=1` | Nosferatu's attack never poisons |
+| `start_special_claire=<id>`, `start_items_claire=<id>:<n>,...` | Claire's starting items (the same keys with `chris` for Chris) |
+| `bgm_map=<from>:<to>,...` | music tracks swapped when room scripts ask for music |
+
 ## Sharing with friends
 
 ```bash
-python pc/tools/make_share.py
+python pc/tools/make_share.py [--rando <path to cvx-rando.exe>]
 ```
 
 builds `build_pc/share/recvx-cvx-pc.zip` with just `recvx.exe`, `recvx-config.exe`, `SDL2.dll`
-and a README. It refuses to include game files; each recipient unzips it, runs
-`recvx-config.exe` and sets the game up from their own disc image (no Python needed).
+and a README (plus `cvx-rando.exe` when it is given or found in `build_pc`). It refuses to
+include game files; each recipient unzips it, runs `recvx-config.exe` and sets the game up from
+their own disc image (no Python needed).
 
 ## How it works
 
@@ -144,7 +170,8 @@ The upstream decompiled sources are kept as they are; every PC change is wrapped
 | GS emulation on OpenGL (render targets, CLUTs, texture cache, HD replacement) | `pc/src/gs/` |
 | VU0 microcode translated to C | `pc/src/vu/` |
 | EE kernel (threads as fibers, semaphores, VBLANK) | `pc_kernel.c` |
-| Disc access (extracted folder or ISO) | `pc_cdvd.c` |
+| Disc access (extracted folder or ISO, mod folder) | `pc_cdvd.c` |
+| Randomizer options (`rando.ini`), `RECVX_WARP` | `pc_rando.c` |
 | IOP / SIF RPC, Tamsoft sound driver (SPU ADPCM synth, MIDI sequencer) | `pc_iop.c`, `pc_iop_tsnddrv.c` |
 | CRI ADX output, SDL audio mixer | `pc_adx_rna.c`, `pc_audio.c` |
 | Movies (pl_mpeg) | `pc_movie.c`, `pc_mpeg.c` |
