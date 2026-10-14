@@ -1,0 +1,1615 @@
+{
+  "_comment": "Code: Veronica X items. Names, kinds, maxPickup, slots, weaponKind and ammo come from BioRand (ReCvItemIds/ReCvItemHelper, MIT); gameMax and gameType are the max and type fields of the game's itemdata table (item.c). Edit by hand.",
+  "items": [
+    {
+      "id": 0,
+      "name": "None",
+      "symbol": "None",
+      "kinds": [],
+      "gameMax": 0,
+      "gameType": 0
+    },
+    {
+      "id": 1,
+      "name": "Rocket Launcher",
+      "symbol": "RocketLauncher",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 1,
+      "gameType": 3329,
+      "slots": 2,
+      "maxPickup": 5,
+      "weaponKind": "powerful"
+    },
+    {
+      "id": 2,
+      "name": "Assault Rifle",
+      "symbol": "AssaultRifle",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 300,
+      "gameType": 5377,
+      "slots": 2,
+      "maxPickup": 255,
+      "weaponKind": "primary",
+      "ammo": [
+        42
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Sniper Rifle",
+      "symbol": "SniperRifle",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 7,
+      "gameType": 2305,
+      "slots": 2,
+      "maxPickup": 7,
+      "weaponKind": "primary",
+      "ammo": [
+        40
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Shotgun",
+      "symbol": "Shotgun",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 7,
+      "gameType": 3073,
+      "maxPickup": 7,
+      "weaponKind": "primary",
+      "ammo": [
+        14
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Handgun Glock17",
+      "symbol": "HandgunGlock17",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 18,
+      "gameType": 3073,
+      "maxPickup": 18,
+      "weaponKind": "sidearm",
+      "ammo": [
+        12
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Grenade Launcher",
+      "symbol": "GrenadeLauncher",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 6,
+      "gameType": 3073,
+      "maxPickup": 6,
+      "weaponKind": "powerful",
+      "ammo": [
+        16,
+        17,
+        15,
+        37
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Bow Gun",
+      "symbol": "BowGun",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 30,
+      "gameType": 3073,
+      "maxPickup": 30,
+      "weaponKind": "primary",
+      "ammo": [
+        18,
+        36
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Combat Knife",
+      "symbol": "CombatKnife",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 0,
+      "gameType": 1025
+    },
+    {
+      "id": 9,
+      "name": "Handgun",
+      "symbol": "Handgun",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 15,
+      "gameType": 3073,
+      "maxPickup": 15,
+      "weaponKind": "sidearm",
+      "ammo": [
+        12
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Custom Handgun",
+      "symbol": "CustomHandgun",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 20,
+      "gameType": 3073,
+      "maxPickup": 20
+    },
+    {
+      "id": 11,
+      "name": "Linear Launcher",
+      "symbol": "LinearLauncher",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 5,
+      "gameType": 2049,
+      "maxPickup": 5,
+      "weaponKind": "powerful"
+    },
+    {
+      "id": 12,
+      "name": "Handgun Bullets",
+      "symbol": "HandgunBullets",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 15,
+      "gameType": 3586,
+      "maxPickup": 30
+    },
+    {
+      "id": 13,
+      "name": "Magnum Bullets",
+      "symbol": "MagnumBullets",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 6,
+      "gameType": 3586,
+      "maxPickup": 12
+    },
+    {
+      "id": 14,
+      "name": "Shotgun Shells",
+      "symbol": "ShotgunShells",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 7,
+      "gameType": 3586,
+      "maxPickup": 14
+    },
+    {
+      "id": 15,
+      "name": "Grenade Rounds",
+      "symbol": "GrenadeRounds",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 6,
+      "gameType": 3586,
+      "maxPickup": 12
+    },
+    {
+      "id": 16,
+      "name": "Acid Rounds",
+      "symbol": "AcidRounds",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 6,
+      "gameType": 3586,
+      "maxPickup": 12
+    },
+    {
+      "id": 17,
+      "name": "Flame Rounds",
+      "symbol": "FlameRounds",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 6,
+      "gameType": 3586,
+      "maxPickup": 12
+    },
+    {
+      "id": 18,
+      "name": "Bow Gun Arrows",
+      "symbol": "BowGunArrows",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 30,
+      "gameType": 3586,
+      "maxPickup": 60
+    },
+    {
+      "id": 19,
+      "name": "M93 R Part",
+      "symbol": "M93RPart",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 18,
+      "gameType": 1028,
+      "maxPickup": 18
+    },
+    {
+      "id": 20,
+      "name": "First Aid Spray",
+      "symbol": "FAidSpray",
+      "kinds": [
+        "heal"
+      ],
+      "gameMax": 1,
+      "gameType": 1032
+    },
+    {
+      "id": 21,
+      "name": "Green Herb",
+      "symbol": "GreenHerb",
+      "kinds": [
+        "heal"
+      ],
+      "gameMax": 1,
+      "gameType": 8
+    },
+    {
+      "id": 22,
+      "name": "Red Herb",
+      "symbol": "RedHerb",
+      "kinds": [
+        "heal"
+      ],
+      "gameMax": 1,
+      "gameType": 8
+    },
+    {
+      "id": 23,
+      "name": "Blue Herb",
+      "symbol": "BlueHerb",
+      "kinds": [
+        "heal"
+      ],
+      "gameMax": 1,
+      "gameType": 8
+    },
+    {
+      "id": 24,
+      "name": "Mixed Herb2 Green",
+      "symbol": "MixedHerb2Green",
+      "kinds": [
+        "heal"
+      ],
+      "gameMax": 1,
+      "gameType": 8
+    },
+    {
+      "id": 25,
+      "name": "Mixed Herb Red Green",
+      "symbol": "MixedHerbRedGreen",
+      "kinds": [
+        "heal"
+      ],
+      "gameMax": 1,
+      "gameType": 8
+    },
+    {
+      "id": 26,
+      "name": "Mixed Herb Blue Green",
+      "symbol": "MixedHerbBlueGreen",
+      "kinds": [
+        "heal"
+      ],
+      "gameMax": 1,
+      "gameType": 8
+    },
+    {
+      "id": 27,
+      "name": "Mixed Herb2 Green Blue",
+      "symbol": "MixedHerb2GreenBlue",
+      "kinds": [
+        "heal"
+      ],
+      "gameMax": 1,
+      "gameType": 8
+    },
+    {
+      "id": 28,
+      "name": "Mixed Herb3 Green",
+      "symbol": "MixedHerb3Green",
+      "kinds": [
+        "heal"
+      ],
+      "gameMax": 1,
+      "gameType": 8
+    },
+    {
+      "id": 29,
+      "name": "Mixed Herb Green Blue Red",
+      "symbol": "MixedHerbGreenBlueRed",
+      "kinds": [
+        "heal"
+      ],
+      "gameMax": 1,
+      "gameType": 8
+    },
+    {
+      "id": 30,
+      "name": "Magnum Bullets Inside Case",
+      "symbol": "MagnumBulletsInsideCase",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 6,
+      "gameType": 3586,
+      "maxPickup": 12
+    },
+    {
+      "id": 31,
+      "name": "Ink Ribbon",
+      "symbol": "InkRibbon",
+      "kinds": [
+        "inkribbon"
+      ],
+      "gameMax": 3,
+      "gameType": 3600,
+      "maxPickup": 6
+    },
+    {
+      "id": 32,
+      "name": "Magnum",
+      "symbol": "Magnum",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 6,
+      "gameType": 3073,
+      "maxPickup": 6,
+      "weaponKind": "powerful",
+      "ammo": [
+        13
+      ]
+    },
+    {
+      "id": 33,
+      "name": "Gold Lugers",
+      "symbol": "GoldLugers",
+      "kinds": [
+        "key",
+        "weapon"
+      ],
+      "gameMax": 0,
+      "gameType": 3329,
+      "slots": 2,
+      "maxPickup": 15
+    },
+    {
+      "id": 34,
+      "name": "Sub Machine Gun",
+      "symbol": "SubMachineGun",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 400,
+      "gameType": 5377,
+      "slots": 2,
+      "maxPickup": 255,
+      "weaponKind": "primary"
+    },
+    {
+      "id": 35,
+      "name": "Bow Gun Powder",
+      "symbol": "BowGunPowder",
+      "kinds": [
+        "gunpowder"
+      ],
+      "gameMax": 10,
+      "gameType": 3588
+    },
+    {
+      "id": 36,
+      "name": "Gun Powder Arrow",
+      "symbol": "GunPowderArrow",
+      "kinds": [
+        "gunpowder"
+      ],
+      "gameMax": 20,
+      "gameType": 3586
+    },
+    {
+      "id": 37,
+      "name": "BOW Gas Rounds",
+      "symbol": "BOWGasRounds",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 6,
+      "gameType": 3586,
+      "maxPickup": 6
+    },
+    {
+      "id": 38,
+      "name": "M Gun Bullets",
+      "symbol": "MGunBullets",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 400,
+      "gameType": 5122,
+      "maxPickup": 255
+    },
+    {
+      "id": 39,
+      "name": "Gas Mask",
+      "symbol": "GasMask",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 4
+    },
+    {
+      "id": 40,
+      "name": "Rifle Bullets",
+      "symbol": "RifleBullets",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 7,
+      "gameType": 3074,
+      "maxPickup": 14
+    },
+    {
+      "id": 41,
+      "name": "Duralumin Case Unused",
+      "symbol": "DuraluminCaseUnused",
+      "kinds": [],
+      "gameMax": 1,
+      "gameType": 1028
+    },
+    {
+      "id": 42,
+      "name": "A Rifle Bullets",
+      "symbol": "ARifleBullets",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 300,
+      "gameType": 5122,
+      "maxPickup": 150
+    },
+    {
+      "id": 43,
+      "name": "Alexanders Pierce",
+      "symbol": "AlexandersPierce",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 44,
+      "name": "Alexanders Jewel",
+      "symbol": "AlexandersJewel",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 45,
+      "name": "Alfreds Ring",
+      "symbol": "AlfredsRing",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 46,
+      "name": "Alfreds Jewel",
+      "symbol": "AlfredsJewel",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 47,
+      "name": "Prisoners Diary",
+      "symbol": "PrisonersDiary",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 48,
+      "name": "Directors Memo",
+      "symbol": "DirectorsMemo",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 49,
+      "name": "Instructions",
+      "symbol": "Instructions",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 50,
+      "name": "Lockpick",
+      "symbol": "Lockpick",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 51,
+      "name": "Glass Eye",
+      "symbol": "GlassEye",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 52,
+      "name": "Piano Roll",
+      "symbol": "PianoRoll",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 53,
+      "name": "Steering Wheel",
+      "symbol": "SteeringWheel",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 54,
+      "name": "Crane Key",
+      "symbol": "CraneKey",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 55,
+      "name": "Lighter",
+      "symbol": "Lighter",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1025
+    },
+    {
+      "id": 56,
+      "name": "Eagle Plate",
+      "symbol": "EaglePlate",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 57,
+      "name": "Side Pack",
+      "symbol": "SidePack",
+      "kinds": [
+        "special"
+      ],
+      "gameMax": 1,
+      "gameType": 4
+    },
+    {
+      "id": 58,
+      "name": "Map Roll",
+      "symbol": "MapRoll",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 59,
+      "name": "Hawk Emblem",
+      "symbol": "HawkEmblem",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 60,
+      "name": "Queen Ant Object",
+      "symbol": "QueenAntObject",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 61,
+      "name": "King Ant Object",
+      "symbol": "KingAntObject",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 62,
+      "name": "Biohazard Card",
+      "symbol": "BiohazardCard",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 63,
+      "name": "Duralumin Case M93 R Parts",
+      "symbol": "DuraluminCaseM93RParts",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 1,
+      "gameType": 1028
+    },
+    {
+      "id": 64,
+      "name": "Detonator",
+      "symbol": "Detonator",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 65,
+      "name": "Control Lever",
+      "symbol": "ControlLever",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 66,
+      "name": "Gold Dragonfly",
+      "symbol": "GoldDragonfly",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 67,
+      "name": "Silver Key",
+      "symbol": "SilverKey",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 68,
+      "name": "Gold Key",
+      "symbol": "GoldKey",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 69,
+      "name": "Army Proof",
+      "symbol": "ArmyProof",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 70,
+      "name": "Navy Proof",
+      "symbol": "NavyProof",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 71,
+      "name": "Air Force Proof",
+      "symbol": "AirForceProof",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 72,
+      "name": "Key With Tag",
+      "symbol": "KeyWithTag",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 73,
+      "name": "ID Card",
+      "symbol": "IDCard",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 74,
+      "name": "Map",
+      "symbol": "Map",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 75,
+      "name": "Airport Key",
+      "symbol": "AirportKey",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 76,
+      "name": "Emblem Card",
+      "symbol": "EmblemCard",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 77,
+      "name": "Skeleton Picture",
+      "symbol": "SkeletonPicture",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 78,
+      "name": "Music Box Plate",
+      "symbol": "MusicBoxPlate",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 79,
+      "name": "Gold Dragonfly No Wings",
+      "symbol": "GoldDragonflyNoWings",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 80,
+      "name": "Album",
+      "symbol": "Album",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 81,
+      "name": "Halberd",
+      "symbol": "Halberd",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 82,
+      "name": "Extinguisher",
+      "symbol": "Extinguisher",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 83,
+      "name": "Briefcase",
+      "symbol": "Briefcase",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 84,
+      "name": "Padlock Key",
+      "symbol": "PadlockKey",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 85,
+      "name": "TG01",
+      "symbol": "TG01",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 86,
+      "name": "Sp Alloy Emblem",
+      "symbol": "SpAlloyEmblem",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 87,
+      "name": "Valve Handle",
+      "symbol": "ValveHandle",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 88,
+      "name": "Octa Valve Handle",
+      "symbol": "OctaValveHandle",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 89,
+      "name": "Machine Room Key",
+      "symbol": "MachineRoomKey",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 90,
+      "name": "Mining Room Key",
+      "symbol": "MiningRoomKey",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 91,
+      "name": "Bar Code Sticker",
+      "symbol": "BarCodeSticker",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 92,
+      "name": "Sterile Room Key",
+      "symbol": "SterileRoomKey",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 93,
+      "name": "Door Knob",
+      "symbol": "DoorKnob",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 94,
+      "name": "Battery Pack",
+      "symbol": "BatteryPack",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 95,
+      "name": "Hemostatic Wire",
+      "symbol": "HemostaticWire",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 96,
+      "name": "Turn Table Key",
+      "symbol": "TurnTableKey",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 97,
+      "name": "Chem Storage Key",
+      "symbol": "ChemStorageKey",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 98,
+      "name": "Clement Alpha",
+      "symbol": "ClementAlpha",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 99,
+      "name": "Clement Sigma",
+      "symbol": "ClementSigma",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 100,
+      "name": "Tank Object",
+      "symbol": "TankObject",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 101,
+      "name": "Sp Alloy Emblem Unused",
+      "symbol": "SpAlloyEmblemUnused",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 102,
+      "name": "Alfreds Memo",
+      "symbol": "AlfredsMemo",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 103,
+      "name": "Rusted Sword",
+      "symbol": "RustedSword",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 104,
+      "name": "Hemostatic",
+      "symbol": "Hemostatic",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 105,
+      "name": "Security Card",
+      "symbol": "SecurityCard",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 106,
+      "name": "Security File",
+      "symbol": "SecurityFile",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 107,
+      "name": "Alexias Choker",
+      "symbol": "AlexiasChoker",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 108,
+      "name": "Alexias Jewel",
+      "symbol": "AlexiasJewel",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 109,
+      "name": "Queen Ant Relief",
+      "symbol": "QueenAntRelief",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 110,
+      "name": "King Ant Relief",
+      "symbol": "KingAntRelief",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 111,
+      "name": "Red Jewel",
+      "symbol": "RedJewel",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 112,
+      "name": "Blue Jewel",
+      "symbol": "BlueJewel",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 113,
+      "name": "Socket",
+      "symbol": "Socket",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 114,
+      "name": "Sq Valve Handle",
+      "symbol": "SqValveHandle",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 115,
+      "name": "Serum",
+      "symbol": "Serum",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 116,
+      "name": "Earthenware Vase",
+      "symbol": "EarthenwareVase",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 117,
+      "name": "Paper Weight",
+      "symbol": "PaperWeight",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 118,
+      "name": "Silver Dragonfly No Wings",
+      "symbol": "SilverDragonflyNoWings",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 119,
+      "name": "Silver Dragonfly",
+      "symbol": "SilverDragonfly",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 120,
+      "name": "Wing Object",
+      "symbol": "WingObject",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 2624
+    },
+    {
+      "id": 121,
+      "name": "Crystal",
+      "symbol": "Crystal",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 122,
+      "name": "Gold Dragonfly1 Wing",
+      "symbol": "GoldDragonfly1Wing",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 123,
+      "name": "Gold Dragonfly2 Wings",
+      "symbol": "GoldDragonfly2Wings",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 124,
+      "name": "Gold Dragonfly3 Wings",
+      "symbol": "GoldDragonfly3Wings",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 125,
+      "name": "File",
+      "symbol": "File",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 126,
+      "name": "Plant Pot",
+      "symbol": "PlantPot",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 127,
+      "name": "Picture B",
+      "symbol": "PictureB",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 128,
+      "name": "Duralumin Case Bow Gun Powder",
+      "symbol": "DuraluminCaseBowGunPowder",
+      "kinds": [
+        "gunpowder"
+      ],
+      "gameMax": 1,
+      "gameType": 1028
+    },
+    {
+      "id": 129,
+      "name": "Duralumin Case Magnum Rounds",
+      "symbol": "DuraluminCaseMagnumRounds",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 1,
+      "gameType": 1028
+    },
+    {
+      "id": 130,
+      "name": "Bow Gun Powder Unused",
+      "symbol": "BowGunPowderUnused",
+      "kinds": [
+        "gunpowder"
+      ],
+      "gameMax": 10,
+      "gameType": 3588
+    },
+    {
+      "id": 131,
+      "name": "Enhanced Handgun",
+      "symbol": "EnhancedHandgun",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 18,
+      "gameType": 3073,
+      "maxPickup": 18
+    },
+    {
+      "id": 132,
+      "name": "Memo",
+      "symbol": "Memo",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 133,
+      "name": "Board Clip",
+      "symbol": "BoardClip",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 134,
+      "name": "Card",
+      "symbol": "Card",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 135,
+      "name": "Newspaper Clip",
+      "symbol": "NewspaperClip",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 136,
+      "name": "Luger Replica",
+      "symbol": "LugerReplica",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 137,
+      "name": "Queen Ant Relief Complete",
+      "symbol": "QueenAntReliefComplete",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 1088
+    },
+    {
+      "id": 138,
+      "name": "Family Picture",
+      "symbol": "FamilyPicture",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 139,
+      "name": "File Folders",
+      "symbol": "FileFolders",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 140,
+      "name": "Remote Controller",
+      "symbol": "RemoteController",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 141,
+      "name": "Question A",
+      "symbol": "QuestionA",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 142,
+      "name": "M1 P",
+      "symbol": "M1P",
+      "kinds": [
+        "weapon"
+      ],
+      "gameMax": 100,
+      "gameType": 5377,
+      "slots": 2,
+      "weaponKind": "primary"
+    },
+    {
+      "id": 143,
+      "name": "Calico Bullets",
+      "symbol": "CalicoBullets",
+      "kinds": [
+        "ammo"
+      ],
+      "gameMax": 100,
+      "gameType": 5122,
+      "maxPickup": 200
+    },
+    {
+      "id": 144,
+      "name": "Clement Mixture",
+      "symbol": "ClementMixture",
+      "kinds": [
+        "gunpowder"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 145,
+      "name": "Playing Manual",
+      "symbol": "PlayingManual",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 2
+    },
+    {
+      "id": 146,
+      "name": "Question B",
+      "symbol": "QuestionB",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 147,
+      "name": "Question C",
+      "symbol": "QuestionC",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 148,
+      "name": "Question D",
+      "symbol": "QuestionD",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 149,
+      "name": "Empty Extinguisher",
+      "symbol": "EmptyExtinguisher",
+      "kinds": [],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 150,
+      "name": "Square Socket",
+      "symbol": "SquareSocket",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 151,
+      "name": "Question E",
+      "symbol": "QuestionE",
+      "kinds": [
+        "document"
+      ],
+      "gameMax": 1,
+      "gameType": 64
+    },
+    {
+      "id": 152,
+      "name": "Crest Key S",
+      "symbol": "CrestKeyS",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 6,
+      "gameType": 3073
+    },
+    {
+      "id": 153,
+      "name": "Crest Key G",
+      "symbol": "CrestKeyG",
+      "kinds": [
+        "key"
+      ],
+      "gameMax": 6,
+      "gameType": 3073
+    }
+  ]
+}

@@ -761,7 +761,7 @@
     "2001": {
       "doorRando": [
         {
-          "type": "exclude"
+          "category": "exclude"
         }
       ],
       "items": [
@@ -782,7 +782,7 @@
     "2002": {
       "doorRando": [
         {
-          "type": "exclude"
+          "category": "exclude"
         }
       ],
       "items": [
@@ -839,7 +839,7 @@
       ],
       "items": [
         {
-          "id": 0,
+          "id": 17,
           "globalId": 159,
           "type": 12,
           "amount": 15
@@ -1022,7 +1022,7 @@
         {
           "id": 7,
           "globalId": 169,
-          "type": 22,
+          "type": 21,
           "amount": 1
         }
       ]
@@ -1559,18 +1559,12 @@
           "id": 13,
           "globalId": 196,
           "type": 15,
-          "amount": 6
+          "amount": 6, "offsets": [ "0x70A84" ]
         },
         {
           "id": 12,
           "globalId": 197,
-          "type": 15,
-          "amount": 1
-        },
-        {
-          "id": 5,
-          "globalId": 17,
-          "type": 15,
+          "type": 21,
           "amount": 1
         },
         {
@@ -1758,7 +1752,7 @@
       ],
       "items": [
         {
-          "id": 0,
+          "id": 3,
           "globalId": 203,
           "type": 12,
           "amount": 15
@@ -2280,7 +2274,7 @@
         },
         {
           "id": 1,
-          "target": "40A0",
+          "target": "4120",
           "entranceId": 2
         },
         {
@@ -2370,12 +2364,12 @@
           "entranceId": 0
         },
         {
-          "id": 1,
+          "id": 2,
           "target": "4100",
           "entranceId": 1
         },
         {
-          "id": 2,
+          "id": 1,
           "target": "4130",
           "entranceId": 2
         }
@@ -2880,7 +2874,7 @@
         {
           "id": 8,
           "globalId": 362,
-          "type": 12,
+          "type": 15,
           "amount": 15
         },
         {
@@ -3137,7 +3131,7 @@
         {
           "id": 13,
           "globalId": 276,
-          "type": 4,
+          "type": 3,
           "amount": 6,
           "priority": "low"
         }
@@ -3376,7 +3370,7 @@
         {
           "id": 3,
           "globalId": 298,
-          "type": 12,
+          "type": 20,
           "amount": 15,
           "priority": "low"
         }
@@ -5198,7 +5192,7 @@
         {
           "id": 13,
           "globalId": 42,
-          "type": 107,
+          "type": 43,
           "amount": 1,
           "requires": [ 54 ],
           "offsets": [ "0x19B192", "0x19B1AC" ]
@@ -5641,7 +5635,7 @@
         {
           "id": 253,
           "globalId": 384,
-          "type": 12,
+          "type": 13,
           "amount": 15,
           "offsets": [ "0x538FA", "0x545BA", "0x545CC" ],
           "requires": [ 80, 111 ],
@@ -5650,7 +5644,7 @@
         {
           "id": 252,
           "globalId": 64,
-          "type": 12,
+          "type": 113,
           "amount": 15,
           "offsets": [ "0x53A0A", "0x54668", "0x5467A" ],
           "requires": [ 88, 112 ],

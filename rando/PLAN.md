@@ -185,7 +185,7 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
   - `nop` ranges fall inside the script region.
 
   Fix or flag any mismatch. All are expected to pass, since it is the same disc.
-- Audit the 40 rooms in the AFS that are not in `rdt.json`: cutscene-only, duplicate variants, or missing data. Add entries where they have items or doors that matter, using `dump-room`.
+- (Done; see Status.) Audit the 40 rooms in the AFS that are not in `rdt.json`: cutscene-only, duplicate variants, or missing data. Add entries where they have items or doors that matter, using `dump-room`.
 - Write `items.json`: ID → name (from `ReCvItemIds`, cross-checked against `SYSMES.ALD` names and `itemdata[]` in `item.c`), kind (key/weapon/ammo/health/ink/document/other), max stack, the ammo each weapon uses, and the Claire/Chris inventory rules.
 
 ### Phase 4: Item randomizer
@@ -327,6 +327,20 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
   - recvx-config shows the seed; "Play normal game" removes `mod=` and restores `saves=`.
   - Not verified in play: `no_nosferatu_poison`, `fix_rifle_stacking`, Chris's starting items, the "Randomizer..." button (needs `cvx-rando.exe`).
 - Testing tips: `RECVX_WARP=7,11,4` puts Claire on top of a pickup (RM_7110 entrance 4); with `newgame.txt` plus `status+90 cross 8` / `status+170 start 8` the item is taken and the inventory shown. Fresh warped games have no weapons, so enemies kill Claire after about a minute.
+
+### Phase 3: done (2026-10-13)
+- `Cvx.Formats/Script`: `CvScriptReader` + `CvOpcodes` (BioRand's opcode size and name tables; every script in all 205 rooms walks with known sizes, no fallbacks), `AotStates` (each trigger area's room state plus every `set_etc_atari2` write in its scripts).
+- `Cvx.Rando/Data`: `RoomMap` (port of BioRand's `Map`; `OffsetSpec` for offsets/ranges), `ItemCatalog` (`data/items.json`, generated once from BioRand's item helper and the game's `itemdata`), `RandoData` (embedded `data/items.json`, `data/recv/rdt.json`, `data/recv/enemy.json`), `DataValidator`.
+- CLI `verify-data [--all]` and `dump-script <room>`.
+- **Facts that later phases must use** (details in `data/recv/CHANGES.md`):
+  - Room scripts rewrite trigger areas with `set_etc_atari2` (0x25: id, attr u16, prm0-3, type). Many doors are examine areas (type 3) whose event calls `set_door_call` (0x33: target stage/room/entrance in bytes 4-6). So door rando must work like BioRand's `OverrideDoor` (a per-frame script that catches the trigger-area flag and calls the door), not only by editing the trigger area.
+  - Trigger-area types: 0 door, 1 stairs, 2 climb/jump, 3 examine, 4 item (hitchk.c `bhCheckExmAtari`).
+  - `entranceId` in the data = arrival entrance in the door's own room (BioRand's DoorRandomiser line 659). 333 of 340 doors match the doors leading back.
+  - The entrance position table (`posp`) can be shorter than the entrance numbers in use; room scripts place the player themselves (they read `pos_no`, script variable 15).
+  - BioRand's "Handgun Bullets x15" entries can be placeholders; the room file or the giving script is the truth.
+- Data fixed: 8 item types, 2 trigger-area ids, 1 added script offset, 1 bogus item removed, 2 door targets and 1 id swap, 2 `doorRando` typos. 7 door errors and 24 warnings stay open for Phase 6 (listed in CHANGES.md, asserted by a test).
+- 40 rooms are not in the data: the Battle Game rooms (RM_55xx-58xx), cutscene rooms, and some room variants. **Phase 4 must mirror item changes into unmapped variants** (same item at the same position as the mapped variant, e.g. RM_3010/RM_3011).
+- 38 tests pass.
 
 ## Risks / open items for the executing agent
 - **Don't copy BioRand's CV item writes as-is**: it writes `type` and relies on its executable patch; we write `id` (see Key facts). Treat every BioRand CV write as unverified until it is checked against the game's C code.
