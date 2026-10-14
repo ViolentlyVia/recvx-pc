@@ -12,6 +12,7 @@
   <ItemGroup>
     <EmbeddedResource Include="..\..\data\items.json" LogicalName="data/items.json" />
     <EmbeddedResource Include="..\..\data\enemies.json" LogicalName="data/enemies.json" />
+    <EmbeddedResource Include="..\..\data\music.json" LogicalName="data/music.json" />
     <EmbeddedResource Include="..\..\data\recv\rdt.json" LogicalName="data/recv/rdt.json" />
     <EmbeddedResource Include="..\..\data\recv\enemy.json" LogicalName="data/recv/enemy.json" />
   </ItemGroup>

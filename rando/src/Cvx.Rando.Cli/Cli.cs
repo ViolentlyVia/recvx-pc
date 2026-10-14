@@ -41,6 +41,7 @@ internal static class Cli
                 "swap-enemies" => SwapEnemies(options),
                 "enemy-donors" => EnemyDonors(options),
                 "dump-sounds" => DumpSounds(options),
+                "dump-music" => DumpMusic(options),
                 "bench-prs" => BenchPrs(options),
                 _ => Unknown(args[0]),
             };
@@ -73,7 +74,7 @@ internal static class Cli
                                                  and check the result; --out also writes an
                                                  RDX_LNK.AFS with every room recompressed
               generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--inventory] [--no-poison]
-                       [--doors] [--enemies] [--enemy-difficulty 0-3] [--out <dir>] [--spoiler]
+                       [--doors] [--enemies] [--enemy-difficulty 0-3] [--music] [--out <dir>] [--spoiler]
                                                  randomize; --out writes the mod folder (RDX_LNK.AFS,
                                                  rando.ini, rando_doors.txt, spoiler.txt, graph.dot,
                                                  graph.dgml) for recvx-pc's mod=
@@ -304,6 +305,25 @@ internal static class Cli
         return bad == 0 ? 0 : 1;
     }
 
+    private static int DumpMusic(Options options)
+    {
+        // Every music track: which discs have it, its length, whether it loops, and which rooms ask for it.
+        var data = OpenData(options);
+        var discs = new[] { 1, 2 }.ToDictionary(d => d, d => global::Cvx.Formats.Music.ReadDisc(data, d));
+        using var rooms = RoomArchive.Open(data);
+        var requests = RoomTable.All.SelectMany(id => global::Cvx.Formats.Music.Requests(id, rooms.ReadRoom(id))).ToList();
+        var tracks = discs.Values.SelectMany(d => d.Keys).Concat(requests.Select(r => r.Track)).Distinct().Order();
+        foreach (var t in tracks)
+        {
+            var info = discs[1].TryGetValue(t, out var a) ? a : discs[2].TryGetValue(t, out var b) ? b : (AdxInfo?)null;
+            var where = string.Join("", new[] { 1, 2 }.Select(d => discs[d].ContainsKey(t) ? d.ToString() : "-"));
+            var uses = requests.Where(r => r.Track == t).ToList();
+            var rs = string.Join(" ", uses.GroupBy(r => r.Room).Select(g => $"{g.Key.Name}{(g.All(r => r.Opcode == "set_next_room_bgm") ? "n" : "")}"));
+            Console.WriteLine($"{t,3} disc {where} {(info is { } i ? $"{i.Seconds,6:0.0}s {(i.Loops ? "loop" : "once")} {i.Channels}ch {i.SampleRate}" : "   (none)"),-28} {uses.Count,3} uses: {rs}");
+        }
+        return 0;
+    }
+
     private static int DumpSounds(Options options)
     {
         // A room's sound pack: its banks (type, number, size).
@@ -419,6 +439,7 @@ internal static class Cli
             NoNosferatuPoison = options.Has("no-poison"),
             RandomDoors = options.Has("doors"),
             RandomEnemies = options.Has("enemies"),
+            RandomMusic = options.Has("music"),
             EnemyDifficulty = options.Get("enemy-difficulty") is { } ed ? int.Parse(ed) : 1,
         };
         using var rooms = RoomArchive.Open(OpenData(options));

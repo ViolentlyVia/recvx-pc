@@ -19,6 +19,7 @@ public static class Spoiler
                       $"{(s.RandomItems && !s.IncludeChris ? " (Claire's half only)" : "")}");
         sb.AppendLine($"Doors: {(s.RandomDoors ? "random" : "off")}");
         sb.AppendLine($"Enemies: {(s.RandomEnemies ? $"random, difficulty {s.EnemyDifficulty}" : "off")}");
+        sb.AppendLine($"Music: {(s.RandomMusic ? "shuffled" : "off")}");
         sb.AppendLine();
 
         if (result.Doors is { } doors)
@@ -83,6 +84,15 @@ public static class Spoiler
                 var was = string.Join(", ", c.OldTypes.GroupBy(t => t).Select(g => $"{g.Count()} {Name(g.Key)}"));
                 sb.AppendLine($"  {RoomLabel(c.Room)}  {was} -> {c.NewKind.Name}{(c.SoundFrom == null ? "  (sounds unchanged)" : "")}");
             }
+            sb.AppendLine();
+        }
+
+        if (result.Music.Count != 0)
+        {
+            sb.AppendLine("Music (track numbers as in dump-music)");
+            sb.AppendLine("-----");
+            foreach (var group in result.Music.GroupBy(m => m.Category))
+                sb.AppendLine($"  {group.Key}: {string.Join(", ", group.Select(m => m.From == m.To ? $"{m.From}" : $"{m.From}->{m.To}"))}");
             sb.AppendLine();
         }
 

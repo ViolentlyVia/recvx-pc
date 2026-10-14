@@ -7,6 +7,7 @@ using Cvx.Rando.Data;
 using Cvx.Rando.Doors;
 using Cvx.Rando.Enemies;
 using Cvx.Rando.Items;
+using Cvx.Rando.Music;
 
 namespace Cvx.Rando;
 
@@ -18,6 +19,8 @@ public sealed record GenerationResult
     public DoorPlan? Doors { get; init; }
     /// <summary>Rooms whose enemies changed.</summary>
     public IReadOnlyList<EnemyRoomChange> Enemies { get; init; } = [];
+    /// <summary>Music tracks swapped (rando.ini bgm_map).</summary>
+    public IReadOnlyList<MusicSwap> Music { get; init; } = [];
     /// <summary>Door layouts made until one could be finished.</summary>
     public int DoorAttempts { get; init; }
     /// <summary>rando_doors.txt, with random doors.</summary>
@@ -103,6 +106,10 @@ public static class Generator
             ? new EnemyRandomizer(data, archive, settings, Rng.For(settings.Seed, "enemies")).Apply(patcher)
             : [];
 
+        var music = settings.RandomMusic && archive.Data is { } gameData
+            ? MusicRandomizer.Shuffle(data.Music, MusicRandomizer.Present(gameData), Rng.For(settings.Seed, "music"))
+            : [];
+
         if (settings.RandomItems && settings.ItemMode == ItemMode.Custom)
             amounts = PickupAmounts(data.Items, settings, Rng.For(settings.Seed, "amounts"));
 
@@ -114,6 +121,7 @@ public static class Generator
             Doors = doors,
             DoorAttempts = doorAttempts,
             Enemies = enemies,
+            Music = music,
             DoorTable = doors == null ? null : Doors.DoorTable.Write(doors, data),
             GraphDot = graph == null ? null : GraphExport.Dot(graph, data.Items, saveRooms),
             GraphDgml = graph == null ? null : GraphExport.Dgml(graph, data.Items, saveRooms),
@@ -233,6 +241,9 @@ public static class Generator
             sb.AppendLine($"start_items_{inventory.Character}=" + string.Join(",",
                 inventory.Items.Select(i => string.Create(CultureInfo.InvariantCulture, $"{i.Type}:{i.Count}"))));
         }
+        var swapped = result.Music.Where(m => m.From != m.To).ToList();
+        if (swapped.Count != 0)
+            sb.AppendLine("bgm_map=" + string.Join(",", swapped.Select(m => string.Create(CultureInfo.InvariantCulture, $"{m.From}:{m.To}"))));
         if (result.PickupAmounts.Count != 0)
         {
             sb.AppendLine("pickup_amounts=" + string.Join(",",

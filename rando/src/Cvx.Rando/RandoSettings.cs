@@ -42,6 +42,10 @@ public sealed record RandoSettings
     /// <summary>0 easy, 1 normal, 2 hard, 3 very hard: which types come up and how many may share a room.</summary>
     public int EnemyDifficulty { get; init; } = 1;
 
+    // Music
+    /// <summary>Swap music tracks within their category (area, save room, tension, boss).</summary>
+    public bool RandomMusic { get; init; }
+
     /// <summary>Nosferatu's attack never poisons (BioRand does this with random doors).</summary>
     public bool NoNosferatuPoison { get; init; }
 

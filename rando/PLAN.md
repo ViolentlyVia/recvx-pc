@@ -396,7 +396,7 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
 - **In game** (seed 2): a new game starts in RM_0010; its door leads to the RM_1080 office (typewriter). Static doors from RM_0050 to the RM_3011 variant, RM_2050 to the RM_0021 variant (case 1), and Chris's RM_9060 to RM_9170 entrance 2 all load the right room at the right entrance.
 - **Not verified in play:** script doors (walk-in and examine areas that call `set_door_call`): they go through the same lookup as static doors, but a warped test cannot meet their story conditions. The 7 known door data errors (CHANGES.md) are unchanged. A full door seed playthrough is the owner's to do.
 
-### Phase 7: done (2026-10-14), not committed yet
+### Phase 7: done (2026-10-14), committed `b96b6d2`
 - **How the game loads enemies** (room.c `bhSetRDT`, `bhSetEneMdl`, `bhFinishRoom`; `Rdx/RdxEnemyLayout`):
   - models (`hed01`): the room's, one page per enemy, then objects (from the fifth) and items. Pages hold relative offsets and are relocated in place, so each enemy needs its own copy;
   - motions (`hed02`): one entry per enemy work; the first enemy of a type carries the type's block (a zombie's is ~940 KB), later ones are 0 and share it;
@@ -412,6 +412,14 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
 - **In game:** RM_0060's zombies as Cerberus dogs attack Claire; Hunters (RM_7190) killed Claire; zombies in the former Bandersnatch room RM_1060 attack. A sweep warped into every changed room of seed 3 (36 rooms, Claire and Chris, with the changed sound packs loaded): all load and keep running. The first sweep, before event-controlled enemies were kept, found the RM_0031 crash.
 - **Not verified:** that the swapped enemy sounds are right (needs listening); bats were never caught on camera in the sweeps; difficulty balance.
 - **Later:** more rooms could change if an event's enemy kept its type while the rest change (done) and if more kinds were checked (Moth, Albinoid, Spotter); BioRand's 50 extra stage-1 positions (`enemy.json`) are not used.
+
+### Phase 8: done (2026-10-14), not committed yet
+- **How music plays:** room scripts ask for a track (`bgm_on`, `bgm_on_2`, `bgm_on_ex`, `bgm_on_2_ex`: byte 1; `set_next_room_bgm`: byte 6) and the track number is an entry of BGM1.AFS (rooms of stages 0-5) or BGM2.AFS (stages 6-9). Each disc's archive only holds its own tracks; the others are 72-byte placeholders. recvx-pc already remaps the requests (Phase 2, `bgm_map`).
+- **Catalog** (`data/music.json`, `dump-music`): every track's discs, length, whether it loops (ADX header) and the rooms that ask for it. One-shot tracks are stingers and event music and stay. Looping ones are sorted into Area (18), Save room (1: only typewriter rooms ask for it), Tension (12 short loops in enemy rooms) and Boss (13). BioRand never randomized Code: Veronica's music, so the categories are new; listen and move tracks between lists to refine them.
+- **Shuffle** (`Music/MusicRandomizer`): a random permutation within each category, where a track only becomes one that every disc it is on also has (scripts only ask for tracks their disc has: tested). The swaps go to rando.ini `bgm_map`; no game file changes.
+- CLI `generate --music`; spoiler section; 3 tests.
+- **Not verified in play:** listening (the categories come from the scripts, not from hearing every track).
+- **Fix found by the owner's playthrough:** BioRand's item-mode tweaks made RM_0010 and RM_0050 always load RM_0021/RM_0031, which skipped the graveyard explosion and zombies rising (RM_0020) and the RM_0030 event. The game loads those event versions once the RM_0080 pickup is taken (item flag 4, kept by the item rando since the flag belongs to the spot) and returns to RM_0021/RM_0031 after; the tweaks are no longer applied (random doors never had them).
 
 ## Risks / open items for the executing agent
 - **Don't copy BioRand's CV item writes as-is**: it writes `type` and relies on its executable patch; we write `id` (see Key facts). Treat every BioRand CV write as unverified until it is checked against the game's C code.

@@ -55,11 +55,10 @@ public static class RoomTweaks
         Nop("1000", 0x18CD74, TweakMode.Always, "do not put Rodrigo's gift into the special slot"),
         Nop("1000", 0x18DB7C, TweakMode.Always, "do not put Rodrigo's gift into the special slot"),
 
-        Nop("1010", 0x3EF2C, TweakMode.ItemsOnly, "always load RM_0021 (briefcase and medal)"),
-        Nop("1010", 0x3EF38, 0x3EF4C, TweakMode.ItemsOnly, "always load RM_0021 (briefcase and medal)"),
-        Nop("1010", 0x3EF50, 0x3EF5A, TweakMode.ItemsOnly, "always load RM_0021 (briefcase and medal)"),
-        Nop("1050", 0x1DF2AA, 0x1DF2BE, TweakMode.ItemsOnly, "always load RM_0031"),
-        Nop("1050", 0x1DF2C2, 0x1DF2CC, TweakMode.ItemsOnly, "always load RM_0031"),
+        // Not ported: BioRand also made RM_0010 and RM_0050 always load RM_0021 and RM_0031. The
+        // game loads the event versions (RM_0020: the explosion and zombies rising from the
+        // graves; RM_0030) once the pickup in RM_0080 is taken (item flag 4) and goes back to
+        // RM_0021/RM_0031 afterwards; forcing the later versions skipped those events.
 
         Nop("1070", 0x1819AE, TweakMode.Always, "the window cutscene plays when the item is taken"),
 

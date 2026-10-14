@@ -40,12 +40,13 @@ dotnet run --project src/Cvx.Rando.Cli -- <command>
 | `dump-all --out <file.json> [--data <dir>]` | Writes the summary of every room to one JSON file |
 | `extract-room <RM_xxxx> --out <file> [--data <dir>]` | Writes a room's expanded file |
 | `roundtrip [--data <dir>] [--out <dir>]` | Rebuilds every room and the archive without changes and checks the result |
-| `generate [--seed <n>] [--mode shuffle\|custom] [--claire-only] [--inventory] [--no-poison] [--doors] [--enemies] [--enemy-difficulty 0-3] [--out <dir>] [--spoiler]` | Randomizes the items (`--inventory`: random starting items for Claire and Chris; `--no-poison`: Nosferatu does not poison; `--doors`: random doors, starting in the second room with its door to a save room; `--enemies`: other enemy types in each room, by difficulty 0-3); `--out` writes the mod folder (`RDX_LNK.AFS`, `MULTSPQ1/2.AFS` for enemy sounds, `rando.ini`, `rando_doors.txt`, `spoiler.txt`, `graph.dot`, `graph.dgml`, `settings.json`) for recvx-pc's `mod=` |
+| `generate [--seed <n>] [--mode shuffle\|custom] [--claire-only] [--inventory] [--no-poison] [--doors] [--enemies] [--enemy-difficulty 0-3] [--music] [--out <dir>] [--spoiler]` | Randomizes the items (`--inventory`: random starting items for Claire and Chris; `--no-poison`: Nosferatu does not poison; `--doors`: random doors, starting in the second room with its door to a save room; `--enemies`: other enemy types in each room, by difficulty 0-3; `--music`: music shuffled within its category); `--out` writes the mod folder (`RDX_LNK.AFS`, `MULTSPQ1/2.AFS` for enemy sounds, `rando.ini`, `rando_doors.txt`, `spoiler.txt`, `graph.dot`, `graph.dgml`, `settings.json`) for recvx-pc's `mod=` |
 | `save-rooms [--data <dir>]` | Lists the rooms with an item box or a typewriter |
 | `dump-enemies [<RM_xxxx>] [--scripts]` | Each room's enemies with the model, motion and texture data the game loads for them; `--scripts` adds the script opcodes that act on enemies |
 | `enemy-donors` | For each enemy type and model version, the rooms it can be copied from (for `data/enemies.json`) |
 | `swap-enemies <RM_xxxx> --donor <RM_xxxx>:<index> [--only <types>] [--effect <n>] [--out <dir>]` | Testing aid: turns a room's enemies into another room's enemy and writes a mod folder |
 | `dump-sounds <RM_xxxx>[,...]` | A room's sound pack banks (MULTSPQ1/2.AFS) |
+| `dump-music` | Every music track: discs, length, whether it loops, and the rooms that ask for it (for `data/music.json`) |
 | `room-memory [--recompress] [--all]` | The rooms with the least room to grow in the game's room memory |
 | `dump-script <RM_xxxx> [--from <hex>] [--to <hex>]` | Lists a room's script opcodes with their file offsets, item names and door targets |
 | `verify-data [--all]` | Checks the built-in room data against the game's rooms (see `data/recv/CHANGES.md`) |
