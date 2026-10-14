@@ -66,6 +66,31 @@ static void mc_root(void)
     {
         snprintf(root, sizeof(root), "%s/saves", dir);
     }
+    else if (!((root[0] == '\\') || (root[0] == '/') || (root[1] == ':')))
+    {
+        /* relative to the exe, like mod= (not to the folder the game was started from) */
+        char rel[1024];
+
+        snprintf(rel, sizeof(rel), "%s", root);
+        snprintf(root, sizeof(root), "%s/%s", dir, rel);
+    }
+
+    /* every level, so saves= can name a folder inside a new one (saves_rando/<seed>) */
+    {
+        char* p;
+
+        for (p = root + 1; *p != 0; p++)
+        {
+            if ((*p == '/') || (*p == '\\'))
+            {
+                char c = *p;
+
+                *p = 0;
+                _mkdir(root);
+                *p = c;
+            }
+        }
+    }
 
     _mkdir(root);
     pcLog("saves: %s", root);

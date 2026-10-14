@@ -256,6 +256,14 @@ static int data_open(void)
     {
         snprintf(data_dir, sizeof(data_dir), "%s/data", dir);
     }
+    else if (!((data_dir[0] == '\\') || (data_dir[0] == '/') || (data_dir[1] == ':')))
+    {
+        /* relative to the exe, like mod= */
+        char rel[1024];
+
+        snprintf(rel, sizeof(rel), "%s", data_dir);
+        snprintf(data_dir, sizeof(data_dir), "%s/%s", dir, rel);
+    }
 
     snprintf(idx, sizeof(idx), "%s/files.idx", data_dir);
 

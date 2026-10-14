@@ -100,9 +100,9 @@ Optional, next to `recvx.exe`, one `key=value` per line (the settings app writes
 
 | Key | Meaning |
 |---|---|
-| `data=` | extracted game data folder (default: `data` next to the exe) |
+| `data=` | extracted game data folder (default: `data` next to the exe; a relative path is relative to the exe) |
 | `iso=` | disc image to run from instead of extracted data |
-| `saves=` | save folder (default: `saves` next to the exe) |
+| `saves=` | save folder (default: `saves` next to the exe; a relative path is relative to the exe, and missing folders are created) |
 | `hd_textures=` | folder of a PCSX2 texture replacement pack (`.dds` files) |
 | `debug_save=1` | debug: the "Save anywhere" key (F5) opens the typewriter's save screen anywhere in normal play, without an ink ribbon |
 | `scale=` | internal resolution multiplier, 1 to 8 (default 3: 1920x1440 at 4:3) |
