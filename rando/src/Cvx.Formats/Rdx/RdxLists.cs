@@ -73,28 +73,30 @@ public readonly struct RdxPageList(int baseOffset, ReadOnlyMemory<byte> data)
         return new RdxPageList(baseOffset, result);
     }
 
-    /// <summary>Builds a list from pages; an empty page gets offset 0.</summary>
-    public static RdxPageList FromPages(int baseOffset, IReadOnlyList<ReadOnlyMemory<byte>> pages)
+    /// <summary>
+    /// Builds a list from pages; an empty page gets offset 0. Each page starts at a multiple of
+    /// <paramref name="align"/> from <paramref name="baseOffset"/> (zero padding between).
+    /// </summary>
+    public static RdxPageList FromPages(int baseOffset, IReadOnlyList<ReadOnlyMemory<byte>> pages, int align = 1)
     {
-        using var ms = new MemoryStream();
-        using var bw = new BinaryWriter(ms);
-        var offset = baseOffset + pages.Count * 4;
-        foreach (var page in pages)
+        var offsets = new int[pages.Count];
+        var position = pages.Count * 4;
+        for (var i = 0; i < pages.Count; i++)
         {
-            if (page.Length == 0)
-            {
-                bw.Write(0);
-            }
-            else
-            {
-                bw.Write(offset);
-                offset += page.Length;
-            }
+            if (pages[i].Length == 0)
+                continue;
+            position = (position + align - 1) / align * align;
+            offsets[i] = baseOffset + position;
+            position += pages[i].Length;
         }
-        foreach (var page in pages)
-            bw.Write(page.Span);
-        bw.Flush();
-        return new RdxPageList(baseOffset, ms.ToArray());
+        var result = new byte[position];
+        for (var i = 0; i < pages.Count; i++)
+        {
+            BitConverter.TryWriteBytes(result.AsSpan(i * 4), offsets[i]);
+            if (offsets[i] != 0)
+                pages[i].Span.CopyTo(result.AsSpan(offsets[i] - baseOffset));
+        }
+        return new RdxPageList(baseOffset, result);
     }
 }
 
@@ -122,6 +124,31 @@ public readonly struct RdxTextureList(int baseOffset, ReadOnlyMemory<byte> data)
             }
             return result;
         }
+    }
+
+    /// <summary>
+    /// Builds a list from groups: the count and offsets in a header of at least
+    /// <paramref name="headerSize"/> bytes (the game's files pad it), each group at a multiple
+    /// of <paramref name="align"/>.
+    /// </summary>
+    public static RdxTextureList FromGroups(int baseOffset, IReadOnlyList<ReadOnlyMemory<byte>> groups, int headerSize, int align = 64)
+    {
+        var position = Math.Max(headerSize, 4 + groups.Count * 4);
+        var offsets = new int[groups.Count];
+        for (var i = 0; i < groups.Count; i++)
+        {
+            position = (position + align - 1) / align * align;
+            offsets[i] = baseOffset + position;
+            position += groups[i].Length;
+        }
+        var result = new byte[position];
+        BitConverter.TryWriteBytes(result, groups.Count);
+        for (var i = 0; i < groups.Count; i++)
+        {
+            BitConverter.TryWriteBytes(result.AsSpan(4 + i * 4), offsets[i]);
+            groups[i].Span.CopyTo(result.AsSpan(offsets[i] - baseOffset));
+        }
+        return new RdxTextureList(baseOffset, result);
     }
 
     public RdxTextureList WithNewBaseOffset(int baseOffset)

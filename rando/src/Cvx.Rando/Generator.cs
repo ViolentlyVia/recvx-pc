@@ -5,6 +5,7 @@ using Cvx.Formats;
 using Cvx.Formats.Rdx;
 using Cvx.Rando.Data;
 using Cvx.Rando.Doors;
+using Cvx.Rando.Enemies;
 using Cvx.Rando.Items;
 
 namespace Cvx.Rando;
@@ -15,6 +16,8 @@ public sealed record GenerationResult
     public required IReadOnlyDictionary<RoomId, RdxFile> ChangedRooms { get; init; }
     public ItemPlacementResult? Items { get; init; }
     public DoorPlan? Doors { get; init; }
+    /// <summary>Rooms whose enemies changed.</summary>
+    public IReadOnlyList<EnemyRoomChange> Enemies { get; init; } = [];
     /// <summary>Door layouts made until one could be finished.</summary>
     public int DoorAttempts { get; init; }
     /// <summary>rando_doors.txt, with random doors.</summary>
@@ -96,6 +99,10 @@ public static class Generator
             RoomTweaks.Apply(patcher, settings, data);
         }
 
+        var enemies = settings.RandomEnemies
+            ? new EnemyRandomizer(data, archive, settings, Rng.For(settings.Seed, "enemies")).Apply(patcher)
+            : [];
+
         if (settings.RandomItems && settings.ItemMode == ItemMode.Custom)
             amounts = PickupAmounts(data.Items, settings, Rng.For(settings.Seed, "amounts"));
 
@@ -106,6 +113,7 @@ public static class Generator
             Items = items,
             Doors = doors,
             DoorAttempts = doorAttempts,
+            Enemies = enemies,
             DoorTable = doors == null ? null : Doors.DoorTable.Write(doors, data),
             GraphDot = graph == null ? null : GraphExport.Dot(graph, data.Items, saveRooms),
             GraphDgml = graph == null ? null : GraphExport.Dgml(graph, data.Items, saveRooms),
@@ -195,6 +203,8 @@ public static class Generator
                 File.Delete(path);
         }
         Write("rando.ini", RandoIni(result));
+        if (archive.Data is { } data)
+            EnemySounds.Write(data, result.Enemies, directory);
         Write(DoorTable.FileName, result.DoorTable);
         Write("spoiler.txt", result.Spoiler);
         Write("graph.dot", result.GraphDot);

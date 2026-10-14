@@ -7,8 +7,34 @@ namespace Cvx.Formats;
 /// </summary>
 public static class Expand
 {
-    public static byte[] Decompress(ReadOnlySpan<byte> source, int capacityHint = 0)
+    /// <summary>
+    /// The room memory pool of recvx-pc (bytes from <c>sys->memp</c> to <c>sys->endp</c> when a
+    /// room loads, from its <c>room ...: pool</c> log line). The packed room is read to the top
+    /// of the pool and expanded from the bottom, in place.
+    /// </summary>
+    public const int RoomPool = 11160448;
+
+    /// <summary>Where the game puts a packed room of <paramref name="packedSize"/> bytes, from the pool's start.</summary>
+    public static int PackedOffset(int packedSize) => (RoomPool - packedSize) & ~63;
+
+    /// <summary>
+    /// Whether the game can expand <paramref name="source"/> in place: the output never reaches
+    /// packed bytes the decompressor has not read yet, and the room fits the pool.
+    /// </summary>
+    public static bool FitsRoomPool(ReadOnlySpan<byte> source, out int expandedSize, out int spare)
     {
+        var data = Decompress(source, 0, out var maxLead);
+        expandedSize = data.Length;
+        spare = PackedOffset(source.Length) - maxLead - 1;
+        return spare >= 0 && expandedSize <= RoomPool;
+    }
+
+    public static byte[] Decompress(ReadOnlySpan<byte> source, int capacityHint = 0) => Decompress(source, capacityHint, out _);
+
+    /// <param name="maxLead">The most the output was ahead of the input when a byte was written (output position minus input bytes read).</param>
+    public static byte[] Decompress(ReadOnlySpan<byte> source, int capacityHint, out int maxLead)
+    {
+        var lead = 0;
         var dst = new byte[Math.Max(capacityHint, source.Length * 4 + 256)];
         var d = 0;
         var s = 0;
@@ -35,7 +61,9 @@ public static class Expand
             if (GetBit(source) != 0)
             {
                 Ensure(ref dst, d + 1);
-                dst[d++] = source[s++];
+                var b = source[s++];
+                lead = Math.Max(lead, d - s);
+                dst[d++] = b;
                 continue;
             }
 
@@ -72,11 +100,13 @@ public static class Expand
             if (d + offset < 0)
                 throw new InvalidDataException("Back reference before the start of the output.");
             Ensure(ref dst, d + count);
+            lead = Math.Max(lead, d + count - 1 - s);
             for (var i = 0; i < count; i++, d++)
                 dst[d] = dst[d + offset];
         }
 
         Array.Resize(ref dst, d);
+        maxLead = lead;
         return dst;
     }
 

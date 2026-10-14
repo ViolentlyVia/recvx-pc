@@ -1,4 +1,5 @@
 using Cvx.Formats;
+using Cvx.Formats.Rdx;
 using Cvx.Rando;
 using Cvx.Rando.Data;
 using Cvx.Rando.Items;
@@ -93,20 +94,31 @@ public class ItemTests
     }
 
     [GameDataFact]
-    public void GeneratedRoomsPatchOnlyItemBytes()
+    public void GeneratedRoomsChangeOnlyItems()
     {
+        // Rooms keep their size and change only item bytes (and script ranges some pickups
+        // blank out, up to ~200 bytes), except where the item textures had to follow the new
+        // ids; either way the loader reads exactly the texture entries the room has.
         using var rooms = RoomArchive.Open(TestData.Open());
         var result = Generator.Generate(new RandoSettings { Seed = 11 }, Data, rooms);
         Assert.NotEmpty(result.ChangedRooms);
+        var rebuilt = 0;
         foreach (var (id, file) in result.ChangedRooms)
         {
             var original = rooms.ReadExpanded(id);
-            Assert.Equal(original.Length, file.Length);
-            // item bytes, plus script ranges some pickups blank out when they change (up to ~200 bytes)
-            var diff = Enumerable.Range(0, original.Length).Count(i => original[i] != file.Data.Span[i]);
-            Assert.InRange(diff, 1, 512);
-            // still a valid room
+            if (original.Length == file.Length)
+            {
+                var diff = Enumerable.Range(0, original.Length).Count(i => original[i] != file.Data.Span[i]);
+                Assert.InRange(diff, 1, 512);
+            }
+            else
+            {
+                rebuilt++;
+            }
+            if (RdxEnemyLayout.Read(new RdxFile(original)).IsConsistent)
+                Assert.True(RdxEnemyLayout.Read(file).IsConsistent, $"{id}: the loader would read other texture entries");
             Assert.True(file.ToBuilder().ToFile().Data.Span.SequenceEqual(file.Data.Span));
         }
+        Assert.InRange(rebuilt, 1, result.ChangedRooms.Count / 2);
     }
 }

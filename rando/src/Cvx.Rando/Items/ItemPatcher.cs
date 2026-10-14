@@ -31,11 +31,32 @@ public sealed class ItemPatcher
     /// opcodes added to their start procedure are rebuilt here, after every in-place change.
     /// </summary>
     public IReadOnlyDictionary<RoomId, RdxFile> ChangedRooms =>
-        _rooms.ToDictionary(x => x.Key, x => _startOpcodes.TryGetValue(x.Key, out var add)
-            ? PrependToStart(new RdxFile(x.Value), add)
-            : new RdxFile(x.Value));
+        _rooms.Keys.ToDictionary(id => id, Current);
 
     private readonly Dictionary<RoomId, List<byte>> _startOpcodes = [];
+    private readonly Dictionary<RoomId, Func<RdxFile, RdxFile>> _rebuilds = [];
+    private readonly Dictionary<RoomId, int[]> _originalItemIds = [];
+
+    /// <summary>A room with every change so far: in-place edits, start opcodes, then rebuilds.</summary>
+    public RdxFile Current(RoomId id)
+    {
+        // (read without marking the room changed)
+        var file = new RdxFile(_rooms.TryGetValue(id, out var bytes) ? bytes : _archive.ReadExpanded(id));
+        if (_originalItemIds.TryGetValue(id, out var ids))
+            file = RdxItemTextures.Fix(file, ids);
+        if (_startOpcodes.TryGetValue(id, out var add))
+            file = PrependToStart(file, add);
+        if (_rebuilds.TryGetValue(id, out var rebuild))
+            file = rebuild(file);
+        return file;
+    }
+
+    /// <summary>Rebuilds a room as a last step (enemy swaps); in-place edits must come first.</summary>
+    public void SetRebuild(RoomId id, Func<RdxFile, RdxFile> rebuild)
+    {
+        Room(id);
+        _rebuilds[id] = rebuild;
+    }
 
     /// <summary>Blanks the opcodes that start inside <paramref name="spec"/>.</summary>
     public void Nop(RoomId id, OffsetSpec spec)
@@ -81,7 +102,10 @@ public sealed class ItemPatcher
     private byte[] Room(RoomId id)
     {
         if (!_rooms.TryGetValue(id, out var data))
+        {
             _rooms[id] = data = _archive.ReadExpanded(id);
+            _originalItemIds[id] = new RdxFile(data).Items.ToArray().Select(i => (int)i.ItemId).ToArray();
+        }
         return data;
     }
 

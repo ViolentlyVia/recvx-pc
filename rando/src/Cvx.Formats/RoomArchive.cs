@@ -8,10 +8,16 @@ public sealed class RoomArchive : IDisposable
     private readonly AfsArchive _afs;
 
     public AfsArchive Afs => _afs;
+    /// <summary>The data folder it was opened from.</summary>
+    public GameData? Data { get; }
 
-    private RoomArchive(AfsArchive afs) => _afs = afs;
+    private RoomArchive(AfsArchive afs, GameData? data)
+    {
+        _afs = afs;
+        Data = data;
+    }
 
-    public static RoomArchive Open(GameData data) => new(data.OpenRoomArchive());
+    public static RoomArchive Open(GameData data) => new(data.OpenRoomArchive(), data);
 
     public byte[] ReadCompressed(RoomId id) => _afs.ReadEntry(IndexOf(id));
 
@@ -25,9 +31,15 @@ public sealed class RoomArchive : IDisposable
     /// Writes a new RDX_LNK.AFS to <paramref name="path"/> with the given rooms compressed and
     /// replaced; every other room is copied unchanged.
     /// </summary>
+    /// <exception cref="InvalidDataException">A room would not fit recvx-pc's room memory (see <see cref="Expand.FitsRoomPool"/>).</exception>
     public void WriteModified(string path, IReadOnlyDictionary<RoomId, RdxFile> rooms)
     {
         var compressed = Compress(rooms.ToDictionary(x => x.Key, x => x.Value.Data));
+        foreach (var (id, data) in compressed.OrderBy(x => x.Key))
+        {
+            if (!Expand.FitsRoomPool(data, out var size, out var spare))
+                throw new InvalidDataException($"{id}: {size} bytes would not fit the game's room memory (short by {-spare}).");
+        }
         AfsWriter.Write(_afs, compressed.ToDictionary(x => IndexOf(x.Key), x => x.Value), path);
     }
 

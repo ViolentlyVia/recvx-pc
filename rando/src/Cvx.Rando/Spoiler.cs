@@ -18,6 +18,7 @@ public static class Spoiler
         sb.AppendLine($"Items: {(s.RandomItems ? s.ItemMode.ToString().ToLowerInvariant() : "off")}" +
                       $"{(s.RandomItems && !s.IncludeChris ? " (Claire's half only)" : "")}");
         sb.AppendLine($"Doors: {(s.RandomDoors ? "random" : "off")}");
+        sb.AppendLine($"Enemies: {(s.RandomEnemies ? $"random, difficulty {s.EnemyDifficulty}" : "off")}");
         sb.AppendLine();
 
         if (result.Doors is { } doors)
@@ -68,6 +69,19 @@ public static class Spoiler
                     var was = a.Location.OriginalType == a.Type ? "(unchanged)" : $"(was {names.NameOf(a.Location.OriginalType)})";
                     sb.AppendLine($"    {names.NameOf(a.Type),-28} {was}{(a.IsKey ? "  [key]" : "")}");
                 }
+            }
+            sb.AppendLine();
+        }
+
+        if (result.Enemies.Count != 0)
+        {
+            string Name(int type) => data.Enemies.Types.FirstOrDefault(k => k.Type == type)?.Name ?? $"enemy {type}";
+            sb.AppendLine("Enemies");
+            sb.AppendLine("-------");
+            foreach (var c in result.Enemies)
+            {
+                var was = string.Join(", ", c.OldTypes.GroupBy(t => t).Select(g => $"{g.Count()} {Name(g.Key)}"));
+                sb.AppendLine($"  {RoomLabel(c.Room)}  {was} -> {c.NewKind.Name}{(c.SoundFrom == null ? "  (sounds unchanged)" : "")}");
             }
             sb.AppendLine();
         }

@@ -36,6 +36,12 @@ public sealed record RandoSettings
     public WeaponChoice StartWeapon1 { get; init; } = WeaponChoice.Sidearm;
     public WeaponChoice StartWeapon2 { get; init; } = WeaponChoice.Random;
 
+    // Enemies
+    /// <summary>Replace the ordinary enemies of rooms with other types (copied from other rooms).</summary>
+    public bool RandomEnemies { get; init; }
+    /// <summary>0 easy, 1 normal, 2 hard, 3 very hard: which types come up and how many may share a room.</summary>
+    public int EnemyDifficulty { get; init; } = 1;
+
     /// <summary>Nosferatu's attack never poisons (BioRand does this with random doors).</summary>
     public bool NoNosferatuPoison { get; init; }
 

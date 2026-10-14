@@ -36,6 +36,11 @@ internal static class Cli
                 "dump-script" => DumpScript(options),
                 "generate" => Generate(options),
                 "save-rooms" => ListSaveRooms(options),
+                "room-memory" => RoomMemory(options),
+                "dump-enemies" => DumpEnemies(options),
+                "swap-enemies" => SwapEnemies(options),
+                "enemy-donors" => EnemyDonors(options),
+                "dump-sounds" => DumpSounds(options),
                 "bench-prs" => BenchPrs(options),
                 _ => Unknown(args[0]),
             };
@@ -68,12 +73,18 @@ internal static class Cli
                                                  and check the result; --out also writes an
                                                  RDX_LNK.AFS with every room recompressed
               generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--inventory] [--no-poison]
-                       [--doors] [--out <dir>] [--spoiler]
+                       [--doors] [--enemies] [--enemy-difficulty 0-3] [--out <dir>] [--spoiler]
                                                  randomize; --out writes the mod folder (RDX_LNK.AFS,
                                                  rando.ini, rando_doors.txt, spoiler.txt, graph.dot,
                                                  graph.dgml) for recvx-pc's mod=
               dump-script <RM_xxxx> [--from <hex>] [--to <hex>]
                                                  a room's script opcodes with their file offsets
+              swap-enemies <RM_xxxx> --donor <RM_xxxx>:<enemy index> [--only <types>] [--effect <n>] [--out <dir>]
+                                                 testing aid: turn a room's enemies into another
+                                                 room's enemy and write a mod folder
+              room-memory [--recompress] [--all]
+                                                 the rooms with the least room to grow when the game
+                                                 expands them (in place, in a fixed pool)
               verify-data [--all]                check the built-in room data against the game's
                                                  rooms; --all also lists info and unmapped rooms
               make-mod --out <dir> [--item <RM_xxxx>:<index>=<item id>]... [--ini <key=value>]...
@@ -259,6 +270,132 @@ internal static class Cli
         return failures == 0 ? 0 : 1;
     }
 
+    private static int DumpEnemies(Options options)
+    {
+        // Each room's enemies with the model, motion and texture data the game loads for them.
+        using var rooms = RoomArchive.Open(OpenData(options));
+        var only = options.OptionalPositional(0) is { } name ? RoomId.ParseName(name) : (RoomId?)null;
+        var bad = 0;
+        foreach (var id in RoomTable.All.Where(r => only == null || r == only))
+        {
+            var layout = RdxEnemyLayout.Read(rooms.ReadRoom(id));
+            if (!layout.IsConsistent)
+                bad++;
+            if (layout.Enemies.Count == 0 && only == null && layout.IsConsistent)
+                continue;
+            Console.WriteLine($"{id.Name} ({id.BioRandId}): {layout.Enemies.Count} enemies, textures {layout.RoomTextures}+{layout.EnemyTextures}+{layout.OtherTextures}" +
+                              $"/{layout.TextureGroups.Length}, motions {layout.MotionEntries.Length}{(layout.IsConsistent ? "" : "  INCONSISTENT")}");
+            if (options.Has("scripts"))
+            {
+                // script opcodes that act on enemies, with their counts
+                var ops = CvScriptReader.ReadOpcodes(rooms.ReadRoom(id))
+                    .Where(o => o.Name.Contains("enemy") || o.Name.Contains("death") || o.Name.Contains("ene_"))
+                    .GroupBy(o => o.Name).Select(g => $"{g.Key}:{g.Count()}");
+                Console.WriteLine($"  scripts: {string.Join(" ", ops)}");
+            }
+            foreach (var e in layout.Enemies)
+            {
+                Console.WriteLine($"  [{e.Index,2}] type {e.Type,3} mdlver {e.ModelVersion} flg {e.Entry.Header:X} fx {e.Entry.Effect} idx {e.Entry.Index:X4}" +
+                                  $"  model {e.Model.Length,7}  motion {e.Motion.Length,7}  textures [{string.Join(",", e.Textures.Select(t => $"{t}:{layout.TextureGroups[t].Length}"))}]");
+            }
+        }
+        if (only == null)
+            Console.WriteLine($"{bad} rooms not understood");
+        return bad == 0 ? 0 : 1;
+    }
+
+    private static int DumpSounds(Options options)
+    {
+        // A room's sound pack: its banks (type, number, size).
+        var data = OpenData(options);
+        foreach (var disc in new[] { 1, 2 })
+        {
+            using var packs = SoundPacks.Open(data, disc);
+            foreach (var name in options.Positional(0, "room").Split(','))
+            {
+                var id = RoomId.ParseName(name);
+                if (packs.ReadRoom(id) is not { } pack)
+                    continue;
+                var banks = SoundPacks.Parse(pack);
+                Console.WriteLine($"{packs.Name} {id.Name}: {pack.Length} bytes, rebuilt the same: {SoundPacks.Build(banks).AsSpan().SequenceEqual(pack)}");
+                foreach (var b in banks)
+                    Console.WriteLine($"  type {b.Type} bank {b.BankNo,2}  {b.Data.Length,8}  {Convert.ToHexString(b.Data.Span[..Math.Min(16, b.Data.Length)])}");
+            }
+        }
+        return 0;
+    }
+
+    private static int EnemyDonors(Options options)
+    {
+        // For each enemy type and model version: the rooms an enemy can be copied from.
+        using var rooms = RoomArchive.Open(OpenData(options));
+        var found = new SortedDictionary<(int, int), List<string>>();
+        foreach (var id in RoomTable.All)
+        {
+            var file = rooms.ReadRoom(id);
+            var layout = RdxEnemyLayout.Read(file);
+            foreach (var e in layout.Enemies.Where(e => e.Type is > 0 and <= 30))
+            {
+                if (RdxEnemyDonor.From(id, file, e.Index) is not { } d)
+                    continue;
+                if (!found.TryGetValue((d.Type, d.ModelVersion), out var list))
+                    found[(d.Type, d.ModelVersion)] = list = [];
+                list.Add($"{id.Name}#{e.Index}(fx{e.Entry.Effect},{(d.Model.Length + d.Motion.Length + d.Textures.Sum(t => t.Length)) / 1024}K)");
+            }
+        }
+        foreach (var ((type, version), list) in found)
+            Console.WriteLine($"type {type,2} v{version,-2}: {string.Join(" ", list.Take(6))}");
+        return 0;
+    }
+
+    private static int SwapEnemies(Options options)
+    {
+        // Testing aid: every enemy of a room (or --only <types>) becomes a donor enemy.
+        using var rooms = RoomArchive.Open(OpenData(options));
+        var id = RoomId.ParseName(options.Positional(0, "room"));
+        var donorSpec = options.Require("donor").Split(':');
+        var donorRoom = RoomId.ParseName(donorSpec[0]);
+        var donor = RdxEnemyDonor.From(donorRoom, rooms.ReadRoom(donorRoom), int.Parse(donorSpec[1]),
+            options.Get("effect") is { } fx ? short.Parse(fx) : null)
+            ?? throw new ArgumentException($"{options.Get("donor")} cannot be a donor.");
+        var only = options.Get("only")?.Split(',').Select(int.Parse).ToHashSet();
+        var file = rooms.ReadRoom(id);
+        var targets = RdxEnemyLayout.Read(file).Enemies.Where(e => only == null || only.Contains(e.Type))
+            .ToDictionary(e => e.Index, _ => donor);
+        var result = RdxEnemyRewriter.Replace(file, targets);
+        var check = RdxEnemyLayout.Read(result);
+        var packed = Prs.Compress(result.Data.Span);
+        var fits = Expand.FitsRoomPool(packed, out var size, out var spare);
+        Console.WriteLine($"{id.Name}: {targets.Count} enemies -> type {donor.Type} version {donor.ModelVersion} from {donorRoom.Name}#{donor.Index}; " +
+                          $"{file.Length} -> {result.Length} bytes, consistent {check.IsConsistent}, fits {fits} (spare {spare})");
+        if (options.Get("out") is { } outDir)
+        {
+            Directory.CreateDirectory(outDir);
+            rooms.WriteModified(Path.Combine(outDir, GameData.RoomArchiveName), new Dictionary<RoomId, RdxFile> { [id] = result });
+            Console.WriteLine($"Wrote {outDir}");
+        }
+        return check.IsConsistent && fits ? 0 : 1;
+    }
+
+    private static int RoomMemory(Options options)
+    {
+        // How much each room can grow: recvx-pc expands a room in place inside a fixed pool.
+        using var rooms = RoomArchive.Open(OpenData(options));
+        var recompress = options.Has("recompress");
+        var results = new (RoomId Id, int Size, int Packed, int Spare, bool Fits)[RoomTable.Count];
+        Parallel.For(0, RoomTable.Count, i =>
+        {
+            var id = RoomTable.Get(i);
+            var packed = recompress ? Prs.Compress(rooms.ReadExpanded(id)) : rooms.ReadCompressed(id);
+            var fits = Expand.FitsRoomPool(packed, out var size, out var spare);
+            results[i] = (id, size, packed.Length, spare, fits);
+        });
+        Console.WriteLine($"room     expanded    packed     spare  (pool {Expand.RoomPool})");
+        foreach (var r in results.OrderBy(r => r.Spare).Take(options.Has("all") ? RoomTable.Count : 15))
+            Console.WriteLine($"{r.Id.Name}  {r.Size,9}  {r.Packed,8}  {r.Spare,8}{(r.Fits ? "" : "  DOES NOT FIT")}");
+        return results.All(r => r.Fits) ? 0 : 1;
+    }
+
     private static int ListSaveRooms(Options options)
     {
         using var rooms = RoomArchive.Open(OpenData(options));
@@ -281,6 +418,8 @@ internal static class Cli
             RandomInventory = options.Has("inventory"),
             NoNosferatuPoison = options.Has("no-poison"),
             RandomDoors = options.Has("doors"),
+            RandomEnemies = options.Has("enemies"),
+            EnemyDifficulty = options.Get("enemy-difficulty") is { } ed ? int.Parse(ed) : 1,
         };
         using var rooms = RoomArchive.Open(OpenData(options));
         var sw = Stopwatch.StartNew();
@@ -295,7 +434,8 @@ internal static class Cli
             return 2;
         }
         Console.WriteLine($"Seed {seed}: {result.Patches.Count} patches in {result.ChangedRooms.Count} rooms" +
-                          $"{(result.Doors != null ? $", door layout {result.DoorAttempts}" : "")} ({sw.Elapsed.TotalSeconds:0.0}s)");
+                          $"{(result.Doors != null ? $", door layout {result.DoorAttempts}" : "")}" +
+                          $"{(result.Settings.RandomEnemies ? $", enemies changed in {result.Enemies.Count} rooms" : "")} ({sw.Elapsed.TotalSeconds:0.0}s)");
         if (options.Has("spoiler"))
             Console.WriteLine(result.Spoiler);
         if (options.Get("out") is { } outDir)
@@ -488,6 +628,8 @@ internal sealed class Options
     public string? Get(string name) => _named.TryGetValue(name, out var v) ? v : null;
     public bool Has(string name) => _named.ContainsKey(name);
     public string Require(string name) => Get(name) ?? throw new ArgumentException($"--{name} is required.");
+
+    public string? OptionalPositional(int index) => index < _positional.Count ? _positional[index] : null;
 
     public string Positional(int index, string what) =>
         index < _positional.Count ? _positional[index] : throw new ArgumentException($"Missing {what}.");

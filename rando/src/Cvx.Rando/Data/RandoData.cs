@@ -17,18 +17,21 @@ public sealed class RandoData
     public RoomMap Map { get; }
     public IReadOnlyList<EnemyPosition> EnemyPositions { get; }
     public ItemCatalog Items { get; }
+    public EnemyCatalog Enemies { get; }
 
-    private RandoData(RoomMap map, IReadOnlyList<EnemyPosition> enemyPositions, ItemCatalog items)
+    private RandoData(RoomMap map, IReadOnlyList<EnemyPosition> enemyPositions, ItemCatalog items, EnemyCatalog enemies)
     {
         Map = map;
         EnemyPositions = enemyPositions;
         Items = items;
+        Enemies = enemies;
     }
 
     private static readonly Lazy<RandoData> BuiltIn = new(() => new RandoData(
         Load<RoomMap>("data/recv/rdt.json"),
         Load<List<EnemyPosition>>("data/recv/enemy.json"),
-        new ItemCatalog(Load<ItemCatalogFile>("data/items.json").Items)));
+        new ItemCatalog(Load<ItemCatalogFile>("data/items.json").Items),
+        Load<EnemyCatalog>("data/enemies.json")));
 
     public static RandoData Load() => BuiltIn.Value;
 
