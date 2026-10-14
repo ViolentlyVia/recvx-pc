@@ -89,6 +89,6 @@ public class ScriptAndValidationTests
         var unexpected = report.Errors.Where(e => !known.Contains(e.Room)).Select(e => e.ToString()).ToList();
         Assert.Empty(unexpected);
         Assert.Equal(7, report.Errors.Count());
-        Assert.Equal(400 - 1, report.ItemsChecked);   // one bogus BioRand item removed
+        Assert.Equal(400 - 1 + 2, report.ItemsChecked);   // one bogus BioRand item removed, two Shotguns added
     }
 }

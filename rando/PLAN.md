@@ -342,6 +342,27 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
 - 40 rooms are not in the data: the Battle Game rooms (RM_55xx-58xx), cutscene rooms, and some room variants. **Phase 4 must mirror item changes into unmapped variants** (same item at the same position as the mapped variant, e.g. RM_3010/RM_3011).
 - 38 tests pass.
 
+### Phase 4: done (2026-10-14), not committed yet
+- `Cvx.Rando`: `Rng` (PCG32, pinned by a test), `RandoSettings`, `Items/ItemGraph` (rooms, doors, pickups by global id), `Items/ItemPlacer`, `Items/Playthrough` (independent check), `Items/ItemPatcher`, `Generator` (mod folder: `RDX_LNK.AFS` with only the changed rooms, `rando.ini`, `spoiler.txt`, `settings.json`), `Spoiler`.
+- CLI `generate [--seed] [--mode shuffle|custom] [--claire-only] [--out] [--spoiler]`.
+- **Logic rules** (differences from BioRand):
+  - Claire and Chris have separate inventories; the logic starts over at the handover (`8080 -> A090`, a one-way bridge).
+  - Keys a half needs but has no pickup of are handed over by the game (Chris: Album, Extinguisher).
+  - Pickups that keep their item (fixed, and key items no requirement mentions) grant it when reached, and the logic waits for them instead of placing copies.
+  - A global id is one pickup across room files. Chris's keys only go into pickups that are his alone, and shared pickups holding a key Chris needs keep it.
+  - The logic runs to `A1E0` (the end of the game) in both modes; BioRand's non-door data stopped at `A090`.
+  - One-way doors are taken only once everything before them is unlocked, so keys never end up behind a point of no return.
+- **Item modes:** shuffle (the game's own non-key items moved; spare key pickups become Green Herbs) or custom (each allowed weapon once, then ammo for those weapons, healing, ink and gunpowder by ratio; per-type pickup amounts in `rando.ini`).
+- **Patching:** the room item table's `ETTY_WORK.id` (no pickup hook needed), the item byte of every listed script opcode, and the data's `nop` ranges. Opcode 0xF4 is the game's `bhComNext` (advance one byte, keep running), so it is a safe one-byte no-op.
+- Unmapped room variants get the same new item, matched by original item and position.
+- **Data fixes:** two missing Shotgun pickups, two colliding global ids (`data/recv/CHANGES.md`).
+- **Tests:** 48 pass, including 600 seeds (shuffle, custom, Claire only) that all complete in the independent playthrough, determinism, and only item bytes changing in rooms.
+- **In game** (test folder, seed 7): the RM_7110 pickup gave Bow Gun Arrows instead of the Door Knob. RM_9240, RM_7040, RM_6010 and RM_0000 load without problems.
+- **Known limits:**
+  - An item on the floor still shows the original item's model; the prompt and the pickup are the new item.
+  - Writing the mod folder takes about 40 s (copying the 588 MB archive and recompressing about 130 rooms); a recompression cache can come later.
+  - The map's item checks only look at the inventory (`map.c`), so they need no change.
+
 ## Risks / open items for the executing agent
 - **Don't copy BioRand's CV item writes as-is**: it writes `type` and relies on its executable patch; we write `id` (see Key facts). Treat every BioRand CV write as unverified until it is checked against the game's C code.
 - **Room memory budget** when copying enemy assets: measure it, don't guess.

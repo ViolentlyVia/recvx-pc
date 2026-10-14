@@ -12,7 +12,7 @@ Work in progress. See [PLAN.md](PLAN.md) for the roadmap.
 | Project | What it is |
 |---|---|
 | `src/Cvx.Formats` | Game file formats: AFS archives, PRS compression, room files (`RM_xxxx.RDX`) |
-| `src/Cvx.Rando` | The randomizer itself (later phases) |
+| `src/Cvx.Rando` | The randomizer: room data, item logic and placement, room patching, the mod folder |
 | `src/Cvx.Rando.App` | The Windows app, `cvx-rando.exe` |
 | `src/Cvx.Rando.Cli` | Command-line tool, `cvx-rando-cli.exe`, for inspecting rooms and scripted runs |
 | `data/` | Built-in data: `items.json` and the room data in `recv/` (from BioRand, corrected; see `recv/CHANGES.md`) |
@@ -40,6 +40,7 @@ dotnet run --project src/Cvx.Rando.Cli -- <command>
 | `dump-all --out <file.json> [--data <dir>]` | Writes the summary of every room to one JSON file |
 | `extract-room <RM_xxxx> --out <file> [--data <dir>]` | Writes a room's expanded file |
 | `roundtrip [--data <dir>] [--out <dir>]` | Rebuilds every room and the archive without changes and checks the result |
+| `generate [--seed <n>] [--mode shuffle\|custom] [--claire-only] [--out <dir>] [--spoiler]` | Randomizes the items; `--out` writes the mod folder (`RDX_LNK.AFS`, `rando.ini`, `spoiler.txt`, `settings.json`) for recvx-pc's `mod=` |
 | `dump-script <RM_xxxx> [--from <hex>] [--to <hex>]` | Lists a room's script opcodes with their file offsets, item names and door targets |
 | `verify-data [--all]` | Checks the built-in room data against the game's rooms (see `data/recv/CHANGES.md`) |
 | `make-mod --out <dir> [--item <RM_xxxx>:<index>=<item id>]... [--ini <key=value>]...` | Builds a test mod folder for recvx-pc (`mod=` in `recvx.ini`) with hand-made item changes and `rando.ini` keys |

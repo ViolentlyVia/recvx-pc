@@ -41,6 +41,23 @@ The room file, or the script that hands the item over, decides what the original
 | 4100 (RM_3160) | door 1 | target 40A0 -> 4120 | area 1 leads to RM_3180, whose doors lead back to RM_3160 |
 | 2001, 2002 | doorRando | `"type": "exclude"` -> `"category": "exclude"` | typo; BioRand reads `category`, so these rooms were never excluded |
 
+## Fixes (2026-10-14, item randomizer)
+
+| Room | Entry | Change | Evidence |
+|---|---|---|---|
+| 8060 (RM_7060) | new item 254, global 2001 | Shotgun, `offsets: [0x194370]`, `fixed` | the script gives the Shotgun (`setb` 0x194370) and checks it before two doors; the data required it but had no pickup of it |
+| A1A0 (RM_9260) | new item 5, global 2002 | Shotgun, `fixed` | trigger area 5 picks up slot 1, a Shotgun; Chris's items here require it |
+| 2000, 2001, 2002 | Green Herb, global 7 | global id -> 2003 | global 7 is also the Piano Roll in 10F0 |
+| A080 | Serum (item 7), global 0 | global id -> 2004 | global 0 is also the Assault Rifle in the same room, which hid the Serum from the logic |
+
+Global ids name a pickup, not an entry: the same id in two rooms is one pickup. That covers
+room variants and also rooms Claire and Chris both visit (`7010`/`A010`, `4000`/`80C0`, ...),
+where the game shares the picked-up flag, so whoever comes first takes it.
+
+Why the Shotguns are `fixed`: RM_7060's give is part of a puzzle the data does not describe
+(its script also checks the Shotgun as the used item and has a `player_item_lost_ex` for it),
+so it is not moved until that is understood.
+
 ## Open (check in the game before relying on them, Phase 6)
 
 `verify-data` still reports these; the door randomizer must not trust them yet.

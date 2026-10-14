@@ -752,7 +752,7 @@
         },
         {
           "id": 7,
-          "globalId": 7,
+          "globalId": 2003,
           "type": 21,
           "amount": 1
         }
@@ -773,7 +773,7 @@
         },
         {
           "id": 7,
-          "globalId": 7,
+          "globalId": 2003,
           "type": 21,
           "amount": 1
         }
@@ -794,7 +794,7 @@
         },
         {
           "id": 7,
-          "globalId": 7,
+          "globalId": 2003,
           "type": 21,
           "amount": 1
         }
@@ -3704,6 +3704,14 @@
       ],
       "items": [
         {
+          "id": 254,
+          "globalId": 2001,
+          "type": 4,
+          "amount": 7,
+          "offsets": [ "0x194370" ],
+          "priority": "fixed"
+        },
+        {
           "id": 16,
           "globalId": 313,
           "type": 22,
@@ -5271,7 +5279,7 @@
         },
         {
           "id": 7,
-          "globalId": 0,
+          "globalId": 2004,
           "type": 115,
           "amount": 1
         },
@@ -6027,6 +6035,13 @@
         }
       ],
       "items": [
+        {
+          "id": 5,
+          "globalId": 2002,
+          "type": 4,
+          "amount": 7,
+          "priority": "fixed"
+        },
         {
           "id": 8,
           "globalId": 423,

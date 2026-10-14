@@ -4,6 +4,7 @@ using Cvx.Formats;
 using Cvx.Formats.Rdx;
 using Cvx.Formats.Script;
 using Cvx.Rando.Data;
+using Cvx.Rando.Items;
 
 namespace Cvx.Rando.Cli;
 
@@ -32,6 +33,7 @@ internal static class Cli
                 "make-mod" => MakeMod(options, args[1..]),
                 "verify-data" => VerifyData(options),
                 "dump-script" => DumpScript(options),
+                "generate" => Generate(options),
                 "bench-prs" => BenchPrs(options),
                 _ => Unknown(args[0]),
             };
@@ -63,6 +65,9 @@ internal static class Cli
               roundtrip [--out <dir>]            rebuild every room and the archive without changes
                                                  and check the result; --out also writes an
                                                  RDX_LNK.AFS with every room recompressed
+              generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--out <dir>] [--spoiler]
+                                                 randomize; --out writes the mod folder (RDX_LNK.AFS,
+                                                 rando.ini, spoiler.txt) for recvx-pc's mod=
               dump-script <RM_xxxx> [--from <hex>] [--to <hex>]
                                                  a room's script opcodes with their file offsets
               verify-data [--all]                check the built-in room data against the game's
@@ -248,6 +253,39 @@ internal static class Cli
         }
 
         return failures == 0 ? 0 : 1;
+    }
+
+    private static int Generate(Options options)
+    {
+        var seed = options.Get("seed") is { } s ? int.Parse(s) : Random.Shared.Next(0, 1_000_000);
+        var settings = new RandoSettings
+        {
+            Seed = seed,
+            ItemMode = options.Get("mode")?.ToLowerInvariant() == "custom" ? ItemMode.Custom : ItemMode.Shuffle,
+            IncludeChris = !options.Has("claire-only"),
+        };
+        using var rooms = RoomArchive.Open(OpenData(options));
+        var sw = Stopwatch.StartNew();
+        GenerationResult result;
+        try
+        {
+            result = Generator.Generate(settings, RandoData.Load(), rooms);
+        }
+        catch (ItemPlacementException ex)
+        {
+            Console.Error.WriteLine($"seed {seed}: {ex.Message}");
+            return 2;
+        }
+        Console.WriteLine($"Seed {seed}: {result.Patches.Count} patches in {result.ChangedRooms.Count} rooms ({sw.Elapsed.TotalSeconds:0.0}s)");
+        if (options.Has("spoiler"))
+            Console.WriteLine(result.Spoiler);
+        if (options.Get("out") is { } outDir)
+        {
+            sw.Restart();
+            Generator.WriteMod(result, rooms, outDir);
+            Console.WriteLine($"Wrote {Path.GetFullPath(outDir)} ({sw.Elapsed.TotalSeconds:0.0}s)");
+        }
+        return 0;
     }
 
     private static int DumpScript(Options options)
