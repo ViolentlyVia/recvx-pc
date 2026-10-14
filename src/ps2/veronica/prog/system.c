@@ -1748,7 +1748,21 @@ void bhSysCallMonitor()
                 {
                     FlushCache(0);
                     
+#ifdef TARGET_PC
+                    {
+                        extern void pcLog(const char* fmt, ...);
+                        unsigned char* packed = sys->rdtp;
+
+                        sys->rdtsz = Expand((char*)sys->rdtp, sys->memp);
+
+                        /* room memory: the room is expanded from memp while it is read from the
+                           packed copy at the top of the pool (cvx-rando checks rooms against this) */
+                        pcLog("room %s: %d bytes expanded, %d packed at %d, pool %d", sys->mes, sys->rdtsz,
+                              (int)(sys->endp - packed), (int)(packed - sys->memp), (int)(sys->endp - sys->memp));
+                    }
+#else
                     sys->rdtsz = Expand((char*)sys->rdtp, sys->memp);
+#endif
                     
                     sys->rdtp = sys->memp;
                     
@@ -1781,6 +1795,14 @@ void bhSysCallMonitor()
                 else 
                 {
                     bhFinishRoom();
+#ifdef TARGET_PC
+                    {
+                        extern void pcLog(const char* fmt, ...);
+
+                        /* room memory: what is left above the room and its work areas */
+                        pcLog("room %s: %d KB free after setup", sys->mes, (int)(sys->endp - sys->memp) >> 10);
+                    }
+#endif
                     
                     if ((sys->cb_flg & 0x80)) 
                     {
