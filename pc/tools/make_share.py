@@ -1,13 +1,17 @@
 """Build the shareable package: the game program without any of the game's files.
 
-usage: python pc/tools/make_share.py
+usage: python pc/tools/make_share.py [--rando <path to cvx-rando.exe>]
 
 Writes build_pc/share/recvx-cvx-pc/ and build_pc/share/recvx-cvx-pc.zip containing recvx.exe,
 recvx-config.exe, SDL2.dll and a README. Nothing else is needed on the player's PC: the settings
 app sets the game up from their own disc image (no Python). Deliberately left out: the ISO,
 extracted disc files (data/), converted movies, HD texture packs, recvx.ini (holds your local
 paths), saves, logs and input recordings.
+
+The randomizer (cvx-rando.exe, from the separate CVXRandomizer project) is included when it is
+given with --rando or found in build_pc/.
 """
+import argparse
 import os
 import shutil
 import sys
@@ -53,19 +57,44 @@ Problems: the game writes recvx.log next to recvx.exe, and last_run_input.txt re
 last session. Include both when you report a problem.
 """
 
+README_RANDO = """
+Randomizer
+  cvx-rando.exe (or "Randomizer..." in recvx-config.exe) shuffles items, enemies, doors and
+  music. It writes the randomized game to a "rando" folder here and never changes your game
+  files; a randomized game keeps its own saves. "Play normal game" in either program switches
+  back to the normal game.
+"""
+
+RANDO_EXE = "cvx-rando.exe"
+
 
 def main():
+    parser = argparse.ArgumentParser(description="Build the shareable package.")
+    parser.add_argument("--rando", help="path to cvx-rando.exe (default: build_pc/cvx-rando.exe if present)")
+    args = parser.parse_args()
+
     missing = [f for f in PROGRAM if not os.path.exists(os.path.join(BUILD, f))]
     if missing:
         print("build first (python pc/tools/build.py); missing: " + ", ".join(missing))
         return 1
+
+    rando = args.rando or os.path.join(BUILD, RANDO_EXE)
+    if args.rando and not os.path.isfile(rando):
+        print("not found: " + rando)
+        return 1
+    if not os.path.isfile(rando):
+        rando = None
+
     # a folder still open elsewhere (Explorer, OneDrive) may survive; the zip only holds files
     shutil.rmtree(OUT, ignore_errors=True)
     os.makedirs(OUT, exist_ok=True)
     for f in PROGRAM:
         shutil.copy2(os.path.join(BUILD, f), os.path.join(OUT, f))
+    if rando:
+        shutil.copy2(rando, os.path.join(OUT, RANDO_EXE))
+        print("including the randomizer: " + rando)
     with open(os.path.join(OUT, "README.txt"), "w", newline="\r\n") as f:
-        f.write(README)
+        f.write(README + (README_RANDO if rando else ""))
 
     # safety net: nothing that looks like game data may end up in the package
     for dirpath, _, files in os.walk(OUT):

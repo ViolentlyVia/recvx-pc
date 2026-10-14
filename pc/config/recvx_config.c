@@ -263,11 +263,13 @@ enum {
     ID_SKIP_DOORS,
     ID_SAVE_ANYWHERE,
     ID_SKIP_INTRO,
+    ID_RANDO, ID_RANDO_OFF,
     ID_KEY = 1000, ID_PAD = 1100,
 };
 
 static HWND main_wnd;
 static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game, h_pause, h_movies_hd, h_skip_doors, h_save_anywhere, h_skip_intro;
+static HWND h_rando, h_rando_off;
 static int loaded_res;   /* resolution entry when the settings were loaded */
 static HWND h_key[PC_BINDING_COUNT], h_pad[PC_BINDING_COUNT];
 static HFONT font, bold_font;
@@ -708,6 +710,118 @@ static void launch_game(void)
     DestroyWindow(main_wnd);
 }
 
+/* ------------------------------------------------------------------------------------------- */
+/* randomizer (cvx-rando.exe, a separate program next to this one)
+ *
+ * It writes the randomized game files to a mod folder and sets mod= (that folder) and saves=
+ * (a save folder for that seed) in recvx.ini, keeping the player's own saves= value in
+ * saves_normal= ("*" when there was none). "Play normal game" puts that back. */
+
+static int rando_exe(char* out, int size)
+{
+    snprintf(out, size, "%s\\cvx-rando.exe", exe_dir);
+    return GetFileAttributesA(out) != INVALID_FILE_ATTRIBUTES;
+}
+
+static void rando_refresh(void)
+{
+    const char* mod = ini_get("mod");
+    char text[MAX_PATH + 64], exe[MAX_PATH + 16];
+
+    if ((mod != NULL) && (mod[0] != 0))
+    {
+        char path[MAX_PATH * 2], seed[128] = "?", line[300];
+        FILE* f;
+
+        if ((mod[0] == '\\') || (mod[0] == '/') || (mod[1] == ':'))
+        {
+            snprintf(path, sizeof(path), "%s\\rando.ini", mod);
+        }
+        else
+        {
+            snprintf(path, sizeof(path), "%s\\%s\\rando.ini", exe_dir, mod);
+        }
+
+        if ((f = fopen(path, "r")) != NULL)
+        {
+            while (fgets(line, sizeof(line), f) != NULL)
+            {
+                if (line_is(line, "seed"))
+                {
+                    snprintf(seed, sizeof(seed), "%s", line + 5);
+                    seed[strcspn(seed, "\r\n")] = 0;
+                }
+            }
+
+            fclose(f);
+        }
+
+        snprintf(text, sizeof(text), "Randomizer on: seed %s", seed);
+        EnableWindow(h_rando_off, TRUE);
+    }
+    else
+    {
+        snprintf(text, sizeof(text), rando_exe(exe, sizeof(exe)) ? "Randomizer off: normal game" :
+                                                                   "Randomizer off (cvx-rando.exe not found)");
+        EnableWindow(h_rando_off, FALSE);
+    }
+
+    SetWindowTextA(h_rando, text);
+}
+
+static void rando_open(void)
+{
+    char exe[MAX_PATH + 16];
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+
+    if (!rando_exe(exe, sizeof(exe)))
+    {
+        MessageBoxA(main_wnd, "The randomizer (cvx-rando.exe) is not in the same folder as this program.",
+                    APP_TITLE, MB_ICONINFORMATION);
+        return;
+    }
+
+    /* it edits recvx.ini too: save ours first and close, so neither overwrites the other */
+    if (dirty && !save_settings())
+    {
+        return;
+    }
+
+    memset(&si, 0, sizeof(si));
+    si.cb = sizeof(si);
+
+    if (!CreateProcessA(exe, NULL, NULL, NULL, FALSE, 0, NULL, exe_dir, &si, &pi))
+    {
+        MessageBoxA(main_wnd, "Could not start cvx-rando.exe.", APP_TITLE, MB_ICONERROR);
+        return;
+    }
+
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    DestroyWindow(main_wnd);
+}
+
+static void rando_off(void)
+{
+    const char* normal = ini_get("saves_normal");
+    char saves[MAX_PATH + 16] = "";
+
+    if ((normal != NULL) && (strcmp(normal, "*") != 0))
+    {
+        snprintf(saves, sizeof(saves), "%s", normal);
+    }
+
+    ini_set("mod", NULL);
+    ini_set("saves_normal", NULL);
+    SetWindowTextA(h_saves, saves);   /* save_settings writes saves= from this field */
+
+    if (save_settings())
+    {
+        rando_refresh();
+    }
+}
+
 static void reset_controls(void)
 {
     int i;
@@ -849,9 +963,12 @@ static void create_controls(void)
                         lx, 150, cx + cw - lx, 24, ID_SKIP_INTRO);
     h_save_anywhere = make("BUTTON", "Save anywhere (debug; set its key under Controls)",
                            BS_AUTOCHECKBOX | WS_TABSTOP, lx, 176, cx + cw - lx, 24, ID_SAVE_ANYWHERE);
+    h_rando = make("STATIC", "", SS_LEFT | SS_ENDELLIPSIS, lx, 208, cx + cw - lx, 20, -1);
+    make("BUTTON", "Randomizer...", BS_PUSHBUTTON | WS_TABSTOP, lx, 230, 130, 28, ID_RANDO);
+    h_rando_off = make("BUTTON", "Play normal game", BS_PUSHBUTTON | WS_TABSTOP, lx + 140, 230, 140, 28, ID_RANDO_OFF);
 
-    heading("Display", lx, 220, 200);
-    y = 246;
+    heading("Display", lx, 270, 200);
+    y = 296;
     label("Resolution", lx, y, cx - lx);
     h_res = combo(cx, y, cw, ID_RES);
     y += 32;
@@ -944,6 +1061,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         main_wnd = hwnd;
         create_controls();
         load_settings();
+        rando_refresh();
 
         if (cmd_iso[0] != 0)
         {
@@ -1027,6 +1145,14 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         else if (id == ID_UPSCALE)
         {
             upscale_movies();
+        }
+        else if (id == ID_RANDO)
+        {
+            rando_open();
+        }
+        else if (id == ID_RANDO_OFF)
+        {
+            rando_off();
         }
         else if (id == ID_SAVE)
         {
