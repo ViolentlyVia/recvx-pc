@@ -4,6 +4,7 @@ using System.Text.Json;
 using Cvx.Formats;
 using Cvx.Formats.Rdx;
 using Cvx.Rando.Data;
+using Cvx.Rando.Doors;
 using Cvx.Rando.Items;
 
 namespace Cvx.Rando;
@@ -13,6 +14,14 @@ public sealed record GenerationResult
     public required RandoSettings Settings { get; init; }
     public required IReadOnlyDictionary<RoomId, RdxFile> ChangedRooms { get; init; }
     public ItemPlacementResult? Items { get; init; }
+    public DoorPlan? Doors { get; init; }
+    /// <summary>Door layouts made until one could be finished.</summary>
+    public int DoorAttempts { get; init; }
+    /// <summary>rando_doors.txt, with random doors.</summary>
+    public string? DoorTable { get; init; }
+    /// <summary>The room graph the logic used (Graphviz and Visual Studio formats).</summary>
+    public string? GraphDot { get; init; }
+    public string? GraphDgml { get; init; }
     public IReadOnlyList<RoomPatch> Patches { get; init; } = [];
     /// <summary>Pickup amount per item type (rando.ini pickup_amounts); empty keeps the game's.</summary>
     public IReadOnlyDictionary<int, int> PickupAmounts { get; init; } = new Dictionary<int, int>();
@@ -25,9 +34,30 @@ public sealed record GenerationResult
 public static class Generator
 {
     public const int RandoIniVersion = 1;
+    public const int MaxDoorAttempts = 200;
+
+    /// <summary>
+    /// Rooms to save in (BioRand ids): rooms whose script has a typewriter, and the rooms the
+    /// data calls box rooms.
+    /// </summary>
+    public static HashSet<string> SaveRoomKeys(RandoData data)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (key, room) in data.Map.Rooms)
+        {
+            var box = (room.DoorRando ?? []).Any(d => string.Equals(d.Category, "box", StringComparison.OrdinalIgnoreCase));
+            if (box || SaveRooms.Typewriters.Contains(key))
+                result.Add(key);
+        }
+        return result;
+    }
 
     public static GenerationResult Generate(RandoSettings settings, RandoData data, RoomArchive archive)
     {
+        // Random doors need random items: with the game's own, keys end up behind the doors
+        // they open.
+        if (settings.RandomDoors)
+            settings = settings with { RandomItems = true };
         ItemPlacementResult? items = null;
         var patcher = new ItemPatcher(data, archive);
         var amounts = new Dictionary<int, int>();
@@ -41,27 +71,83 @@ public static class Generator
                 inventories.Add(StartInventory.Make("chris", data.Items, settings, rng));
         }
 
-        if (settings.RandomItems)
+        var claireWeapons = inventories.FirstOrDefault(i => i.Character == "claire")?.Weapons(data.Items).ToList() ?? [];
+
+        DoorPlan? doors = null;
+        ItemGraph? graph = null;
+        HashSet<string>? saveRooms = null;
+        var doorAttempts = 0;
+        if (settings.RandomDoors)
         {
-            var graph = ItemGraph.Build(data, settings);
-            var claireWeapons = inventories.FirstOrDefault(i => i.Character == "claire")?.Weapons(data.Items).ToList() ?? [];
-            items = new ItemPlacer(graph, data.Items, settings, Rng.For(settings.Seed, "items"), claireWeapons).Place();
-            patcher.Apply(items, settings);
-            if (settings.ItemMode == ItemMode.Custom)
-                amounts = PickupAmounts(data.Items, settings, Rng.For(settings.Seed, "amounts"));
+            saveRooms = SaveRoomKeys(data);
+            var layout = MakeDoors(settings, data, claireWeapons);
+            (doors, graph, doorAttempts) = (layout.Plan, layout.Graph, layout.Attempts);
+            if (settings.RandomItems)
+                items = layout.Items;
         }
+        else if (settings.RandomItems)
+        {
+            graph = ItemGraph.Build(data, settings);
+            items = PlaceItems(data, settings, graph, claireWeapons);
+        }
+        if (items != null)
+        {
+            patcher.Apply(items, settings);
+            RoomTweaks.Apply(patcher, settings, data);
+        }
+
+        if (settings.RandomItems && settings.ItemMode == ItemMode.Custom)
+            amounts = PickupAmounts(data.Items, settings, Rng.For(settings.Seed, "amounts"));
 
         var result = new GenerationResult
         {
             Settings = settings,
             ChangedRooms = patcher.ChangedRooms,
             Items = items,
+            Doors = doors,
+            DoorAttempts = doorAttempts,
+            DoorTable = doors == null ? null : Doors.DoorTable.Write(doors, data),
+            GraphDot = graph == null ? null : GraphExport.Dot(graph, data.Items, saveRooms),
+            GraphDgml = graph == null ? null : GraphExport.Dgml(graph, data.Items, saveRooms),
             Patches = patcher.Patches,
             PickupAmounts = amounts,
             StartInventories = inventories,
             Spoiler = "",
         };
         return result with { Spoiler = Spoiler.Write(result, data) };
+    }
+
+    private static ItemPlacementResult PlaceItems(RandoData data, RandoSettings settings, ItemGraph graph, IReadOnlyCollection<int> startWeapons) =>
+        new ItemPlacer(graph, data.Items, settings, Rng.For(settings.Seed, "items"), startWeapons).Place();
+
+    public sealed record DoorLayout(DoorPlan Plan, ItemGraph Graph, ItemPlacementResult Items, int Attempts);
+
+    /// <summary>
+    /// Door layouts until one the item logic can finish, checked again by <see cref="Playthrough"/>.
+    /// </summary>
+    public static DoorLayout MakeDoors(RandoSettings settings, RandoData data, IReadOnlyCollection<int>? startWeapons = null)
+    {
+        settings = settings with { RandomItems = true };
+        var randomizer = new DoorRandomizer(data, SaveRoomKeys(data), settings.IncludeChris);
+        for (var attempt = 0; attempt < MaxDoorAttempts; attempt++)
+        {
+            var plan = randomizer.Make(Rng.For(settings.Seed, $"doors{attempt}"));
+            if (plan == null)
+                continue;
+            var graph = ItemGraph.Build(data, settings, plan);
+            ItemPlacementResult placement;
+            try
+            {
+                placement = PlaceItems(data, settings, graph, startWeapons ?? []);
+            }
+            catch (ItemPlacementException)
+            {
+                continue;
+            }
+            if (Playthrough.Check(graph, placement).Completed)
+                return new DoorLayout(plan, graph, placement, attempt + 1);
+        }
+        throw new ItemPlacementException($"No door layout for seed {settings.Seed} could be finished (try another seed).");
     }
 
     /// <summary>
@@ -89,7 +175,7 @@ public static class Generator
 
     /// <summary>
     /// Writes the mod folder recvx-pc loads (mod= in recvx.ini): the changed room archive,
-    /// rando.ini and the spoiler log.
+    /// rando.ini, rando_doors.txt, the spoiler log and the room graph.
     /// </summary>
     public static void WriteMod(GenerationResult result, RoomArchive archive, string directory)
     {
@@ -100,8 +186,19 @@ public static class Generator
         else if (File.Exists(afs))
             File.Delete(afs);
 
-        File.WriteAllText(Path.Combine(directory, "rando.ini"), RandoIni(result), new UTF8Encoding(false));
-        File.WriteAllText(Path.Combine(directory, "spoiler.txt"), result.Spoiler, new UTF8Encoding(false));
+        void Write(string name, string? text)
+        {
+            var path = Path.Combine(directory, name);
+            if (text != null)
+                File.WriteAllText(path, text, new UTF8Encoding(false));
+            else if (File.Exists(path))
+                File.Delete(path);
+        }
+        Write("rando.ini", RandoIni(result));
+        Write(DoorTable.FileName, result.DoorTable);
+        Write("spoiler.txt", result.Spoiler);
+        Write("graph.dot", result.GraphDot);
+        Write("graph.dgml", result.GraphDgml);
         File.WriteAllText(Path.Combine(directory, "settings.json"),
             JsonSerializer.Serialize(result.Settings, new JsonSerializerOptions { WriteIndented = true }));
     }
@@ -116,6 +213,11 @@ public static class Generator
             sb.AppendLine("fix_rifle_stacking=1");
         if (result.Settings.NoNosferatuPoison)
             sb.AppendLine("no_nosferatu_poison=1");
+        if (result.Doors is { } doors)
+        {
+            var start = RoomId.ParseBioRand(doors.StartRoom);
+            sb.AppendLine($"start={start.Stage},{start.Room},{doors.StartEntrance},{start.Variant}");
+        }
         foreach (var inventory in result.StartInventories)
         {
             sb.AppendLine($"start_items_{inventory.Character}=" + string.Join(",",

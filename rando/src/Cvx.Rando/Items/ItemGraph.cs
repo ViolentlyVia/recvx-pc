@@ -3,6 +3,7 @@
 
 using Cvx.Formats;
 using Cvx.Rando.Data;
+using Cvx.Rando.Doors;
 
 namespace Cvx.Rando.Items;
 
@@ -69,7 +70,8 @@ public sealed class ItemGraph
     /// Builds the original room graph. Pickups of documents are left out (never randomized), as
     /// are entries only meant for the other door mode.
     /// </summary>
-    public static ItemGraph Build(RandoData data, RandoSettings settings)
+    /// <param name="doors">Random doors: each door leads where the plan says, and the game starts in the plan's start room.</param>
+    public static ItemGraph Build(RandoData data, RandoSettings settings, DoorPlan? doors = null)
     {
         var map = data.Map;
         var rooms = map.Rooms.Keys.ToDictionary(k => k, k => new RoomNode { Id = RoomId.ParseBioRand(k), Key = k }, StringComparer.Ordinal);
@@ -82,19 +84,21 @@ public sealed class ItemGraph
             var node = rooms[key];
             node.Requires = room.Requires ?? [];
 
-            foreach (var door in room.Doors ?? [])
+            foreach (var (door, index) in (room.Doors ?? []).Select((d, i) => (d, i)))
             {
                 if (!Applies(door.DoorRando) || door.Target == null || !rooms.ContainsKey(door.Target))
                     continue;
+                var target = doors?.Find(key, index)?.TargetRoom ?? door.Target;
+                if (target == key && doors?.Find(key, index) != null)
+                    continue;   // a dead end: leads back into its own room
                 node.Edges.Add(new DoorEdge
                 {
                     From = node,
-                    To = rooms[door.Target],
+                    To = rooms[target],
                     Requires = door.Requires ?? [],
                     RequiresRoom = Nodes(door.RequiresRoom),
                     NoReturn = door.NoReturn,
-                    Locked = door.Lock is { } l && !l.Equals("none", StringComparison.OrdinalIgnoreCase)
-                                                && !l.Equals("unblock", StringComparison.OrdinalIgnoreCase),
+                    Locked = DoorRandomizer.IsLocked(door),
                 });
             }
 
@@ -128,14 +132,12 @@ public sealed class ItemGraph
 
         var beginEnd = map.BeginEndRooms.First(x => x.DoorRando == null || x.DoorRando == settings.RandomDoors);
         // With Chris, the logic runs to the last room of the game (BioRand's door-mode end,
-        // A1E0); BioRand's non-door data stops at Chris's start (A090).
-        var end = settings.IncludeChris
-            ? map.BeginEndRooms.First(x => x.DoorRando == true).End!
-            : beginEnd.End!;
+        // A1E0); without, to Chris's start (BioRand's non-door end, A090).
+        var end = map.BeginEndRooms.First(x => x.DoorRando == settings.IncludeChris).End!;
 
         return new ItemGraph
         {
-            Start = rooms[beginEnd.Start!],
+            Start = rooms[doors?.StartRoom ?? beginEnd.Start!],
             End = rooms[end],
             Rooms = rooms,
             Locations = locations.Values.OrderBy(x => x.GlobalId).ToList(),

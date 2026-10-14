@@ -363,7 +363,7 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
   - Writing the mod folder takes about 40 s (copying the 588 MB archive and recompressing about 130 rooms); a recompression cache can come later.
   - The map's item checks only look at the inventory (`map.c`), so they need no change.
 
-### Phase 5: done (2026-10-14), not committed yet
+### Phase 5: done (2026-10-14), committed `15b165d`
 - `Items/StartInventory` (after BioRand's RandomizeStartInventory), made separately for Claire and Chris:
   - a Combat Knife;
   - up to two weapons by kind (`StartWeapon1/2`: none, random, sidearm, primary, powerful), loaded, with a 75% chance of spare ammo;
@@ -377,6 +377,24 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
 - CLI `generate --inventory --no-poison`. 54 tests pass.
 - **In game** (seed 5): Claire's inventory showed the Sub Machine Gun at the top in two slots, then the knife, the Handgun (15), Handgun Bullets 40, M Gun Bullets and two mixed herbs. Chris (warped with player 1) had his knife, Handgun and two mixed herbs, and an empty special slot.
 - **Not verified in play:** the Nosferatu option. Also, in a warped game, Start did not open the status screen (the pickup screen was used instead); look into it if it matters for testing.
+
+### Phase 6: done (2026-10-14), not committed yet
+- **Doors are redirected by the engine, not by editing rooms.** The randomizer writes `rando_doors.txt` to the mod folder, one line per door: `stage room case area old_stage old_room  new_stage new_room new_case entrance`. recvx-pc matches it where the game sets `sys->door`: `bhCheckExmAtari` for static door areas (`hitchk.c`, area = trigger area index) and `bhSetDoorDemo` for script doors (`room.c`, area = `sys->etc_idx`; 255 matches any area). The new case is applied when the room loads (`sys->rcase` is global and only scripts set it). Room variants the data does not list get the same lines as their mapped variant.
+- **Start:** a new game starts in RM_0010 (BioRand `1010`, `start=0,1,0,0` in `rando.ini`), skipping the cell. The door back to the cell leads back into RM_0010, and the other door always leads to a save room with another door to continue through.
+- **Save rooms** (`Doors/SaveRooms`): rooms whose script opens the save screen (`set` of `cb_flg` bit 0x200000, group 10 index 10) plus the data's `box` rooms. The 18 typewriter rooms are listed in code because scanning takes 8 s; a test checks the list against the room files.
+- **Layout** (`Doors/DoorRandomizer`, after BioRand's DoorRandomiser):
+  - parts of the game between one-way doors are randomized separately;
+  - doors that stay: `randomize: false`, one-way, bridges, locks, room or flag conditions, doors into or out of excluded rooms, and their reverse doors;
+  - rooms joined by kept doors that the logic can use both ways form a block; a tree joins every block from the part's entry (preferring keyless doors), the rest pair up at random, and an odd one out leads back into its own room;
+  - when a part runs out of free doors (Antarctica does), the rooms left over keep their own doors and the part is tried again;
+  - with `--claire-only`, Chris's doors stay.
+- **Logic:** door layouts are made until one the item placer finishes and `Playthrough` confirms (up to 200; usually the first few). Random doors turn on random items: with the game's own items, keys end up behind the doors they open.
+- **Room tweaks** (`RoomTweaks`, BioRand's ReCvDoorHelper.Begin), applied whenever items are randomized: Rodrigo's lighter and gift fixes, the Steve/Alfred cutscene, Steve at the airport, the 1021/1031/4011 room choices (items only), and with random doors the story flag sets (prepended to the room's start procedure, which rebuilds the room) and the player switch in 70A0. Each room's door-mode nop ranges are applied too, except ranges that contain a door call or room case change: BioRand blanked scripted doors and rewrote them another way, and the engine redirect needs them.
+- **Outputs:** `rando_doors.txt`, `start=` in `rando.ini`, a Doors section in `spoiler.txt`, and the room graph as `graph.dot` (Graphviz) and `graph.dgml` (Visual Studio) with the start, end and save rooms coloured.
+- CLI `generate --doors`. 72 tests pass (door seed sweeps with and without Chris, start to save room, two-way pairing, every room still reachable, determinism, the typewriter list, rebuilt rooms).
+- **recvx-pc:** door redirects in `hitchk.c` and `room.c`, `pcRandoDoor` / `pcRandoTakePendingCase` / `start=` in `pc_rando.c`, a fallback to case 0 when a room variant file does not exist (`system.c`), and the testing aid `RECVX_TEST_DOOR=<area>[,<presses>]`: on that action press it uses static door area `<area>`, or points the action probe at any other area (examine areas).
+- **In game** (seed 2): a new game starts in RM_0010; its door leads to the RM_1080 office (typewriter). Static doors from RM_0050 to the RM_3011 variant, RM_2050 to the RM_0021 variant (case 1), and Chris's RM_9060 to RM_9170 entrance 2 all load the right room at the right entrance.
+- **Not verified in play:** script doors (walk-in and examine areas that call `set_door_call`): they go through the same lookup as static doors, but a warped test cannot meet their story conditions. The 7 known door data errors (CHANGES.md) are unchanged. A full door seed playthrough is the owner's to do.
 
 ## Risks / open items for the executing agent
 - **Don't copy BioRand's CV item writes as-is**: it writes `type` and relies on its executable patch; we write `id` (see Key facts). Treat every BioRand CV write as unverified until it is checked against the game's C code.

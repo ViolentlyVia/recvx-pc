@@ -5,6 +5,7 @@ using Cvx.Formats.Rdx;
 using Cvx.Formats.Script;
 using Cvx.Rando.Data;
 using Cvx.Rando.Items;
+using Cvx.Rando.Doors;
 
 namespace Cvx.Rando.Cli;
 
@@ -34,6 +35,7 @@ internal static class Cli
                 "verify-data" => VerifyData(options),
                 "dump-script" => DumpScript(options),
                 "generate" => Generate(options),
+                "save-rooms" => ListSaveRooms(options),
                 "bench-prs" => BenchPrs(options),
                 _ => Unknown(args[0]),
             };
@@ -66,9 +68,10 @@ internal static class Cli
                                                  and check the result; --out also writes an
                                                  RDX_LNK.AFS with every room recompressed
               generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--inventory] [--no-poison]
-                       [--out <dir>] [--spoiler]
+                       [--doors] [--out <dir>] [--spoiler]
                                                  randomize; --out writes the mod folder (RDX_LNK.AFS,
-                                                 rando.ini, spoiler.txt) for recvx-pc's mod=
+                                                 rando.ini, rando_doors.txt, spoiler.txt, graph.dot,
+                                                 graph.dgml) for recvx-pc's mod=
               dump-script <RM_xxxx> [--from <hex>] [--to <hex>]
                                                  a room's script opcodes with their file offsets
               verify-data [--all]                check the built-in room data against the game's
@@ -256,6 +259,17 @@ internal static class Cli
         return failures == 0 ? 0 : 1;
     }
 
+    private static int ListSaveRooms(Options options)
+    {
+        using var rooms = RoomArchive.Open(OpenData(options));
+        foreach (var (id, info) in SaveRooms.FindAll(rooms).OrderBy(x => x.Key))
+        {
+            if (info.ItemBox || info.Typewriter)
+                Console.WriteLine($"{id.Name} ({id.BioRandId}): {(info.ItemBox ? "item box" : "")}{(info.ItemBox && info.Typewriter ? " + " : "")}{(info.Typewriter ? "typewriter" : "")}");
+        }
+        return 0;
+    }
+
     private static int Generate(Options options)
     {
         var seed = options.Get("seed") is { } s ? int.Parse(s) : Random.Shared.Next(0, 1_000_000);
@@ -266,6 +280,7 @@ internal static class Cli
             IncludeChris = !options.Has("claire-only"),
             RandomInventory = options.Has("inventory"),
             NoNosferatuPoison = options.Has("no-poison"),
+            RandomDoors = options.Has("doors"),
         };
         using var rooms = RoomArchive.Open(OpenData(options));
         var sw = Stopwatch.StartNew();
@@ -279,7 +294,8 @@ internal static class Cli
             Console.Error.WriteLine($"seed {seed}: {ex.Message}");
             return 2;
         }
-        Console.WriteLine($"Seed {seed}: {result.Patches.Count} patches in {result.ChangedRooms.Count} rooms ({sw.Elapsed.TotalSeconds:0.0}s)");
+        Console.WriteLine($"Seed {seed}: {result.Patches.Count} patches in {result.ChangedRooms.Count} rooms" +
+                          $"{(result.Doors != null ? $", door layout {result.DoorAttempts}" : "")} ({sw.Elapsed.TotalSeconds:0.0}s)");
         if (options.Has("spoiler"))
             Console.WriteLine(result.Spoiler);
         if (options.Get("out") is { } outDir)

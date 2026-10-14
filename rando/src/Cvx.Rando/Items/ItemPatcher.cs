@@ -26,9 +26,57 @@ public sealed class ItemPatcher
         _archive = archive;
     }
 
-    /// <summary>The rooms that changed, ready for <see cref="RoomArchive.WriteModified"/>.</summary>
+    /// <summary>
+    /// The rooms that changed, ready for <see cref="RoomArchive.WriteModified"/>. Rooms with
+    /// opcodes added to their start procedure are rebuilt here, after every in-place change.
+    /// </summary>
     public IReadOnlyDictionary<RoomId, RdxFile> ChangedRooms =>
-        _rooms.ToDictionary(x => x.Key, x => new RdxFile(x.Value));
+        _rooms.ToDictionary(x => x.Key, x => _startOpcodes.TryGetValue(x.Key, out var add)
+            ? PrependToStart(new RdxFile(x.Value), add)
+            : new RdxFile(x.Value));
+
+    private readonly Dictionary<RoomId, List<byte>> _startOpcodes = [];
+
+    /// <summary>Blanks the opcodes that start inside <paramref name="spec"/>.</summary>
+    public void Nop(RoomId id, OffsetSpec spec)
+    {
+        var file = new RdxFile(Room(id));
+        if (!CvScriptReader.ReadOpcodes(file).Any(o => spec.Contains(o.Offset)))
+            throw new InvalidDataException($"{id.BioRandId}: no opcode at {spec}");
+        Nop(id, file, spec);
+    }
+
+    /// <summary>Whether an opcode in <paramref name="spec"/> is one of <paramref name="opcodes"/>.</summary>
+    public bool RangeHas(RoomId id, OffsetSpec spec, IReadOnlyCollection<byte> opcodes) =>
+        CvScriptReader.ReadOpcodes(new RdxFile(Room(id))).Any(o => spec.Contains(o.Offset) && opcodes.Contains(o.Opcode));
+
+    /// <summary>Changes one byte inside an opcode.</summary>
+    public void PatchByte(RoomId id, int offset, byte value)
+    {
+        var bytes = Room(id);
+        if (!CvScriptReader.ReadOpcodes(new RdxFile(bytes)).Any(o => offset > o.Offset && offset < o.Offset + o.Length))
+            throw new InvalidDataException($"{id.BioRandId}: 0x{offset:X} is not inside an opcode");
+        bytes[offset] = value;
+    }
+
+    /// <summary>Runs <paramref name="opcodes"/> first when the room starts (procedure 0).</summary>
+    public void AddStartOpcodes(RoomId id, byte[] opcodes)
+    {
+        Room(id);
+        if (!_startOpcodes.TryGetValue(id, out var list))
+            _startOpcodes[id] = list = [];
+        list.AddRange(opcodes);
+    }
+
+    private static RdxFile PrependToStart(RdxFile file, List<byte> opcodes)
+    {
+        var builder = file.ToBuilder();
+        var script = builder.Script;
+        var procedures = Enumerable.Range(0, script.Count).Select(i => script[i]).ToList();
+        procedures[0] = opcodes.Concat(procedures[0].ToArray()).ToArray();
+        builder.Script = RdxScript.FromProcedures(procedures);
+        return builder.ToFile();
+    }
 
     private byte[] Room(RoomId id)
     {

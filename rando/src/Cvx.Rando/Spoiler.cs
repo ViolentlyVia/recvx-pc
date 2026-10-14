@@ -1,4 +1,5 @@
 using System.Text;
+using Cvx.Formats;
 using Cvx.Rando.Data;
 
 namespace Cvx.Rando;
@@ -16,7 +17,28 @@ public static class Spoiler
         sb.AppendLine($"Seed: {s.Seed}");
         sb.AppendLine($"Items: {(s.RandomItems ? s.ItemMode.ToString().ToLowerInvariant() : "off")}" +
                       $"{(s.RandomItems && !s.IncludeChris ? " (Claire's half only)" : "")}");
+        sb.AppendLine($"Doors: {(s.RandomDoors ? "random" : "off")}");
         sb.AppendLine();
+
+        if (result.Doors is { } doors)
+        {
+            var start = RoomId.ParseBioRand(doors.StartRoom);
+            sb.AppendLine("Doors");
+            sb.AppendLine("-----");
+            sb.AppendLine($"  A new game starts in {RoomLabel(start)}.");
+            foreach (var room in doors.Links.Values.GroupBy(l => l.Door.Room).OrderBy(g => g.Key, StringComparer.Ordinal))
+            {
+                sb.AppendLine($"  {RoomLabel(RoomId.ParseBioRand(room.Key))}");
+                foreach (var link in room.OrderBy(l => l.Door.Index))
+                {
+                    var to = link.TargetRoom == link.Door.Room
+                        ? "back into this room"
+                        : $"{RoomLabel(RoomId.ParseBioRand(link.TargetRoom))} entrance {link.Arrival}";
+                    sb.AppendLine($"    door to {link.Door.OriginalTarget,-5} -> {to}");
+                }
+            }
+            sb.AppendLine();
+        }
 
         if (result.Items is { } items)
         {
@@ -73,5 +95,5 @@ public static class Spoiler
         return sb.ToString();
     }
 
-    private static string RoomLabel(Cvx.Formats.RoomId id) => $"{id.Name} ({id.BioRandId})";
+    private static string RoomLabel(RoomId id) => $"{id.Name} ({id.BioRandId})";
 }
