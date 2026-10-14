@@ -130,7 +130,8 @@ match, so `scale=3` at 16:9 renders at 2560x1440.
 
 The randomizer, `cvx-rando.exe`, is a separate program (the CVXRandomizer project).
 "Randomizer..." in `recvx-config.exe` starts it when it is next to the exe. It writes the files
-it changes (the room archive `RDX_LNK.AFS`) to a folder such as `rando\<seed>` and points `mod=`
+it changes (the room archive `RDX_LNK.AFS`, and the room sound packs `MULTSPQ1.AFS` and
+`MULTSPQ2.AFS` when enemies change) to a folder such as `rando\<seed>` and points `mod=`
 at it. A file in the `mod=` folder is read instead of the data folder's file with the same path,
 so the game data itself is never changed. The randomizer also sets `saves=` to a save folder for
 that seed. "Play normal game" (in either program) removes `mod=` and puts your own `saves=` back.
@@ -154,6 +155,10 @@ one per line: `<stage> <room> <case> <area> <old stage> <old room>  <new stage> 
 <new case> <entrance>`. The game looks a door up where it decides where the door goes (door
 areas and script doors), so the room files keep their own door data. When a room's variant
 file does not exist, the game loads variant 0 instead of waiting forever.
+
+`recvx.log` lists each room's memory use when it loads (`room rm_SRRC.rdx: ... pool ...`): the
+room is expanded in place inside a fixed pool, and the randomizer checks every room it changes
+against that pool.
 
 ## Sharing with friends
 
