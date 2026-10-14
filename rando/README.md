@@ -40,7 +40,7 @@ dotnet run --project src/Cvx.Rando.Cli -- <command>
 | `dump-all --out <file.json> [--data <dir>]` | Writes the summary of every room to one JSON file |
 | `extract-room <RM_xxxx> --out <file> [--data <dir>]` | Writes a room's expanded file |
 | `roundtrip [--data <dir>] [--out <dir>]` | Rebuilds every room and the archive without changes and checks the result |
-| `generate [--seed <n>] [--mode shuffle\|custom] [--claire-only] [--out <dir>] [--spoiler]` | Randomizes the items; `--out` writes the mod folder (`RDX_LNK.AFS`, `rando.ini`, `spoiler.txt`, `settings.json`) for recvx-pc's `mod=` |
+| `generate [--seed <n>] [--mode shuffle\|custom] [--claire-only] [--inventory] [--no-poison] [--out <dir>] [--spoiler]` | Randomizes the items (`--inventory`: random starting items for Claire and Chris; `--no-poison`: Nosferatu does not poison); `--out` writes the mod folder (`RDX_LNK.AFS`, `rando.ini`, `spoiler.txt`, `settings.json`) for recvx-pc's `mod=` |
 | `dump-script <RM_xxxx> [--from <hex>] [--to <hex>]` | Lists a room's script opcodes with their file offsets, item names and door targets |
 | `verify-data [--all]` | Checks the built-in room data against the game's rooms (see `data/recv/CHANGES.md`) |
 | `make-mod --out <dir> [--item <RM_xxxx>:<index>=<item id>]... [--ini <key=value>]...` | Builds a test mod folder for recvx-pc (`mod=` in `recvx.ini`) with hand-made item changes and `rando.ini` keys |

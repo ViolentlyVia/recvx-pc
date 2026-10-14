@@ -30,6 +30,15 @@ public sealed record RandoSettings
     /// <summary>Weapons that may appear in custom mode (item ids); empty = all.</summary>
     public int[] Weapons { get; init; } = [];
 
+    // Starting inventory (Claire's and Chris's, each made separately)
+    /// <summary>Replace the starting items: a knife, the weapons below, and random ammo, healing and ink.</summary>
+    public bool RandomInventory { get; init; }
+    public WeaponChoice StartWeapon1 { get; init; } = WeaponChoice.Sidearm;
+    public WeaponChoice StartWeapon2 { get; init; } = WeaponChoice.Random;
+
+    /// <summary>Nosferatu's attack never poisons (BioRand does this with random doors).</summary>
+    public bool NoNosferatuPoison { get; init; }
+
     // Doors (Phase 6): read by the room data filters already.
     public bool RandomDoors { get; init; }
 }
@@ -38,4 +47,13 @@ public enum ItemMode
 {
     Shuffle,
     Custom,
+}
+
+public enum WeaponChoice
+{
+    None,
+    Random,
+    Sidearm,
+    Primary,
+    Powerful,
 }

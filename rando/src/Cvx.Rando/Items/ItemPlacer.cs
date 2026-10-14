@@ -44,10 +44,13 @@ public sealed class ItemPlacer
     private readonly HashSet<int> _keyTypes;
     private readonly HashSet<int> _chrisKeys;
     private readonly List<(string, int)> _givenKeys = [];
+    private readonly IReadOnlyCollection<int> _startWeapons;
     private bool _chrisHalf;
 
-    public ItemPlacer(ItemGraph graph, ItemCatalog items, RandoSettings settings, Rng rng)
+    /// <param name="startWeapons">Weapons Claire starts with: in custom mode they are not placed again (their ammo still is).</param>
+    public ItemPlacer(ItemGraph graph, ItemCatalog items, RandoSettings settings, Rng rng, IReadOnlyCollection<int>? startWeapons = null)
     {
+        _startWeapons = startWeapons ?? [];
         _graph = graph;
         _items = items;
         _settings = settings;
@@ -301,8 +304,9 @@ public sealed class ItemPlacer
         var weapons = _items.Items.Where(i => i.IsWeapon && i.WeaponKind != null && i.WeaponKind != "none")
             .Select(i => i.Id)
             .Where(id => _settings.Weapons.Length == 0 || _settings.Weapons.Contains(id))
+            .Where(id => !_startWeapons.Contains(id))
             .ToList();
-        var ammoTypes = new List<int>();
+        var ammoTypes = _startWeapons.SelectMany(w => _items.Get(w)?.Ammo ?? []).ToList();
         foreach (var weapon in _rng.Shuffle(weapons))
         {
             if (queue.Count == 0)

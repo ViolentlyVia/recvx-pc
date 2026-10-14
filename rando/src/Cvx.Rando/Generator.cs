@@ -16,6 +16,8 @@ public sealed record GenerationResult
     public IReadOnlyList<RoomPatch> Patches { get; init; } = [];
     /// <summary>Pickup amount per item type (rando.ini pickup_amounts); empty keeps the game's.</summary>
     public IReadOnlyDictionary<int, int> PickupAmounts { get; init; } = new Dictionary<int, int>();
+    /// <summary>Claire's and Chris's starting items, when randomized.</summary>
+    public IReadOnlyList<StartInventory> StartInventories { get; init; } = [];
     public required string Spoiler { get; init; }
 }
 
@@ -30,10 +32,20 @@ public static class Generator
         var patcher = new ItemPatcher(data, archive);
         var amounts = new Dictionary<int, int>();
 
+        var inventories = new List<StartInventory>();
+        if (settings.RandomInventory)
+        {
+            var rng = Rng.For(settings.Seed, "inventory");
+            inventories.Add(StartInventory.Make("claire", data.Items, settings, rng));
+            if (settings.IncludeChris)
+                inventories.Add(StartInventory.Make("chris", data.Items, settings, rng));
+        }
+
         if (settings.RandomItems)
         {
             var graph = ItemGraph.Build(data, settings);
-            items = new ItemPlacer(graph, data.Items, settings, Rng.For(settings.Seed, "items")).Place();
+            var claireWeapons = inventories.FirstOrDefault(i => i.Character == "claire")?.Weapons(data.Items).ToList() ?? [];
+            items = new ItemPlacer(graph, data.Items, settings, Rng.For(settings.Seed, "items"), claireWeapons).Place();
             patcher.Apply(items, settings);
             if (settings.ItemMode == ItemMode.Custom)
                 amounts = PickupAmounts(data.Items, settings, Rng.For(settings.Seed, "amounts"));
@@ -46,6 +58,7 @@ public static class Generator
             Items = items,
             Patches = patcher.Patches,
             PickupAmounts = amounts,
+            StartInventories = inventories,
             Spoiler = "",
         };
         return result with { Spoiler = Spoiler.Write(result, data) };
@@ -101,6 +114,13 @@ public static class Generator
         sb.AppendLine($"seed={result.Settings.Seed}");
         if (result.Settings.RandomItems)
             sb.AppendLine("fix_rifle_stacking=1");
+        if (result.Settings.NoNosferatuPoison)
+            sb.AppendLine("no_nosferatu_poison=1");
+        foreach (var inventory in result.StartInventories)
+        {
+            sb.AppendLine($"start_items_{inventory.Character}=" + string.Join(",",
+                inventory.Items.Select(i => string.Create(CultureInfo.InvariantCulture, $"{i.Type}:{i.Count}"))));
+        }
         if (result.PickupAmounts.Count != 0)
         {
             sb.AppendLine("pickup_amounts=" + string.Join(",",

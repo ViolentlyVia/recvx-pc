@@ -50,6 +50,16 @@ public static class Spoiler
             sb.AppendLine();
         }
 
+        foreach (var inventory in result.StartInventories)
+        {
+            var who = inventory.Character == "chris" ? "Chris" : "Claire";
+            sb.AppendLine($"{who}'s starting items");
+            sb.AppendLine(new string('-', who.Length + 17));
+            foreach (var i in inventory.Items)
+                sb.AppendLine($"  {names.NameOf(i.Type),-28} {i.Count}");
+            sb.AppendLine();
+        }
+
         if (result.PickupAmounts.Count != 0)
         {
             sb.AppendLine("Pickup amounts");

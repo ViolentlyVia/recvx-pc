@@ -342,7 +342,7 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
 - 40 rooms are not in the data: the Battle Game rooms (RM_55xx-58xx), cutscene rooms, and some room variants. **Phase 4 must mirror item changes into unmapped variants** (same item at the same position as the mapped variant, e.g. RM_3010/RM_3011).
 - 38 tests pass.
 
-### Phase 4: done (2026-10-14), not committed yet
+### Phase 4: done (2026-10-14), committed `c8ef7ec`
 - `Cvx.Rando`: `Rng` (PCG32, pinned by a test), `RandoSettings`, `Items/ItemGraph` (rooms, doors, pickups by global id), `Items/ItemPlacer`, `Items/Playthrough` (independent check), `Items/ItemPatcher`, `Generator` (mod folder: `RDX_LNK.AFS` with only the changed rooms, `rando.ini`, `spoiler.txt`, `settings.json`), `Spoiler`.
 - CLI `generate [--seed] [--mode shuffle|custom] [--claire-only] [--out] [--spoiler]`.
 - **Logic rules** (differences from BioRand):
@@ -362,6 +362,21 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
   - An item on the floor still shows the original item's model; the prompt and the pickup are the new item.
   - Writing the mod folder takes about 40 s (copying the 588 MB archive and recompressing about 130 rooms); a recompression cache can come later.
   - The map's item checks only look at the inventory (`map.c`), so they need no change.
+
+### Phase 5: done (2026-10-14), not committed yet
+- `Items/StartInventory` (after BioRand's RandomizeStartInventory), made separately for Claire and Chris:
+  - a Combat Knife;
+  - up to two weapons by kind (`StartWeapon1/2`: none, random, sidearm, primary, powerful), loaded, with a 75% chance of spare ammo;
+  - up to four healing items;
+  - a 50% chance of 1-2 ink ribbons;
+  - 8 slots in all, with two-slot weapons first (itemdata type bit 0x100; the game sorts them to the top).
+- Claire keeps the lighter in her special slot (her first cutscene needs it). Chris's special slot stays empty, as in the game.
+- `rando.ini`: `start_items_claire=` / `start_items_chris=` and `no_nosferatu_poison=1` (setting `NoNosferatuPoison`, off by default; turn it on with random doors as BioRand did).
+- Custom mode does not place Claire's starting weapons again, but still places their ammo.
+- `items.json`: ammo for the Sub Machine Gun (M Gun Bullets) and the M-100P (Calico Bullets, magazine 100).
+- CLI `generate --inventory --no-poison`. 54 tests pass.
+- **In game** (seed 5): Claire's inventory showed the Sub Machine Gun at the top in two slots, then the knife, the Handgun (15), Handgun Bullets 40, M Gun Bullets and two mixed herbs. Chris (warped with player 1) had his knife, Handgun and two mixed herbs, and an empty special slot.
+- **Not verified in play:** the Nosferatu option. Also, in a warped game, Start did not open the status screen (the pickup screen was used instead); look into it if it matters for testing.
 
 ## Risks / open items for the executing agent
 - **Don't copy BioRand's CV item writes as-is**: it writes `type` and relies on its executable patch; we write `id` (see Key facts). Treat every BioRand CV write as unverified until it is checked against the game's C code.

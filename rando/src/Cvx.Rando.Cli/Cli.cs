@@ -65,7 +65,8 @@ internal static class Cli
               roundtrip [--out <dir>]            rebuild every room and the archive without changes
                                                  and check the result; --out also writes an
                                                  RDX_LNK.AFS with every room recompressed
-              generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--out <dir>] [--spoiler]
+              generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--inventory] [--no-poison]
+                       [--out <dir>] [--spoiler]
                                                  randomize; --out writes the mod folder (RDX_LNK.AFS,
                                                  rando.ini, spoiler.txt) for recvx-pc's mod=
               dump-script <RM_xxxx> [--from <hex>] [--to <hex>]
@@ -263,6 +264,8 @@ internal static class Cli
             Seed = seed,
             ItemMode = options.Get("mode")?.ToLowerInvariant() == "custom" ? ItemMode.Custom : ItemMode.Shuffle,
             IncludeChris = !options.Has("claire-only"),
+            RandomInventory = options.Has("inventory"),
+            NoNosferatuPoison = options.Has("no-poison"),
         };
         using var rooms = RoomArchive.Open(OpenData(options));
         var sw = Stopwatch.StartNew();
