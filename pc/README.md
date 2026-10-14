@@ -83,6 +83,7 @@ Environment variables for testing:
 | `RECVX_GSDUMP=<frame>` | log every GS draw of that frame |
 | `RECVX_DATA`, `RECVX_ISO`, `RECVX_SAVES`, `RECVX_HDTEX`, `RECVX_MOD` | override the `recvx.ini` paths |
 | `RECVX_WARP=<stage>,<room>[,<entrance>[,<room case>[,<player>]]]` | a new game starts in that room instead of the first one (stage 7 room 11 is `RM_7110.RDX`; player 0 Claire, 1 Chris); the input script's presses still apply |
+| `RECVX_TEST_DOOR=<area>[,<presses>]` | action press number `<presses>` in play (default 1) uses trigger area `<area>` of the current room: a door area as if walked through, any other area as if examined (for testing random doors) |
 | `RECVX_SEDUMP=<file>` | write the sound effect mix as raw 16-bit stereo 48 kHz |
 | `RECVX_MIXDUMP=<file>` | write the final mix as played (music, voices, effects; float32 stereo 48 kHz) |
 | `RECVX_SNDLOG=1` | log sound sequence starts, rejected sequences, sequence uploads and reverb changes |
