@@ -1669,6 +1669,20 @@ void bhSysCallMonitor()
                     sprintf(sys->mes, "rm_%1d%02d%1d.rdx", sys->stg_no, sys->rom_no, sys->rcase); 
                     
                     sz = GetFileSize(sys->mes);
+#ifdef TARGET_PC
+                    /* The room case is global and only room scripts set it, so after random
+                       doors it can name a variant this room does not have: the load would wait
+                       forever. Use the room's first variant instead. */
+                    if ((sz == 0) && (sys->rcase != 0))
+                    {
+                        extern void pcLog(const char* fmt, ...);
+
+                        pcLog("room %s is missing: using case 0", sys->mes);
+                        sys->rcase = 0;
+                        sprintf(sys->mes, "rm_%1d%02d%1d.rdx", sys->stg_no, sys->rom_no, sys->rcase);
+                        sz = GetFileSize(sys->mes);
+                    }
+#endif
                     
                     if (sz != 0) 
                     {

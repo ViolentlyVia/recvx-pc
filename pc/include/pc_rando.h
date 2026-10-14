@@ -18,6 +18,20 @@ int pcRandoBgm(int bgm_no);
  * (sys->itm + 16 * player), when rando.ini says so. */
 void pcRandoStartItems(int player, unsigned int* pip);
 
+/* Random doors: a door of room (stage, room, rcase) through trigger area `area` (the static
+ * area index, or sys->etc_idx for script doors) going to (*tstage, *troom) is redirected when
+ * rando_doors.txt lists it. Returns 1 and changes the target, arrival entrance and pending room
+ * case when it is. */
+int pcRandoDoor(int stage, int room, int rcase, int area, int* tstage, int* troom, int* tpos);
+
+/* The room case a redirected door needs, or -1; cleared by the call. Applied when the room
+ * changes (bhStartDoorDemo). */
+int pcRandoTakePendingCase(void);
+
+/* Testing aid: RECVX_TEST_DOOR=<area>[,<presses>]; see pc_rando.c. */
+int pcTestDoorDue(void);
+
 /* Testing aid: RECVX_WARP=<stage>,<room>[,<entrance>[,<room case>[,<player>]]] starts a new game
- * in that room instead of the first one. Returns 1 and fills the values when it is set. */
+ * in that room instead of the first one. Without it, the randomizer's start= room (if any) is
+ * used. Returns 1 and fills the values when either is set. */
 int pcWarpGet(int* stage, int* room, int* pos, int* rcase, int* player);

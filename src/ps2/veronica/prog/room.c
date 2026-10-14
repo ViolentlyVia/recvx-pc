@@ -904,6 +904,20 @@ void bhSetDoorDemo(unsigned int attr, int stg_no, int rom_no, unsigned int pos_n
     
     plp->stflg |= 0x80010000;
     
+#ifdef TARGET_PC
+    {
+        extern int pcRandoDoor(int stage, int room, int rcase, int area, int* tstage, int* troom, int* tpos);
+        int tstage = stg_no, troom = rom_no, tpos = pos_no;
+
+        /* randomizer: random doors (rando_doors.txt, pc_rando.c) */
+        if (pcRandoDoor(sys->stg_no, sys->rom_no, sys->rcase, sys->etc_idx, &tstage, &troom, &tpos))
+        {
+            stg_no = tstage;
+            rom_no = troom;
+            pos_no = tpos;
+        }
+    }
+#endif
     sys->cb_flg |= 0x1;
     sys->st_flg &= ~0x400200;
 
@@ -986,6 +1000,17 @@ void bhStartDoorDemo()
         
         sys->error = 0;
         
+#ifdef TARGET_PC
+        {
+            extern int pcRandoTakePendingCase(void);
+            int rcase = pcRandoTakePendingCase();
+
+            if (rcase >= 0)
+            {
+                sys->rcase = rcase;   /* randomizer: random doors */
+            }
+        }
+#endif
         sys->stg_no = ddp->stg_no;
         sys->rom_no = ddp->rom_no;
         sys->pos_no = ddp->pos_no;

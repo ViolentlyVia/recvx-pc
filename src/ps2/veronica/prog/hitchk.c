@@ -4598,6 +4598,9 @@ void bhCheckExmAtari(BH_PWORK* pp)
     int etc_n;   
     int danf;    
     int ang;     
+#ifdef TARGET_PC
+    int pc_only = -1; /* RECVX_TEST_DOOR: the one area this press may use */
+#endif
     
     njSinCos(pp->ay, &px, &pz);
     
@@ -4621,9 +4624,87 @@ void bhCheckExmAtari(BH_PWORK* pp)
     sys->cb_flg &= ~0x100;
     
     etc_n = rom->etc_n + sys->metc_n;
+#ifdef TARGET_PC
+    {
+        extern int pcTestDoorDue(void);
+        int t = pcTestDoorDue();
+
+        if ((t >= 0) && (t < etc_n))
+        {
+            exp = (t < rom->etc_n) ? &rom->etcp[t] : &sys->metcp[t - rom->etc_n];
+        }
+
+        if ((t >= 0) && ((t >= etc_n) || (exp->type != 0)))
+        {
+            extern void pcLog(const char* fmt, ...);
+
+            if ((t < etc_n) && (exp->type < 5))
+            {
+                static const int faces[4] = { 0x0000, 0x4000, 0x8000, 0xC000 };
+                static const int blocks[4] = { 0x1000, 0x800, 0x400, 0x2000 };
+                int k;
+
+                /* any other area: point the action probe at it and face a side it accepts, so
+                   the loop below examines it as if the player stood there (script doors) */
+                pxn[exp->type] = exp->px + (exp->w * 0.5f);
+                pzn[exp->type] = exp->pz + (exp->d * 0.5f);
+                pp->flr_no = exp->flr_no;
+
+                for (k = 0; k < 4; k++)
+                {
+                    if (!(exp->attr & blocks[k]))
+                    {
+                        pp->ay = faces[k] - 8192;
+                        break;
+                    }
+                }
+
+                pcLog("RECVX_TEST_DOOR: examining area %d (type %d)", t, exp->type);
+                pc_only = t;
+            }
+            else
+            {
+                pcLog("RECVX_TEST_DOOR: no area %d (%d areas)", t, etc_n);
+            }
+        }
+        else if (t >= 0)
+        {
+            pp->stflg |= 0x80000000;
+            sys->cb_flg |= 0x1;
+            sys->st_flg |= 0x4;
+            sys->ddmd = 0;
+            sys->door.flg = (unsigned short)exp->attr;
+            sys->door.stg_no = exp->prm0;
+            sys->door.rom_no = exp->prm1;
+            sys->door.pos_no = exp->prm2;
+            sys->door.dor_tp = exp->prm3;
+
+            {
+                extern int pcRandoDoor(int stage, int room, int rcase, int area, int* tstage, int* troom, int* tpos);
+                int tstage = sys->door.stg_no, troom = sys->door.rom_no, tpos = sys->door.pos_no;
+
+                /* randomizer: random doors (rando_doors.txt, pc_rando.c) */
+                if (pcRandoDoor(sys->stg_no, sys->rom_no, sys->rcase, t, &tstage, &troom, &tpos))
+                {
+                    sys->door.stg_no = tstage;
+                    sys->door.rom_no = troom;
+                    sys->door.pos_no = tpos;
+                }
+            }
+
+            return;
+        }
+    }
+#endif
     
     for (i = 0; i < etc_n; i++)
     {
+#ifdef TARGET_PC
+        if ((pc_only >= 0) && (i != pc_only))
+        {
+            continue;
+        }
+#endif
         if (i < rom->etc_n) 
         {
             exp = &rom->etcp[i];
@@ -4671,6 +4752,20 @@ void bhCheckExmAtari(BH_PWORK* pp)
                         sys->door.pos_no = exp->prm2;
                     
                         sys->door.dor_tp = exp->prm3;
+#ifdef TARGET_PC
+                        {
+                            extern int pcRandoDoor(int stage, int room, int rcase, int area, int* tstage, int* troom, int* tpos);
+                            int tstage = sys->door.stg_no, troom = sys->door.rom_no, tpos = sys->door.pos_no;
+
+                            /* randomizer: random doors (rando_doors.txt, pc_rando.c) */
+                            if (pcRandoDoor(sys->stg_no, sys->rom_no, sys->rcase, i, &tstage, &troom, &tpos))
+                            {
+                                sys->door.stg_no = tstage;
+                                sys->door.rom_no = troom;
+                                sys->door.pos_no = tpos;
+                            }
+                        }
+#endif
                     } 
                     
                     return;
