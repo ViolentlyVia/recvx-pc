@@ -167,7 +167,8 @@ python pc/tools/make_share.py [--rando <path to cvx-rando.exe>]
 ```
 
 builds `build_pc/share/recvx-cvx-pc.zip` with just `recvx.exe`, `recvx-config.exe`, `SDL2.dll`
-and a README (plus `cvx-rando.exe` when it is given or found in `build_pc`). It refuses to
+and a README (plus `cvx-rando.exe` and its `cvx-rando-notices.txt` when given or found in
+`build_pc`; CVXRandomizer's `tools/publish.ps1` builds and copies them there). It refuses to
 include game files; each recipient unzips it, runs `recvx-config.exe` and sets the game up from
 their own disc image (no Python needed).
 

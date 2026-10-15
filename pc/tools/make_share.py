@@ -8,8 +8,9 @@ app sets the game up from their own disc image (no Python). Deliberately left ou
 extracted disc files (data/), converted movies, HD texture packs, recvx.ini (holds your local
 paths), saves, logs and input recordings.
 
-The randomizer (cvx-rando.exe, from the separate CVXRandomizer project) is included when it is
-given with --rando or found in build_pc/.
+The randomizer (cvx-rando.exe, from the separate CVXRandomizer project; build it with its
+tools/publish.ps1) is included when it is given with --rando or found in build_pc/, with its
+licence notices (cvx-rando-notices.txt) from the same folder.
 """
 import argparse
 import os
@@ -62,10 +63,12 @@ Randomizer
   cvx-rando.exe (or "Randomizer..." in recvx-config.exe) shuffles items, enemies, doors and
   music. It writes the randomized game to a "rando" folder here and never changes your game
   files; a randomized game keeps its own saves. "Play normal game" in either program switches
-  back to the normal game.
+  back to the normal game. Share codes (CVX1-...) let friends play the same seed.
+  cvx-rando-notices.txt holds the licences of the code it is based on (BioRand).
 """
 
 RANDO_EXE = "cvx-rando.exe"
+RANDO_NOTICES = "cvx-rando-notices.txt"
 
 
 def main():
@@ -91,7 +94,12 @@ def main():
     for f in PROGRAM:
         shutil.copy2(os.path.join(BUILD, f), os.path.join(OUT, f))
     if rando:
+        notices = os.path.join(os.path.dirname(rando), RANDO_NOTICES)
+        if not os.path.isfile(notices):
+            print("missing " + notices + " (tools/publish.ps1 writes it next to the exe)")
+            return 1
         shutil.copy2(rando, os.path.join(OUT, RANDO_EXE))
+        shutil.copy2(notices, os.path.join(OUT, RANDO_NOTICES))
         print("including the randomizer: " + rando)
     with open(os.path.join(OUT, "README.txt"), "w", newline="\r\n") as f:
         f.write(README + (README_RANDO if rando else ""))
