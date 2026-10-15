@@ -43,6 +43,17 @@ dotnet build
 dotnet test
 ```
 
+## Publishing
+
+```bash
+powershell -File tools/publish.ps1
+```
+
+builds `cvx-rando.exe` as one self-contained file (about 47 MB; players install nothing) in
+`artifacts\publish`, with `cvx-rando-notices.txt` (the licences, which travel with the exe), and
+copies both next to `recvx.exe` in `..\recvx-pc\build_pc`. recvx-pc's `pc/tools/make_share.py`
+then puts them in the share zip. `-Target <folder>` copies elsewhere, `-NoCopy` only builds.
+
 ## Command-line tool
 
 ```bash

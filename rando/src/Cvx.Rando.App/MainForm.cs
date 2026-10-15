@@ -57,7 +57,15 @@ public sealed class MainForm : Form
     public MainForm()
     {
         _app = AppSettings.Load();
-        Text = AppTitle;
+        Text = $"{AppTitle} {Version}";
+        try
+        {
+            Icon = Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? Application.ExecutablePath);
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException)
+        {
+            // no icon: the default one
+        }
         Font = new Font("Segoe UI", 9f);
         AutoScaleMode = AutoScaleMode.Dpi;
         StartPosition = FormStartPosition.CenterScreen;
@@ -189,13 +197,15 @@ public sealed class MainForm : Form
 
         var about = new LinkLabel { Text = "About", AutoSize = true, Anchor = AnchorStyles.Right, Margin = new Padding(3, 6, 3, 3) };
         about.LinkClicked += (_, _) => ShowAbout();
-        var statusRow = new TableLayoutPanel { ColumnCount = 3, Dock = DockStyle.Fill, AutoSize = true };
+        // (not auto-sized: an auto-sized table would shrink the status text to nothing)
+        var statusRow = new TableLayoutPanel { ColumnCount = 3, Dock = DockStyle.Fill, Height = 30, Margin = new Padding(0) };
         statusRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         statusRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         statusRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        statusRow.Controls.Add(_progress);
-        statusRow.Controls.Add(_status);
-        statusRow.Controls.Add(about);
+        // explicit cells: a hidden control would otherwise give its cell to the next one
+        statusRow.Controls.Add(_progress, 0, 0);
+        statusRow.Controls.Add(_status, 1, 0);
+        statusRow.Controls.Add(about, 2, 0);
         root.Controls.Add(statusRow);
 
         Controls.Add(root);
@@ -524,14 +534,38 @@ public sealed class MainForm : Form
         RefreshGame();
     }
 
+    private static string Version =>
+        typeof(MainForm).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "";
+
+    private static string Resource(string name)
+    {
+        using var stream = typeof(MainForm).Assembly.GetManifestResourceStream(name);
+        return stream == null ? "" : new StreamReader(stream).ReadToEnd();
+    }
+
     private void ShowAbout()
     {
-        MessageBox.Show(this,
-            $"{AppTitle}\n\nA randomizer for the PC port of Resident Evil Code: Veronica X (recvx-pc).\n\n" +
+        var answer = MessageBox.Show(this,
+            $"{AppTitle} {Version}\n\nA randomizer for the PC port of Resident Evil Code: Veronica X (recvx-pc).\n\n" +
             "Based on BioRand by Ted John (IntelOrca), MIT licence, and its Code: Veronica room data, " +
             "with Code: Veronica information from kapdap.\n\n" +
-            "Resident Evil Code: Veronica X is a trademark of Capcom. This program contains no game data.",
-            $"About {AppTitle}", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            "Resident Evil Code: Veronica X is a trademark of Capcom. This program contains no game data.\n\n" +
+            "Show the licences?",
+            $"About {AppTitle}", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+        if (answer != DialogResult.Yes)
+            return;
+        using var dialog = new Form
+        {
+            Text = "Licences", Size = new Size(720, 560), StartPosition = FormStartPosition.CenterParent,
+            MinimizeBox = false, ShowInTaskbar = false, Font = Font,
+        };
+        dialog.Controls.Add(new TextBox
+        {
+            Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Dock = DockStyle.Fill,
+            Font = new Font(FontFamily.GenericMonospace, 9f),
+            Text = (Resource("license.txt") + "\n\n" + Resource("notices.md")).ReplaceLineEndings("\r\n"),
+        });
+        dialog.ShowDialog(this);
     }
 
     private void SetStatus(string text) => _status.Text = text;

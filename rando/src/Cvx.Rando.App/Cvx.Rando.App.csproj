@@ -6,7 +6,15 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>cvx-rando</AssemblyName>
     <RootNamespace>Cvx.Rando.App</RootNamespace>
+    <ApplicationIcon>cvx-rando.ico</ApplicationIcon>
+    <!-- tools/publish.ps1: one self-contained exe (WinForms does not support trimming) -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\THIRD_PARTY_NOTICES.md" LogicalName="notices.md" />
+    <EmbeddedResource Include="..\..\LICENSE" LogicalName="license.txt" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Cvx.Rando\Cvx.Rando.csproj" />

@@ -421,7 +421,7 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
 - **Not verified in play:** listening (the categories come from the scripts, not from hearing every track).
 - **Fix found by the owner's playthrough:** BioRand's item-mode tweaks made RM_0010 and RM_0050 always load RM_0021/RM_0031, which skipped the graveyard explosion and zombies rising (RM_0020) and the RM_0030 event. The game loads those event versions once the RM_0080 pickup is taken (item flag 4, kept by the item rando since the flag belongs to the spot) and returns to RM_0021/RM_0031 after; the tweaks are no longer applied (random doors never had them).
 
-### Phase 9: done (2026-10-14), not committed yet
+### Phase 9: done (2026-10-14), committed `666dc15`
 - **Window** (`src/Cvx.Rando.App`, `MainForm`): the game folder (this program's folder, the last one used, or chosen), whether the data is set up and whether a seed is active; the seed with a Random button; the share code with Copy and Paste; tabs Items, Inventory, Enemies, Doors, Music; Generate, Generate and play, Play normal game, Open folder, Spoiler log (asks first), Delete old seeds (keeps the active one and every save folder); a status line with each step, and About with the BioRand/kapdap credit. Built in code with auto-sizing layout panels, so it scales with the display.
 - **Game folder** (`Setup/GameFolder`): recvx.ini edited with recvx-config's rules (lines kept, last value wins, a key's last line replaced and the others removed). Generating writes `rando\<seed>` and sets `mod=rando\<seed>`, `saves=saves_rando\<seed>`, keeping the player's own `saves=` in `saves_normal=` (`*` for none) once; Play normal game puts it back. Generation runs on a background task; the app refuses to rewrite the seed the running game is playing.
 - **Share code** (`Setup/ShareCode`): `CVX1-` and the settings that differ from the defaults, as deflated JSON in base64url (about 40 characters for a plain seed).
@@ -429,6 +429,19 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
 - **recvx-pc:** `saves=` and `data=` are now relative to the exe like `mod=` (they were relative to the folder the game was started from), and every level of the save folder is created (`saves_rando\<seed>`).
 - 5 tests (recvx.ini round trip back to the player's saves, share codes). In a test game folder, Generate wrote seed 77 (items, enemies, music) in 78 s and set recvx.ini as above.
 - **Later:** QR code for share codes; rendering graph.dot with Graphviz when installed.
+
+### Phase 10: done (2026-10-14)
+- `tools/publish.ps1`: `dotnet publish` win-x64, self-contained, single file, compressed, native libraries inside, no trimming (WinForms) and no symbols: `cvx-rando.exe`, 47 MB. It also writes `cvx-rando-notices.txt` (LICENSE and THIRD_PARTY_NOTICES: BioRand's MIT notice must travel with copies) and copies both to `..\recvx-pc\build_pc` (or `-Target`).
+- The app has an icon, shows its version in the title, and its About box can show the licences (embedded).
+- recvx-pc `make_share.py` includes the notices with the exe (and refuses to package the exe without them); the share zip's README mentions share codes. The zip: recvx.exe, recvx-config.exe, SDL2.dll, cvx-rando.exe, the notices, README: 45 MB.
+- Checked: the published exe, copied next to a test game's recvx.exe, found the game by itself and generated a seed; recvx-config's "Randomizer..." starts it from build_pc.
+
+### Fix from the owner's playtest (2026-10-14)
+- Door seed 968047 (share code) dead-ended: the start's save room RM_0160 led through its kept door into a fenced corner of RM_0080 behind the Eagle Plate door. The room data lists the plate only on RM_0080's side (the side the normal game comes from), so the logic counted the corner as the whole room.
+- `ItemGraph.SameKeysBothWays`: a door that keeps its original pairing needs its keys from both sides (24 such doors list keys on one side only). Stricter logic only; the 600-seed item sweeps still pass.
+- The door randomizer only joins rooms into one block through kept doors that open both ways without keys, so the start's way out cannot depend on a key door.
+- When a part runs out of free doors, the stranded rooms keep their doors and the doors into them, and a room left with no free door joins them (RM_4001 is entered from RM_4010 but leads to RM_4011).
+- CLI `generate --share <code>` reproduces a share code; a regression test checks the Eagle Plate door in both modes.
 
 ## Risks / open items for the executing agent
 - **Don't copy BioRand's CV item writes as-is**: it writes `type` and relies on its executable patch; we write `id` (see Key facts). Treat every BioRand CV write as unverified until it is checked against the game's C code.

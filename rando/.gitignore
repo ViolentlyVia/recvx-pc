@@ -21,3 +21,4 @@ out/
 
 # Local Claude Code settings
 .claude/
+artifacts/
