@@ -87,6 +87,10 @@ public sealed class DoorRandomizer
     public static bool IsLocked(MapRoomDoor door) =>
         door.Lock is { } l && !l.Equals("none", StringComparison.OrdinalIgnoreCase) && !l.Equals("unblock", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>A door that opens from its own side only (the way back is closed until then).</summary>
+    public static bool IsUnblock(MapRoomDoor door) =>
+        string.Equals(door.Lock, "unblock", StringComparison.OrdinalIgnoreCase);
+
     private bool Excluded(string room) =>
         room == CellRoom ||
         (_data.Map.Rooms[room].DoorRando ?? []).Any(d => string.Equals(d.Category, "exclude", StringComparison.OrdinalIgnoreCase));
@@ -199,8 +203,9 @@ public sealed class DoorRandomizer
         // Rooms joined by doors that stay, and that open both ways without keys, are one block.
         // (A locked, one-way or keyed door may not open when the player first meets it: rooms
         // behind it get a random door of their own. Kept doors need their keys from both
-        // sides, see ItemGraph.SameKeysBothWays.)
-        bool Open(DoorStub s) => !s.Raw.NoReturn && !IsLocked(s.Raw) && s.Requires.Length == 0;
+        // sides, see ItemGraph.SameKeysBothWays. A door that opens from one side only does not
+        // join either: RM_1090's corridor cannot reach its office, see ItemGraph.OneSideOnly.)
+        bool Open(DoorStub s) => !s.Raw.NoReturn && !IsLocked(s.Raw) && !IsUnblock(s.Raw) && s.Requires.Length == 0;
         bool Joined(string a, string b) =>
             stubs.Any(s => s.Room == a && s.OriginalTarget == b && Open(s)) &&
             stubs.Any(s => s.Room == b && s.OriginalTarget == a && Open(s));
@@ -231,17 +236,40 @@ public sealed class DoorRandomizer
         var unconnected = Enumerable.Range(0, blockCount).Where(b => !connected.Contains(b))
             .Where(b => segFree.Any(s => block[s.Room] == b)).ToHashSet();
 
+        // A kept door the player can go through from its room, maybe with a key (the item logic
+        // checks the keys): not locked, and not the closed side of a one-side door.
+        bool Forward(DoorStub s) =>
+            !s.Raw.NoReturn && !IsLocked(s.Raw) && fixedPairs.Contains((s.Room, s.OriginalTarget)) &&
+            segmentOf.TryGetValue(s.OriginalTarget, out var t) && t == segIndex &&
+            (IsUnblock(s.Raw) || !stubs.Any(b => b.Room == s.OriginalTarget && b.OriginalTarget == s.Room && IsUnblock(b.Raw)));
+        var forward = segment.ToDictionary(r => r, r => stubs.Where(s => s.Room == r && Forward(s)).ToList());
+
+        // A block and the blocks behind its kept doors without keys are reached together.
+        void Reach(int b)
+        {
+            var stack = new Stack<int>([b]);
+            while (stack.Count != 0)
+            {
+                var next = stack.Pop();
+                if (!connected.Add(next) && next != b)
+                    continue;
+                unconnected.Remove(next);
+                open.AddRange(segFree.Where(s => block[s.Room] == next && !links.ContainsKey(s) && !open.Contains(s)));
+                foreach (var s in block.Where(x => x.Value == next).SelectMany(x => forward[x.Key]))
+                {
+                    if (s.Requires.Length == 0 && !connected.Contains(block[s.OriginalTarget]))
+                        stack.Push(block[s.OriginalTarget]);
+                }
+            }
+        }
+
         void Connect(DoorStub from, DoorStub to)
         {
             Pair(from, to);
             open.Remove(from);
             open.Remove(to);
-            var b = block[to.Room];
-            if (connected.Add(b))
-            {
-                unconnected.Remove(b);
-                open.AddRange(segFree.Where(s => block[s.Room] == b && !links.ContainsKey(s)));
-            }
+            if (!connected.Contains(block[to.Room]))
+                Reach(block[to.Room]);
         }
 
         // The entry's first door leads to a save room of this part, when it has one (a save
@@ -253,12 +281,21 @@ public sealed class DoorRandomizer
             Connect(rng.NextOf(entryDoor), rng.NextOf(saveStubs));
         else if (segIndex == 0)
             return new GrowResult(true, []);
+        Reach(block[entry]);
 
         // Grow a tree: an open door of the reached rooms to a door of a new block.
         while (unconnected.Count != 0)
         {
             if (open.Count == 0)
-                return new GrowResult(false, block.Where(x => unconnected.Contains(x.Value)).Select(x => x.Key).ToHashSet());
+            {
+                // Out of doors: a block behind a kept door with a key counts as reached.
+                var behind = connected.SelectMany(b => block.Where(x => x.Value == b)).SelectMany(x => forward[x.Key])
+                    .Select(s => block[s.OriginalTarget]).Where(b => !connected.Contains(b)).Order().ToList();
+                if (behind.Count == 0)
+                    return new GrowResult(false, block.Where(x => unconnected.Contains(x.Value)).Select(x => x.Key).ToHashSet());
+                Reach(rng.NextOf(behind));
+                continue;
+            }
             var keyless = open.Where(s => s.Requires.Length == 0).ToList();
             var from = keyless.Count != 0 && rng.NextProbability(70) ? rng.NextOf(keyless) : rng.NextOf(open);
 

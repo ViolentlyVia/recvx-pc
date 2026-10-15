@@ -55,8 +55,10 @@ public sealed class DoorEdge
     public bool NoReturn { get; init; }
     /// <summary>Random doors gave this door a new target (it is not paired with its original door).</summary>
     public bool Redirected { get; init; }
-    /// <summary>Locked (always/side/gate): not passable for item logic.</summary>
-    public bool Locked { get; init; }
+    /// <summary>Locked (always/side/gate), or the far side of a door that opens from one side only: not passable for item logic.</summary>
+    public bool Locked { get; set; }
+    /// <summary>The door opens from this side only (<c>unblock</c>): the way back through it is closed.</summary>
+    public bool Unblock { get; init; }
 
     public override string ToString() => $"{From} -> {To}";
 }
@@ -102,6 +104,7 @@ public sealed class ItemGraph
                     NoReturn = door.NoReturn,
                     Locked = DoorRandomizer.IsLocked(door),
                     Redirected = doors?.Find(key, index) != null,
+                    Unblock = DoorRandomizer.IsUnblock(door),
                 });
             }
 
@@ -134,6 +137,7 @@ public sealed class ItemGraph
         }
 
         SameKeysBothWays(rooms.Values);
+        OneSideOnly(rooms.Values);
 
         var beginEnd = map.BeginEndRooms.First(x => x.DoorRando == null || x.DoorRando == settings.RandomDoors);
         // With Chris, the logic runs to the last room of the game (BioRand's door-mode end,
@@ -165,6 +169,21 @@ public sealed class ItemGraph
                 if (!edge.Requires.All(back.Requires.Contains))
                     back.Requires = back.Requires.Union(edge.Requires).Order().ToArray();
             }
+        }
+    }
+
+    /// <summary>
+    /// The way back through a kept door that opens from one side only is closed. RM_1090's
+    /// passage opens from the office (the Gold Lugers); from the corridor the bookcase is a wall,
+    /// so coming in from RM_1100 leads nowhere. Doors marked on both sides stay open both ways.
+    /// </summary>
+    private static void OneSideOnly(IEnumerable<RoomNode> rooms)
+    {
+        var all = rooms.SelectMany(r => r.Edges).Where(e => !e.Redirected).ToList();
+        foreach (var edge in all.Where(e => e.Unblock))
+        {
+            foreach (var back in all.Where(b => b.From == edge.To && b.To == edge.From && !b.Unblock))
+                back.Locked = true;
         }
     }
 

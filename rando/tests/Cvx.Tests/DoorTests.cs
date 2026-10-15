@@ -105,6 +105,46 @@ public class DoorTests
         Assert.All(eagle, e => Assert.Contains(56, e.Requires));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PalacePassageOpensFromTheOfficeOnly(bool doors)
+    {
+        // Found in play (seed 394125): RM_2000 -> RM_1100 -> RM_1090's corridor, where the
+        // bookcase is a wall; it opens from the office with the Gold Lugers.
+        var settings = new RandoSettings { Seed = 1, RandomDoors = doors };
+        var graph = doors ? Generator.MakeDoors(settings, Data).Graph : ItemGraph.Build(Data, settings);
+        var office = graph.Rooms["2090"];
+        Assert.All(graph.Rooms["20A0"].Edges.Where(e => e.To == office), e => Assert.True(e.Locked));
+        Assert.All(office.Edges.Where(e => e.To.Key == "20A0"), e => Assert.Contains(33, e.Requires));
+    }
+
+    [Fact]
+    public void ThePlaneDoorKeepsItsPair()
+    {
+        // Found in play (seed 79634): a random door into RM_4011 through the plane door's pair
+        // lands on the gangway, which only the bridge (set from the hangar side) connects.
+        var layout = Generator.MakeDoors(new RandoSettings { Seed = 1, RandomDoors = true }, Data);
+        var plane = layout.Graph.Rooms["5011"].Edges.Where(e => e.To.Key == "6000").ToList();
+        Assert.NotEmpty(plane);
+        Assert.All(plane, e => Assert.False(e.Redirected));
+        Assert.DoesNotContain(layout.Plan.Links.Values, l => l.TargetRoom == "5011" && l.Arrival == 5);
+    }
+
+    [Fact]
+    public void StoryDoorsStayClosedWithRandomDoors()
+    {
+        // Found in play (seed 389349): on a fresh game RM_2050's door to RM_2040 plays a scene
+        // that sends the player to RM_2030 (through a random door), and RM_2040's door back
+        // does nothing. Doors like these are left out with random doors (doorRando: false).
+        var layout = Generator.MakeDoors(new RandoSettings { Seed = 1, RandomDoors = true }, Data);
+        Assert.DoesNotContain(layout.Graph.Rooms["3050"].Edges, e => e.To.Key == "3040");
+        Assert.DoesNotContain(layout.Graph.Rooms["3040"].Edges, e => e.To.Key == "3050");
+        Assert.DoesNotContain(layout.Plan.Links.Keys, s => s.Room == "3050" && s.OriginalTarget == "3040");
+        var items = ItemGraph.Build(Data, new RandoSettings { Seed = 1 });
+        Assert.Contains(items.Rooms["3050"].Edges, e => e.To.Key == "3040" && !e.Locked);
+    }
+
     [Fact]
     public void ClaireOnlyKeepsChrisDoors()
     {

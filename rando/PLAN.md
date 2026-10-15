@@ -443,6 +443,21 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
 - When a part runs out of free doors, the stranded rooms keep their doors and the doors into them, and a room left with no free door joins them (RM_4001 is entered from RM_4010 but leads to RM_4011).
 - CLI `generate --share <code>` reproduces a share code; a regression test checks the Eagle Plate door in both modes.
 
+### Second playtest fix (2026-10-14)
+- Door seed 394125 dead-ended in RM_1090's hidden corridor: RM_1080 -> RM_2000 -> RM_1100 -> the corridor, where the bookcase is a wall. It opens from the office side (the Gold Lugers display case), and the office's own door had been used to continue the door tree.
+- `lock: "unblock"` (BioRand: the door opens from this side) now means the way back through a kept door is closed for the item logic (`ItemGraph.OneSideOnly`; doors marked on both sides, RM_0040/RM_0160, stay two-way). The data gives RM_1090's passage door the Gold Lugers.
+- The door randomizer no longer joins rooms through these doors. That split left more one-door blocks than free doors (53 blocks, 96 free doors), so the tree now counts a block behind a kept door it can walk through as reached: right away for doors without keys, and with keys only when the free doors run out (the item logic checks those keys). About 2 layout attempts per seed instead of 1.2; no failures in 60 seeds.
+- Regression test: the corridor cannot reach the office, and the passage needs the Gold Lugers, in both modes.
+
+### Third playtest fix (2026-10-14)
+- Door seed 389349 dead-ended at RM_2050 (residence): its door to RM_2040 is a script event, and on a fresh game it plays a scene that sends the player to RM_2030 instead. With random doors that went through the redirected RM_2030 door, back to where the player came from. RM_2040's door back to RM_2050 does nothing on a fresh game. (Found by replaying the owner's `last_run_input.txt` in a copy of the game.)
+- Both doors are `doorRando: false` in the room data: random doors leave them out (no edge for the logic, not paired), and their partner doors are randomized as usual. The item mode is unchanged. (Keeping them as locked pairs instead took two free doors each and left the Rockfort part short of doors for the tree.)
+- **Door sweep** (scratch tool, not in the repo): for each of the 318 door-mode doors, a test game warps next to it on a fresh game, uses its trigger area (`RECVX_TEST_DOOR`) and records the next room. Unmodified game: 243 reach the data's target, 22 go elsewhere, 38 do nothing (plus script-only doors, area 255, which it cannot use). Rerun of the 60 under a door-mode mod without redirects (script tweaks applied): 5 more are fine.
+- Not acted on, because a fresh warp is not the game's real state: doors that need a key (RM_1070's two, items 67/68) or a story flag (RM_1080's door to RM_1090 timed out but worked in the owner's play) and rooms whose script changes trigger areas by story state (RM_3180). **Open, for the next door playtests:** doors that reloaded their own room or went elsewhere: 4020 #1, 6010 #0, 7000 #1, 8010 #1/#2, 80C0 #1, 80F0 #0, 8100 #0-#2, 8150 #2, 8170 #1, 8180 #0, 9040 #0, A0A0 #0, A0F0 #1, A1A0 #0 (several are the known data errors listed in CHANGES.md); doors that did nothing: 1031 #2, 2020 #2/#4, 20E0 #1, 3060 #2, 4080 #5, 40C0 #1/#2, 40F0 #1, 5011 #1, 5020 #2, 5050 #0, 6000 #1, 8031 #2, 80B0 #3, 8180 #1, A0C0 #0, A0F0 #0, A100 #0/#2.
+
+### Fourth playtest fix (2026-10-15)
+- Door seed 79634 stranded the player on RM_4011's gangway beside the plane: RM_3010's door was paired with the plane door, so the player arrived where the plane leads back to, and the rest of the hangar only connects once the bridge is set from the other side. The plane door (Army, Navy and Air Force Proofs) is `randomize: false` now, so it keeps its pair with RM_5000 and no random door arrives on the gangway.
+
 ## Risks / open items for the executing agent
 - **Don't copy BioRand's CV item writes as-is**: it writes `type` and relies on its executable patch; we write `id` (see Key facts). Treat every BioRand CV write as unverified until it is checked against the game's C code.
 - **Room memory budget** when copying enemy assets: measure it, don't guess.

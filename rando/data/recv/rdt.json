@@ -1098,6 +1098,7 @@
           "id": 1,
           "target": "20A0",
           "lock": "unblock",
+          "requires": [ 33 ],
           "entranceId": 1
         }
       ],
@@ -1467,6 +1468,7 @@
         {
           "id": 0,
           "target": "3050",
+          "doorRando": false,
           "entranceId": 1
         },
         {
@@ -1500,6 +1502,7 @@
         {
           "id": 1,
           "target": "3040",
+          "doorRando": false,
           "entranceId": 1
         },
         {
@@ -2595,6 +2598,7 @@
           "id": 5,
           "target": "6000",
           "requires": [ 69, 70, 71 ],
+          "randomize": false,
           "entranceId": 5,
           "offsets": [ "0xA4848", "0xA4852", "0xA485C" ]
         }
