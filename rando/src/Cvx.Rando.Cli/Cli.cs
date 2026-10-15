@@ -74,7 +74,7 @@ internal static class Cli
                                                  and check the result; --out also writes an
                                                  RDX_LNK.AFS with every room recompressed
               generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--inventory] [--no-poison]
-                       [--doors] [--enemies] [--enemy-difficulty 0-3] [--music] [--out <dir>] [--spoiler]
+                       [--doors] [--enemies] [--enemy-difficulty 0-3] [--music] [--share <code>] [--out <dir>] [--spoiler]
                                                  randomize; --out writes the mod folder (RDX_LNK.AFS,
                                                  rando.ini, rando_doors.txt, spoiler.txt, graph.dot,
                                                  graph.dgml) for recvx-pc's mod=
@@ -442,6 +442,15 @@ internal static class Cli
             RandomMusic = options.Has("music"),
             EnemyDifficulty = options.Get("enemy-difficulty") is { } ed ? int.Parse(ed) : 1,
         };
+        if (options.Get("share") is { } code)
+        {
+            // a share code from the app sets everything
+            if (!Cvx.Rando.Setup.ShareCode.TryDecode(code, out var shared, out var error))
+                throw new ArgumentException(error);
+            settings = shared!;
+            seed = settings.Seed;
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(settings));
+        }
         using var rooms = RoomArchive.Open(OpenData(options));
         var sw = Stopwatch.StartNew();
         GenerationResult result;

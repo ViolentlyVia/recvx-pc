@@ -50,9 +50,11 @@ public sealed class DoorEdge
 {
     public required RoomNode From { get; init; }
     public required RoomNode To { get; init; }
-    public int[] Requires { get; init; } = [];
+    public int[] Requires { get; set; } = [];
     public RoomNode[] RequiresRoom { get; set; } = [];
     public bool NoReturn { get; init; }
+    /// <summary>Random doors gave this door a new target (it is not paired with its original door).</summary>
+    public bool Redirected { get; init; }
     /// <summary>Locked (always/side/gate): not passable for item logic.</summary>
     public bool Locked { get; init; }
 
@@ -99,6 +101,7 @@ public sealed class ItemGraph
                     RequiresRoom = Nodes(door.RequiresRoom),
                     NoReturn = door.NoReturn,
                     Locked = DoorRandomizer.IsLocked(door),
+                    Redirected = doors?.Find(key, index) != null,
                 });
             }
 
@@ -130,6 +133,8 @@ public sealed class ItemGraph
             }
         }
 
+        SameKeysBothWays(rooms.Values);
+
         var beginEnd = map.BeginEndRooms.First(x => x.DoorRando == null || x.DoorRando == settings.RandomDoors);
         // With Chris, the logic runs to the last room of the game (BioRand's door-mode end,
         // A1E0); without, to Chris's start (BioRand's non-door end, A090).
@@ -142,6 +147,25 @@ public sealed class ItemGraph
             Rooms = rooms,
             Locations = locations.Values.OrderBy(x => x.GlobalId).ToList(),
         };
+    }
+
+    /// <summary>
+    /// A door that keeps its original pairing needs its keys from both sides. The room data
+    /// often lists a key on one side only, the side the normal game reaches it from: RM_0080's
+    /// Eagle Plate door also locks the fenced corner RM_0160 leads into, which random doors can
+    /// reach first. Requiring the keys from the other side too can only make the logic stricter.
+    /// </summary>
+    private static void SameKeysBothWays(IEnumerable<RoomNode> rooms)
+    {
+        var all = rooms.SelectMany(r => r.Edges).Where(e => !e.Redirected).ToList();
+        foreach (var edge in all.Where(e => e.Requires.Length != 0))
+        {
+            foreach (var back in all.Where(b => b.From == edge.To && b.To == edge.From))
+            {
+                if (!edge.Requires.All(back.Requires.Contains))
+                    back.Requires = back.Requires.Union(edge.Requires).Order().ToArray();
+            }
+        }
     }
 
     private static ItemPriority ParsePriority(string? s) =>

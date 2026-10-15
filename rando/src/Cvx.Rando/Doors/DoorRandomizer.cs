@@ -150,10 +150,24 @@ public sealed class DoorRandomizer
                     links.Remove(s);
                 if (tries == 100)
                     return Fail($"segment {segIndex}: rooms {string.Join(" ", result.Stranded)} cannot be joined");
-                foreach (var s in segFree.Where(s => result.Stranded.Contains(s.Room)))
+                // Their doors and the doors that lead into them keep their targets. A room left
+                // with no free door by that keeps its doors too, and the doors into it (the
+                // data's doors are not always in pairs: RM_4001 is entered from RM_4010 but its
+                // door leads to RM_4011).
+                var keep = new HashSet<string>(result.Stranded);
+                var hadFree = segFree.Select(s => s.Room).ToHashSet();
+                while (true)
                 {
-                    fixedPairs.Add((s.Room, s.OriginalTarget));
-                    fixedPairs.Add((s.OriginalTarget, s.Room));
+                    foreach (var s in segFree.Where(s => keep.Contains(s.Room) || keep.Contains(s.OriginalTarget)))
+                    {
+                        fixedPairs.Add((s.Room, s.OriginalTarget));
+                        fixedPairs.Add((s.OriginalTarget, s.Room));
+                    }
+                    segFree = segFree.Where(s => !fixedPairs.Contains((s.Room, s.OriginalTarget))).ToList();
+                    var closed = hadFree.Where(r => !keep.Contains(r) && segFree.All(s => s.Room != r)).ToList();
+                    if (closed.Count == 0)
+                        break;
+                    keep.UnionWith(closed);
                 }
             }
         }
@@ -182,10 +196,11 @@ public sealed class DoorRandomizer
             links[b] = new DoorLink(b, a.Room, a.Arrival, a);
         }
 
-        // Rooms joined by doors that stay, and that the logic can use both ways, are one
-        // block. (A locked or one-way door never opens for the logic: rooms behind it get a
-        // random door of their own.)
-        bool Open(DoorStub s) => !s.Raw.NoReturn && !IsLocked(s.Raw);
+        // Rooms joined by doors that stay, and that open both ways without keys, are one block.
+        // (A locked, one-way or keyed door may not open when the player first meets it: rooms
+        // behind it get a random door of their own. Kept doors need their keys from both
+        // sides, see ItemGraph.SameKeysBothWays.)
+        bool Open(DoorStub s) => !s.Raw.NoReturn && !IsLocked(s.Raw) && s.Requires.Length == 0;
         bool Joined(string a, string b) =>
             stubs.Any(s => s.Room == a && s.OriginalTarget == b && Open(s)) &&
             stubs.Any(s => s.Room == b && s.OriginalTarget == a && Open(s));

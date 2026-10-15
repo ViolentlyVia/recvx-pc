@@ -91,6 +91,20 @@ public class DoorTests
         Assert.Empty(before.Except(after).Order(StringComparer.Ordinal));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void KeptKeyDoorsNeedTheirKeysFromBothSides(bool doors)
+    {
+        // Found in play (seed 968047): RM_0160 leads into a fenced corner of RM_0080 behind the
+        // Eagle Plate door. The data only gives the plate on RM_0080's side.
+        var settings = new RandoSettings { Seed = 1, RandomDoors = doors };
+        var graph = doors ? Generator.MakeDoors(settings, Data).Graph : ItemGraph.Build(Data, settings);
+        var eagle = graph.Rooms["1100"].Edges.Where(e => e.To.Key == "1080" && !e.Redirected).ToList();
+        Assert.NotEmpty(eagle);
+        Assert.All(eagle, e => Assert.Contains(56, e.Requires));
+    }
+
     [Fact]
     public void ClaireOnlyKeepsChrisDoors()
     {
