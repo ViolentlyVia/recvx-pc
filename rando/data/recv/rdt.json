@@ -487,7 +487,7 @@
     "10B0": {
       "doorRando": [
         {
-          "nop": [ "0x208F98-0x208FD6", "0x2090DE-0x20911C" ]
+          "nop": [ "0x208F98-0x208FD4", "0x2090DE-0x20911C" ]
         }
       ],
       "doors": [
@@ -1188,7 +1188,7 @@
     "20C0": {
       "doorRando": [
         {
-          "nop": [ "0x1580B4-0x1580D8", "0x1580FE-0x158142" ]
+          "nop": [ "0x1580FE-0x158142" ]
         }
       ],
       "doors": [
@@ -1474,6 +1474,7 @@
         {
           "id": 2,
           "target": "3060",
+          "lock": "unblock",
           "requires": [ 61, 78 ],
           "entranceId": 2
         }
@@ -2724,6 +2725,7 @@
         {
           "id": 5,
           "target": "5010",
+          "doorRando": false,
           "entranceId": 0
         },
         {

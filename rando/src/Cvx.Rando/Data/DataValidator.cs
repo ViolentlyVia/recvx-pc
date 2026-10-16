@@ -297,7 +297,10 @@ public sealed class DataValidator
         }
 
         foreach (var dr in room.DoorRando ?? [])
+        {
             CheckNop(dr.Nop, "doorRando", opcodes, file, Error);
+            CheckDoorSetups(dr.Nop, opcodes, file, Error);
+        }
         foreach (var en in room.Enemies ?? [])
             CheckNop(en.Nop, "enemies", opcodes, file, Error);
 
@@ -316,6 +319,28 @@ public sealed class DataValidator
                 error($"{label}: nop {spec} covers no opcode");
             else if (!spec.IsRange && !opcodes.Any(o => o.Offset == spec.Start))
                 error($"{label}: nop {spec} is not the start of an opcode");
+        }
+    }
+
+    /// <summary>
+    /// A door mode nop must not remove the only line that makes a trigger area a door: the room
+    /// file's area is then not a door, and nothing else sets it up (RM_0110 #11 lost its door
+    /// to RM_0120 when a range reached one opcode past an <c>else</c>).
+    /// </summary>
+    private static void CheckDoorSetups(OffsetSpec[]? specs, IReadOnlyList<CvOpcode> opcodes, RdxFile file, Action<string> error)
+    {
+        var aots = file.Aots;
+        bool MakesDoor(CvOpcode o) => o.Opcode == CvOpcodes.SetEtcAtari2 && o.Length >= 9 && o.Bytes.Span[8] == RdxAot.KindDoor;
+        foreach (var spec in specs ?? [])
+        {
+            foreach (var op in opcodes.Where(o => spec.Contains(o.Offset) && MakesDoor(o)))
+            {
+                var area = op.Bytes.Span[1];
+                var fileDoor = area < aots.Length && aots[area].Kind == RdxAot.KindDoor;
+                var kept = opcodes.Any(o => !(specs ?? []).Any(s => s.Contains(o.Offset)) && MakesDoor(o) && o.Bytes.Span[1] == area);
+                if (!fileDoor && !kept)
+                    error($"doorRando: nop {spec} removes every door setup of trigger area {area} (0x{op.Offset:X})");
+            }
         }
     }
 

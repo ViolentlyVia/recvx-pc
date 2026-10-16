@@ -58,6 +58,24 @@ Why the Shotguns are `fixed`: RM_7060's give is part of a puzzle the data does n
 (its script also checks the Shotgun as the used item and has a `player_item_lost_ex` for it),
 so it is not moved until that is understood.
 
+## Fixes (2026-10-14/15, door randomizer playtests)
+
+| Room | Entry | Change | Evidence |
+|---|---|---|---|
+| 2090 (RM_1090) | door 1 (to 20A0) | `requires: [33]` | the bookcase passage opens from the office with the Gold Lugers; from the corridor it is a wall |
+| 3040 (RM_2040), 3050 (RM_2050) | the doors between them | `doorRando: false` | on a fresh game RM_2050's door plays a scene that sends the player to RM_2030, and RM_2040's does nothing |
+| 5011 (RM_4011) | door 1 (the plane) | `randomize: false` | arriving through its pair puts the player on the gangway, which only the bridge connects to the hangar |
+| 10B0 (RM_0110) | `doorRando` nop | `0x208F98-0x208FD6` -> `0x208F98-0x208FD4` | the range ended on the `else`'s body, the only line that makes area 11 the door to RM_0120; it now removes the `if`/`else` and keeps the door |
+| 3040 (RM_2040) | door 2 (the attic ladder, to 3060) | `lock: "unblock"` | coming down the ladder leaves the player on the bed canopy until the King Ant / Music Box Plate puzzle on the floor lowers it; kept, and closed from the attic for the logic |
+| 6000 (RM_5000) | door 0 (to 5010) | `doorRando: false` | with random doors the plane starts the flight to Antarctica when it loads; only the plane door may lead in |
+| 20C0 (RM_1120) | `doorRando` nop | `0x1580B4-0x1580D8` removed | it is the stairs' climb event (procedure 2 calls the door to RM_1000); without it the stairs cannot be climbed |
+
+Nop ranges include the opcode at their end (they end on the `endif` or `else` that closes what
+they remove; CV writes `if ... endif else <body>`, the `else` jumping over its body).
+`verify-data` now reports a door mode nop that removes every door setup of a trigger area the
+room file does not make a door. RM_1100's door to RM_2000 needs map flag 0x46, which the
+cutscene its nop removes would set: `RoomTweaks` sets it when the room starts with random doors.
+
 ## Open (check in the game before relying on them, Phase 6)
 
 `verify-data` still reports these; the door randomizer must not trust them yet.

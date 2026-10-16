@@ -63,6 +63,9 @@ public static class RoomTweaks
         Nop("1070", 0x1819AE, TweakMode.Always, "the window cutscene plays when the item is taken"),
 
         Flag("20E0", 19, 0, "story flag for random doors"),
+        // The nop above RM_1100's door event (room data) removes the cutscene that sets this map
+        // flag, and only with it does the room set up its door to RM_2000 (RM_2000 sets it too).
+        new("20A0", TweakMode.DoorsOnly, "RM_1100's door to RM_2000 works without its cutscene") { Flag = (8, 0x46, 0) },
         Flag("5040", 19, 1, "story flag for random doors"),
 
         Nop("3050", 0x15F288, 0x15F2DA, TweakMode.Always, "no Steve/Alfred cutscene"),
@@ -71,6 +74,10 @@ public static class RoomTweaks
         Patch("3060", 0x70A10 + 6, 0x00, TweakMode.ItemsOnly, "no softlock entering by the ladder without the Silver Key"),
 
         Patch("4080", 0x9F86C + 2, 0xC5, TweakMode.ItemsOnly, "RM_4011 right after the Alfred cutscene"),
+        // RM_3210's pickup (area 9) relies on the script the door mode nop removes to switch it
+        // off once taken (the item opcodes only hide the model): let the game switch it off.
+        Patch("4150", 0x145DF8 + 5, 0x00, TweakMode.DoorsOnly, "set_ck_item switches the taken pickup off"),
+        Patch("4150", 0x145E6E + 5, 0x00, TweakMode.DoorsOnly, "ck_item switches the pickup off when taken"),
         Patch("40F0", 0x7241C + 2, 0xC5, TweakMode.ItemsOnly, "RM_4011 right after the Alfred cutscene"),
         Flag("4080", 211, 0, "story flag for random doors"),
 

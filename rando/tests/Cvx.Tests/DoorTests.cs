@@ -131,6 +131,69 @@ public class DoorTests
         Assert.DoesNotContain(layout.Plan.Links.Values, l => l.TargetRoom == "5011" && l.Arrival == 5);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TheAtticLadderGoesUpOnly(bool doors)
+    {
+        // Found in play (seed 79634): coming down RM_2040's attic ladder (or through a random
+        // door paired with it) leaves the player on the bed canopy until the King Ant / Music
+        // Box Plate puzzle on the floor lowers the ladder.
+        var settings = new RandoSettings { Seed = 1, RandomDoors = doors };
+        var graph = doors ? Generator.MakeDoors(settings, Data).Graph : ItemGraph.Build(Data, settings);
+        Assert.Contains(graph.Rooms["3040"].Edges, e => e.To.Key == "3060" && !e.Redirected && !e.Locked);
+        Assert.All(graph.Rooms["3060"].Edges.Where(e => e.To.Key == "3040"), e => Assert.True(e.Locked));
+    }
+
+    [Fact]
+    public void OnlyThePlaneDoorLeadsIntoThePlane()
+    {
+        // With random doors RM_5000 (the plane) starts the flight to Antarctica when it loads
+        // (its story flags), a one-way trip; a random door into it would skip the rest of
+        // Rockfort. Seen with seed 7 in the door sweep.
+        foreach (var seed in Enumerable.Range(1, 20))
+        {
+            var layout = Generator.MakeDoors(new RandoSettings { Seed = seed, RandomDoors = true }, Data);
+            Assert.DoesNotContain(layout.Plan.Links.Values, l => l.TargetRoom == "6000");
+            Assert.DoesNotContain(layout.Graph.Rooms.Values.SelectMany(r => r.Edges), e => e.To.Key == "6000" && e.Redirected);
+            Assert.Contains(layout.Graph.Rooms["5011"].Edges, e => e.To.Key == "6000");
+        }
+    }
+
+    [Fact]
+    public void RandomDoorsOpenTheDoorFromRm1100()
+    {
+        // Found in play (seed 79634): the door mode nop removes RM_1100's cutscene that sets map
+        // flag 0x46, without which the room never sets up its door to RM_2000.
+        var tweak = Assert.Single(RoomTweaks.For(new RandoSettings { RandomDoors = true }, Data), t => t.Room == "20A0" && t.Flag != null);
+        Assert.Equal(new byte[] { 0x05, 0x08, 0x46, 0x00, 0x00, 0x00 }, tweak.FlagOpcode());
+        Assert.DoesNotContain(RoomTweaks.For(new RandoSettings(), Data), t => t.Room == "20A0" && t.Flag != null);
+    }
+
+    [Fact]
+    public void RandomDoorsSwitchOffTakenPickups()
+    {
+        // Found in play (seed 79634): RM_3210's pickup came back on every visit. Its item
+        // opcodes only hide the model (last byte 1) and leave switching the area off to the
+        // script that the door mode nop removes.
+        var doors = RoomTweaks.For(new RandoSettings { RandomDoors = true }, Data).Where(t => t.Room == "4150" && t.Patch != null).ToList();
+        Assert.Contains(doors, t => t.Patch == (0x145DF8 + 5, (byte)0));
+        Assert.Contains(doors, t => t.Patch == (0x145E6E + 5, (byte)0));
+        Assert.Contains(RoomTweaks.For(new RandoSettings { RandomDoors = true }, Data), t => t.Room == "4150" && t.Nop != null);
+        Assert.DoesNotContain(RoomTweaks.For(new RandoSettings(), Data), t => t.Room == "4150");
+    }
+
+    [Fact]
+    public void RandomDoorsKeepScriptDoors()
+    {
+        // Found in play (seed 79634) and by the door sweep: door mode nops that removed RM_1120's
+        // stair climb and RM_0110's door setup (area 11, to RM_0120).
+        var nops = RoomTweaks.For(new RandoSettings { RandomDoors = true }, Data).Where(t => t.Nop != null).ToList();
+        Assert.DoesNotContain(nops, t => t.Room == "20C0" && t.Nop!.Value.Contains(0x1580B4));
+        Assert.DoesNotContain(nops, t => t.Room == "10B0" && t.Nop!.Value.Contains(0x208FD6));
+        Assert.Contains(nops, t => t.Room == "10B0" && t.Nop!.Value.Contains(0x208FD4));
+    }
+
     [Fact]
     public void StoryDoorsStayClosedWithRandomDoors()
     {
