@@ -23,9 +23,9 @@ the game folder. Pick the options, then **Generate** (or **Generate and play**):
 The share code (`CVX1-...`) holds the seed and every option: paste one to play someone else's
 seed. **Spoiler log** opens `spoiler.txt` (where everything is). There is one seed at a time:
 generating a seed deletes the previous seed's folder and the random run's saves once the new
-one is written (the app asks first), and **Random** asks, then picks a new seed number and
-generates it. The app remembers your
-choices in `cvx-rando.json` next to it.
+one is written (the app asks first). **Random** only picks a new seed number; press
+**Generate** or **Generate and play** to make it. The app remembers your choices in
+`cvx-rando.json` next to it.
 
 ## Projects
 

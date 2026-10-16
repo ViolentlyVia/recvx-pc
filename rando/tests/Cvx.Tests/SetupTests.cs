@@ -69,6 +69,27 @@ public sealed class SetupTests : IDisposable
     }
 
     [Fact]
+    public void ASeedFolderHeldForAMomentIsStillDeleted()
+    {
+        // OneDrive held an emptied seed folder for a moment and the delete gave up.
+        var game = new GameFolder(_dir);
+        foreach (var seed in new[] { 1, 2 })
+            Directory.CreateDirectory(game.SeedDirectory(seed));
+        var held = new FileStream(Path.Combine(game.SeedDirectory(1), "rando.ini"), FileMode.Create, FileAccess.Write, FileShare.None);
+        var release = new Thread(() => { Thread.Sleep(300); held.Dispose(); });
+        release.Start();
+        try
+        {
+            Assert.Empty(game.DeleteOtherSeeds(2));
+            Assert.False(Directory.Exists(game.SeedDirectory(1)));
+        }
+        finally
+        {
+            release.Join();
+        }
+    }
+
+    [Fact]
     public void PlayNormalWithoutOwnSavesRemovesSaves()
     {
         File.WriteAllText(Ini, "scale=2\n");

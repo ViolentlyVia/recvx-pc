@@ -140,7 +140,7 @@ public sealed class MainForm : Form
 
         // Seed and share code
         var randomSeed = Btn("Random");
-        randomSeed.Click += async (_, _) => await NewRandomSeed();
+        randomSeed.Click += (_, _) => _seed.Value = Random.Shared.Next(1, 1_000_000);
         var copy = Btn("Copy");
         copy.Click += (_, _) => { Clipboard.SetText(_shareCode.Text); SetStatus("Share code copied."); };
         var paste = Btn("Paste");
@@ -403,34 +403,10 @@ public sealed class MainForm : Form
     // ------------------------------------------------------------------ actions
 
     /// <summary>
-    /// The Random button: a new seed number and a new seed, after confirming that the current
-    /// seed and its saves go (one seed at a time).
-    /// </summary>
-    private async Task NewRandomSeed()
-    {
-        if (_game is not { HasData: true } game)
-        {
-            _seed.Value = Random.Shared.Next(1, 1_000_000);
-            return;
-        }
-        if (_busy)
-            return;
-        var current = game.SeedFolders().Count != 0 || game.HasRandomSaves;
-        var question = current
-            ? "Delete your current seed and its saves, and generate a new random seed?"
-            : "Generate a new random seed?";
-        if (MessageBox.Show(this, question, AppTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-            return;
-        _seed.Value = Random.Shared.Next(1, 1_000_000);
-        await Generate(play: false, confirmed: true);
-    }
-
-    /// <summary>
     /// Writes the seed and points the game at it. One seed at a time: once it is written, the
-    /// other seed folders and the random run's saves are deleted (asked first unless
-    /// <paramref name="confirmed"/>).
+    /// other seed folders and the random run's saves are deleted (asked first).
     /// </summary>
-    private async Task Generate(bool play, bool confirmed = false)
+    private async Task Generate(bool play)
     {
         if (_game is not { HasData: true } game)
             return;
@@ -442,7 +418,7 @@ public sealed class MainForm : Form
             return;
         }
         var replaces = game.SeedFolders().Count != 0 || game.HasRandomSaves;
-        if (!confirmed && replaces &&
+        if (replaces &&
             MessageBox.Show(this, "This replaces your current seed: its folder and its saves (saves_rando) will be deleted. Continue?",
                 AppTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
             return;
@@ -455,15 +431,15 @@ public sealed class MainForm : Form
         var watch = Stopwatch.StartNew();
         try
         {
-            var result = await Task.Run(() =>
+            var (result, stuck) = await Task.Run(() =>
             {
                 using var rooms = RoomArchive.Open(new GameData(game.DataDirectory));
                 var r = Generator.Generate(settings, _data, rooms, progress);
                 Generator.WriteMod(r, rooms, target, progress);
-                return r;
+                var old = game.DeleteOtherSeeds(settings.Seed);
+                game.ClearRandomSaves();
+                return (r, old);
             });
-            var stuck = game.DeleteOtherSeeds(settings.Seed);
-            game.ClearRandomSaves();
             game.Play(settings.Seed);
             _app.Rando = settings;
             _app.GameDirectory = game.Directory;

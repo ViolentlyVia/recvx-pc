@@ -164,7 +164,7 @@ public sealed class GameFolder
         foreach (var file in dir.EnumerateFiles())
             file.Delete();
         foreach (var sub in dir.EnumerateDirectories())
-            sub.Delete(recursive: true);
+            DeleteFolder(sub);
     }
 
     /// <summary>Back to the normal game: no mod, the player's own saves.</summary>
@@ -191,7 +191,7 @@ public sealed class GameFolder
         {
             try
             {
-                d.Delete(recursive: true);
+                DeleteFolder(d);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -199,6 +199,29 @@ public sealed class GameFolder
             }
         }
         return failed;
+    }
+
+    /// <summary>
+    /// Deletes a folder and what is in it. A sync client (OneDrive) or a virus scanner may hold
+    /// the emptied folder for a moment after its files go, so the delete is tried again for
+    /// about two seconds before it gives up.
+    /// </summary>
+    private static void DeleteFolder(DirectoryInfo dir)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                dir.Refresh();
+                if (dir.Exists)
+                    dir.Delete(recursive: true);
+                return;
+            }
+            catch (Exception ex) when (attempt < 10 && ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(200);
+            }
+        }
     }
 
     /// <summary>The seed folders in rando\, newest first.</summary>
