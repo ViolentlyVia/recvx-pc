@@ -62,8 +62,9 @@ README_RANDO = """
 Randomizer
   cvx-rando.exe (or "Randomizer..." in recvx-config.exe) shuffles items, enemies, doors and
   music. It writes the randomized game to a "rando" folder here and never changes your game
-  files; a randomized game keeps its own saves. "Play normal game" in either program switches
-  back to the normal game. Share codes (CVX1-...) let friends play the same seed.
+  files. Randomized games save to their own folder (saves_rando), which a new seed empties;
+  your normal saves are never touched. "Play normal game" in either program switches back to
+  the normal game. Share codes (CVX1-...) let friends play the same seed.
   cvx-rando-notices.txt holds the licences of the code it is based on (BioRand).
 """
 
