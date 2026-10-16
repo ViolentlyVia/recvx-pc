@@ -26,7 +26,7 @@ graveyard), saving and loading. Report problems with a `last_run_input.txt` reco
 | Music and voices (CRI ADX) | done |
 | Sound effects with room reverb (Tamsoft sound driver replacement) | done |
 | Saving and loading (to a `saves` folder, no memory card screens) | done |
-| Keyboard and game controllers (SDL2) | done |
+| Keyboard and game controllers (SDL2), with vibration | done |
 | Fast-forward (hold Numpad 0) | done |
 | Randomizer support (mod folder, `rando.ini`) for the separate `cvx-rando.exe` | done |
 
@@ -85,7 +85,8 @@ its window is not active (can be turned off in the settings app).
 Keyboard: arrows = move, Z = Cross, X = Square, C = Circle, V = Triangle, A / S = L1 / R1,
 Enter = Start, Backspace = Select, hold Numpad 0 = fast-forward, F11 or Alt+Enter =
 fullscreen on/off, F9 = back to the title screen (pauses and asks; F9 again to confirm). The
-window title shows the frame rate. Game controllers are picked up automatically.
+window title shows the frame rate. Game controllers are picked up automatically; a controller
+with motors vibrates like a DualShock 2 (VIBRATION in the title OPTION menu turns it on or off).
 
 Saves are written to `build_pc/saves` (copy the folder to back them up).
 

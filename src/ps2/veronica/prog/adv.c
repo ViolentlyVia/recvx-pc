@@ -2680,8 +2680,8 @@ void DisplayOptionBg(int Level, int Flag)
 
 // 99.65% matching
 #ifdef TARGET_PC
-/* PC: OPTION rows not shown: 1 key config (recvx-config.exe sets the buttons), 4 vibration */
-#define PC_OPTION_HIDDEN(i) (((i) == 1) || ((i) == 4))
+/* PC: OPTION row not shown: 1 key config (recvx-config.exe sets the buttons) */
+#define PC_OPTION_HIDDEN(i) ((i) == 1)
 #endif
 
 int DisplayOptionPlateLevel0(int PortId, int Flag)
@@ -2913,17 +2913,17 @@ int DisplayOptionPlateLevel0(int PortId, int Flag)
     SetQuadUv2(0, 320.0f, 448.0f, 48.0f, 2, &qp[13]);
     
 #ifdef TARGET_PC
-    /* PC: the key config row (recvx-config.exe sets the buttons) and the vibration row are
-     * left out; the rows below them move up */
+    /* PC: the key config row (recvx-config.exe sets the buttons) is left out; the rows below
+     * it move up, with the vibration row's ON and OFF */
     while (PC_OPTION_HIDDEN(ap->OptIndex))
     {
         ap->OptIndex++;
     }
 
     {
-        static const float up[7] = { 0, 0, 32.0f, 32.0f, 0, 64.0f, 64.0f };
+        static const float up[13] = { 0, 0, 32.0f, 32.0f, 32.0f, 32.0f, 32.0f, 0, 0, 0, 0, 32.0f, 32.0f };
 
-        for (i = 0; i < 7; i++)
+        for (i = 0; i < 13; i++)
         {
             qp[i].y1 -= up[i];
             qp[i].y2 -= up[i];
@@ -2997,7 +2997,6 @@ int DisplayOptionPlateLevel0(int PortId, int Flag)
     }
 #endif
     
-#ifndef TARGET_PC /* PC: no vibration row */
     if (OptionDef[4].Item == 0) 
     {
         if (ap->OptIndex == 4) 
@@ -3024,7 +3023,6 @@ int DisplayOptionPlateLevel0(int PortId, int Flag)
             AdvEasyDrawTexture(0, 0xDFCFCFCF, &Qtex[13], 0.05f, 1);
         }
     }
-#endif
     
     AdvEasyDrawTexture(1, -1, &Qtex[14], 0.05f, 1);
     

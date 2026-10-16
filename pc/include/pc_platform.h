@@ -40,3 +40,5 @@ void* pcCdLoadFile(const char* path, unsigned int* size_out);
 void pcPadInit(void);
 void pcPadUpdate(void);
 void pcPadGetState(int port, unsigned char* rdata);  /* 32-byte DualShock 2 report */
+int  pcPadHasRumble(void);
+void pcPadRumble(int small, int large);              /* DualShock 2 motors: on/off, 0-255 */

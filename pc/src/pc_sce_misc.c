@@ -23,7 +23,17 @@ int scePadInfoPressMode(int port, int slot)                  { (void)port; (void
 int scePadEnterPressMode(int port, int slot)                 { (void)port; (void)slot; pad_press_mode = 1; return 1; }
 int scePadExitPressMode(int port, int slot)                  { (void)port; (void)slot; pad_press_mode = 0; return 1; }
 int scePadSetActAlign(int port, int slot, const unsigned char* data)  { (void)port; (void)slot; (void)data; return 1; }
-int scePadSetActDirect(int port, int slot, const unsigned char* data) { (void)port; (void)slot; (void)data; return 1; }
+int scePadSetActDirect(int port, int slot, const unsigned char* data)
+{
+    (void)slot;
+
+    if (port == 0)
+    {
+        pcPadRumble(data[0], data[1]);   /* Ps2_pad_actuater: small motor, large motor */
+    }
+
+    return 1;
+}
 int scePadInfoAct(int port, int slot, int actno, int term)   { (void)port; (void)slot; (void)actno; (void)term; return 0; }
 
 int scePadInfoMode(int port, int slot, int term, int offs)
@@ -35,7 +45,7 @@ int scePadInfoMode(int port, int slot, int term, int offs)
     case InfoModeCurID:
         return 7;          /* DualShock (analog) */
     case InfoModeCurExID:
-        return 0;
+        return pcPadHasRumble() ? 7 : 0;   /* 7: DualShock with motors (pdVibMxIsReady) */
     case InfoModeIdTable:
         return (offs == -1) ? 2 : ((offs == 0) ? 4 : 7);
     }

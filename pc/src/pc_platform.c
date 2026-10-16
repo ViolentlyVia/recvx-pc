@@ -1655,3 +1655,32 @@ void pcPadGetState(int port, unsigned char* rdata)
         rdata[0] = 0xFF;   /* nothing connected */
     }
 }
+
+/* the controller has motors: the game then offers VIBRATION and starts them */
+int pcPadHasRumble(void)
+{
+    return (controller != NULL) && SDL_GameControllerHasRumble(controller);
+}
+
+/* DualShock 2 motors, set every frame: small (on/off, the right motor) and large (0-255, the
+ * left motor). Each call holds them for a short time, so they stop by themselves when the game
+ * stops calling (paused, window closed). */
+void pcPadRumble(int small, int large)
+{
+    static int last_small, last_large;
+
+    if (controller == NULL)
+    {
+        return;
+    }
+
+    if ((small == 0) && (large == 0) && (last_small == 0) && (last_large == 0))
+    {
+        return;
+    }
+
+    SDL_GameControllerRumble(controller, (Uint16)(large * 257), small ? 0xFFFF : 0, 150);
+
+    last_small = small;
+    last_large = large;
+}
