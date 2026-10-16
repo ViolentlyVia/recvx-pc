@@ -119,6 +119,25 @@ public static class RoomTweaks
         }
     }
 
+    /// <summary>
+    /// The side pack from the start: the status screen gives the bigger inventory while event
+    /// flag 6 (Claire) or 7 (Chris) is set (player.c <c>bhCheckSubPack</c>). Set in the rooms a
+    /// new game starts in (RM_0000, and RM_0010 with random doors).
+    /// </summary>
+    public static readonly IReadOnlyList<RoomTweak> SidePack =
+    [
+        new("1000", TweakMode.Always, "start with the side pack") { Flag = (1, 6, 0) },
+        new("1000", TweakMode.Always, "start with the side pack") { Flag = (1, 7, 0) },
+        new("1010", TweakMode.Always, "start with the side pack") { Flag = (1, 6, 0) },
+        new("1010", TweakMode.Always, "start with the side pack") { Flag = (1, 7, 0) },
+    ];
+
+    public static void ApplySidePack(ItemPatcher rooms)
+    {
+        foreach (var t in SidePack)
+            rooms.AddStartOpcodes(RoomId.ParseBioRand(t.Room), t.FlagOpcode());
+    }
+
     public static void Apply(ItemPatcher rooms, RandoSettings settings, RandoData data)
     {
         foreach (var t in For(settings, data))

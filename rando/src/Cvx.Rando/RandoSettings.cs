@@ -35,6 +35,8 @@ public sealed record RandoSettings
     public bool RandomInventory { get; init; }
     public WeaponChoice StartWeapon1 { get; init; } = WeaponChoice.Sidearm;
     public WeaponChoice StartWeapon2 { get; init; } = WeaponChoice.Random;
+    /// <summary>Claire and Chris start with the side pack (the bigger inventory).</summary>
+    public bool StartSidePack { get; init; }
 
     // Enemies
     /// <summary>Replace the ordinary enemies of rooms with other types (copied from other rooms).</summary>

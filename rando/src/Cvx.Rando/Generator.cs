@@ -105,6 +105,8 @@ public static class Generator
             patcher.Apply(items, settings);
             RoomTweaks.Apply(patcher, settings, data);
         }
+        if (settings.StartSidePack)
+            RoomTweaks.ApplySidePack(patcher);
 
         if (settings.RandomEnemies)
             progress?.Report("Choosing enemies...");

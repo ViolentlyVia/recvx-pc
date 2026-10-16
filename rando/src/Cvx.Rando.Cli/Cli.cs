@@ -73,7 +73,7 @@ internal static class Cli
               roundtrip [--out <dir>]            rebuild every room and the archive without changes
                                                  and check the result; --out also writes an
                                                  RDX_LNK.AFS with every room recompressed
-              generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--inventory] [--no-poison]
+              generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--inventory] [--side-pack] [--no-poison]
                        [--doors] [--enemies] [--enemy-difficulty 0-3] [--music] [--share <code>] [--out <dir>] [--spoiler]
                                                  randomize; --out writes the mod folder (RDX_LNK.AFS,
                                                  rando.ini, rando_doors.txt, spoiler.txt, graph.dot,
@@ -437,6 +437,7 @@ internal static class Cli
             IncludeChris = !options.Has("claire-only"),
             RandomInventory = options.Has("inventory"),
             NoNosferatuPoison = options.Has("no-poison"),
+            StartSidePack = options.Has("side-pack"),
             RandomDoors = options.Has("doors"),
             RandomEnemies = options.Has("enemies"),
             RandomMusic = options.Has("music"),

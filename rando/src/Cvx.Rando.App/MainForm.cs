@@ -40,6 +40,7 @@ public sealed class MainForm : Form
     // inventory
     private readonly CheckBox _randomInventory = Check("Random starting items");
     private readonly ComboBox _weapon1 = Choice<WeaponChoice>(), _weapon2 = Choice<WeaponChoice>();
+    private readonly CheckBox _sidePack = Check("Start with the side pack");
     private readonly CheckBox _noPoison = Check("Nosferatu does not poison");
 
     // enemies, doors, music
@@ -177,6 +178,8 @@ public sealed class MainForm : Form
             Note("Claire and Chris each start with a knife, the weapons below, and random ammo, healing items and maybe ink ribbons. Claire keeps her lighter."),
             Row(Caption("First weapon"), _weapon1),
             Row(Caption("Second weapon"), _weapon2),
+            _sidePack,
+            Note("Claire and Chris have the side pack's two extra item slots from the start."),
             _noPoison)));
         tabs.TabPages.Add(Page("Enemies", Column(
             _randomEnemies,
@@ -223,7 +226,7 @@ public sealed class MainForm : Form
     {
         foreach (var c in new Control[] { _seed, _ratioAmmo, _ratioHealth, _ratioInk, _ratioPowder })
             ((NumericUpDown)c).ValueChanged += (_, _) => SettingsChanged();
-        foreach (var c in new CheckBox[] { _randomItems, _includeChris, _hiddenKeys, _randomInventory, _noPoison, _randomEnemies, _randomDoors, _randomMusic })
+        foreach (var c in new CheckBox[] { _randomItems, _includeChris, _hiddenKeys, _randomInventory, _sidePack, _noPoison, _randomEnemies, _randomDoors, _randomMusic })
             c.CheckedChanged += (_, _) => SettingsChanged();
         _shuffle.CheckedChanged += (_, _) => SettingsChanged();
         _custom.CheckedChanged += (_, _) => SettingsChanged();
@@ -273,6 +276,7 @@ public sealed class MainForm : Form
         _randomInventory.Checked = s.RandomInventory;
         _weapon1.SelectedItem = s.StartWeapon1;
         _weapon2.SelectedItem = s.StartWeapon2;
+        _sidePack.Checked = s.StartSidePack;
         _noPoison.Checked = s.NoNosferatuPoison;
         _randomEnemies.Checked = s.RandomEnemies;
         _enemyDifficulty.SelectedIndex = Math.Clamp(s.EnemyDifficulty, 0, 3);
@@ -298,6 +302,7 @@ public sealed class MainForm : Form
         RandomInventory = _randomInventory.Checked,
         StartWeapon1 = _weapon1.SelectedItem is WeaponChoice w1 ? w1 : WeaponChoice.Sidearm,
         StartWeapon2 = _weapon2.SelectedItem is WeaponChoice w2 ? w2 : WeaponChoice.Random,
+        StartSidePack = _sidePack.Checked,
         NoNosferatuPoison = _noPoison.Checked,
         RandomEnemies = _randomEnemies.Checked,
         EnemyDifficulty = Math.Max(0, _enemyDifficulty.SelectedIndex),

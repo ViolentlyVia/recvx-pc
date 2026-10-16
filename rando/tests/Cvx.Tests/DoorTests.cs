@@ -171,6 +171,19 @@ public class DoorTests
     }
 
     [Fact]
+    public void TheLiftKeepsItsDoors()
+    {
+        // Found in play (seed 306305): RM_1140 and RM_4050 are one lift; area 3 rides it and
+        // area 0's exit depends on the level, not on the room file, so its doors stay as they are.
+        foreach (var seed in Enumerable.Range(1, 20))
+        {
+            var plan = Generator.MakeDoors(new RandoSettings { Seed = seed, RandomDoors = true }, Data).Plan;
+            Assert.DoesNotContain(plan.Links.Values, l => l.Door.Room is "5050" or "20E0" || l.TargetRoom is "5050" or "20E0"
+                                                          || l.Door.OriginalTarget is "5050" or "20E0");
+        }
+    }
+
+    [Fact]
     public void RandomDoorsSwitchOffTakenPickups()
     {
         // Found in play (seed 79634): RM_3210's pickup came back on every visit. Its item

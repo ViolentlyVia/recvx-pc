@@ -1249,7 +1249,11 @@
       ]
     },
     "20E0": {
-      "doorRando": [],
+      "doorRando": [
+        {
+          "category": "exclude"
+        }
+      ],
       "doors": [
         {
           "id": 0,
@@ -2698,7 +2702,11 @@
       ]
     },
     "5050": {
-      "doorRando": [],
+      "doorRando": [
+        {
+          "category": "exclude"
+        }
+      ],
       "doors": [
         {
           "id": 1,

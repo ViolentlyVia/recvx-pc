@@ -67,6 +67,7 @@ so it is not moved until that is understood.
 | 5011 (RM_4011) | door 1 (the plane) | `randomize: false` | arriving through its pair puts the player on the gangway, which only the bridge connects to the hangar |
 | 10B0 (RM_0110) | `doorRando` nop | `0x208F98-0x208FD6` -> `0x208F98-0x208FD4` | the range ended on the `else`'s body, the only line that makes area 11 the door to RM_0120; it now removes the `if`/`else` and keeps the door |
 | 3040 (RM_2040) | door 2 (the attic ladder, to 3060) | `lock: "unblock"` | coming down the ladder leaves the player on the bed canopy until the King Ant / Music Box Plate puzzle on the floor lowers it; kept, and closed from the attic for the logic |
+| 5050 (RM_4050), 20E0 (RM_1140) | `doorRando` | `category: exclude` | the two files are one lift: area 3 rides it, and area 0's exit leads to RM_4030 or RM_1130 by the level the player is at, not by the file; a random door through it came back somewhere else |
 | 6000 (RM_5000) | door 0 (to 5010) | `doorRando: false` | with random doors the plane starts the flight to Antarctica when it loads; only the plane door may lead in |
 | 20C0 (RM_1120) | `doorRando` nop | `0x1580B4-0x1580D8` removed | it is the stairs' climb event (procedure 2 calls the door to RM_1000); without it the stairs cannot be climbed |
 

@@ -1,3 +1,4 @@
+using Cvx.Formats;
 using Cvx.Rando;
 using Cvx.Rando.Data;
 using Cvx.Rando.Items;
@@ -73,5 +74,25 @@ public class InventoryTests
         Assert.Contains("start_items_chris=8:1", ini);
         Assert.Contains("no_nosferatu_poison=1", ini);
         Assert.Contains("version=1", ini);
+    }
+
+    [GameDataFact]
+    public void TheSidePackIsSetWhereANewGameStarts()
+    {
+        using var rooms = RoomArchive.Open(TestData.Open());
+        byte[] claire = [0x05, 0x01, 6, 0, 0, 0], chris = [0x05, 0x01, 7, 0, 0, 0];
+        foreach (var (items, doors) in new[] { (false, false), (true, false), (true, true) })
+        {
+            var result = Generator.Generate(new RandoSettings { Seed = 4, RandomItems = items, RandomDoors = doors, StartSidePack = true }, Data, rooms);
+            foreach (var room in new[] { "1000", "1010" })
+            {
+                var start = result.ChangedRooms[RoomId.ParseBioRand(room)].Script[0].ToArray();
+                Assert.True(Contains(start, claire) && Contains(start, chris), $"{room} items {items} doors {doors}");
+            }
+            Assert.Contains("Side pack: from the start", result.Spoiler);
+        }
+
+        static bool Contains(byte[] haystack, byte[] needle) =>
+            Enumerable.Range(0, haystack.Length - needle.Length + 1).Any(i => haystack.AsSpan(i, needle.Length).SequenceEqual(needle));
     }
 }

@@ -18,6 +18,8 @@ public static class Spoiler
         sb.AppendLine($"Items: {(s.RandomItems ? s.ItemMode.ToString().ToLowerInvariant() : "off")}" +
                       $"{(s.RandomItems && !s.IncludeChris ? " (Claire's half only)" : "")}");
         sb.AppendLine($"Doors: {(s.RandomDoors ? "random" : "off")}");
+        if (s.StartSidePack)
+            sb.AppendLine("Side pack: from the start");
         sb.AppendLine($"Enemies: {(s.RandomEnemies ? $"random, difficulty {s.EnemyDifficulty}" : "off")}");
         sb.AppendLine($"Music: {(s.RandomMusic ? "shuffled" : "off")}");
         sb.AppendLine();
