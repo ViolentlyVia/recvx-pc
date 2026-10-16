@@ -10,6 +10,20 @@ public class ItemTests
 {
     private static readonly RandoData Data = RandoData.Load();
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TheStatueKeepsItsRustedSword(bool doors)
+    {
+        // Found in play (seed 522131): taking RM_0150's statue pickup locks the door until a
+        // Rusted Sword is used on the statue, so that pickup must stay the Rusted Sword.
+        var settings = new RandoSettings { Seed = 1, ItemMode = ItemMode.Custom, RandomDoors = doors };
+        var graph = doors ? Generator.MakeDoors(settings, Data).Graph : ItemGraph.Build(Data, settings);
+        var statue = Assert.Single(graph.Locations, l => l.GlobalId == 8);
+        Assert.Equal(103, statue.OriginalType);
+        Assert.Equal(ItemPriority.Fixed, statue.Priority);
+    }
+
     private static ItemPlacementResult Place(RandoSettings settings, out ItemGraph graph)
     {
         graph = ItemGraph.Build(Data, settings);

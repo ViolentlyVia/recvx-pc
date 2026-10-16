@@ -662,6 +662,7 @@
           "globalId": 8,
           "type": 103,
           "amount": 1,
+          "priority": "fixed",
           "offsets": [ 1191434 ]
         },
         {
