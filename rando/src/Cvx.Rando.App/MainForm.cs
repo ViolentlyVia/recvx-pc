@@ -51,7 +51,7 @@ public sealed class MainForm : Form
 
     // actions
     private readonly Button _generate = Btn("Generate"), _generatePlay = Btn("Generate and play"), _playNormal = Btn("Play normal game"),
-        _openFolder = Btn("Open folder"), _spoiler = Btn("Spoiler log"), _cleanUp = Btn("Delete old seeds...");
+        _openFolder = Btn("Open folder"), _spoiler = Btn("Spoiler log");
     private readonly ProgressBar _progress = new() { Style = ProgressBarStyle.Marquee, MarqueeAnimationSpeed = 0, Width = 160, Visible = false };
     private readonly Label _status = new() { AutoEllipsis = true, Dock = DockStyle.Fill, Height = 24, TextAlign = ContentAlignment.MiddleLeft };
 
@@ -140,7 +140,7 @@ public sealed class MainForm : Form
 
         // Seed and share code
         var randomSeed = Btn("Random");
-        randomSeed.Click += (_, _) => _seed.Value = Random.Shared.Next(1, 1_000_000);
+        randomSeed.Click += async (_, _) => await NewRandomSeed();
         var copy = Btn("Copy");
         copy.Click += (_, _) => { Clipboard.SetText(_shareCode.Text); SetStatus("Share code copied."); };
         var paste = Btn("Paste");
@@ -195,7 +195,7 @@ public sealed class MainForm : Form
 
         // Actions
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Margin = new Padding(0, 8, 0, 0) };
-        actions.Controls.AddRange([_generate, _generatePlay, _playNormal, _openFolder, _spoiler, _cleanUp]);
+        actions.Controls.AddRange([_generate, _generatePlay, _playNormal, _openFolder, _spoiler]);
         root.Controls.Add(actions);
 
         var about = new LinkLabel { Text = "About", AutoSize = true, Anchor = AnchorStyles.Right, Margin = new Padding(3, 6, 3, 3) };
@@ -242,7 +242,6 @@ public sealed class MainForm : Form
         _playNormal.Click += (_, _) => PlayNormal();
         _openFolder.Click += (_, _) => OpenFolder();
         _spoiler.Click += (_, _) => OpenSpoiler();
-        _cleanUp.Click += (_, _) => CleanUp();
         FormClosing += (_, e) =>
         {
             if (_busy)
@@ -399,22 +398,54 @@ public sealed class MainForm : Form
         _generate.Enabled = _generatePlay.Enabled = ready;
         _playNormal.Enabled = !_busy && _game?.ActiveMod != null;
         _openFolder.Enabled = _spoiler.Enabled = !_busy && _game != null;
-        _cleanUp.Enabled = !_busy && _game != null && _game.SeedFolders().Count > 1;
     }
 
     // ------------------------------------------------------------------ actions
 
-    private async Task Generate(bool play)
+    /// <summary>
+    /// The Random button: a new seed number and a new seed, after confirming that the current
+    /// seed and its saves go (one seed at a time).
+    /// </summary>
+    private async Task NewRandomSeed()
+    {
+        if (_game is not { HasData: true } game)
+        {
+            _seed.Value = Random.Shared.Next(1, 1_000_000);
+            return;
+        }
+        if (_busy)
+            return;
+        var current = game.SeedFolders().Count != 0 || game.HasRandomSaves;
+        var question = current
+            ? "Delete your current seed and its saves, and generate a new random seed?"
+            : "Generate a new random seed?";
+        if (MessageBox.Show(this, question, AppTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
+        _seed.Value = Random.Shared.Next(1, 1_000_000);
+        await Generate(play: false, confirmed: true);
+    }
+
+    /// <summary>
+    /// Writes the seed and points the game at it. One seed at a time: once it is written, the
+    /// other seed folders and the random run's saves are deleted (asked first unless
+    /// <paramref name="confirmed"/>).
+    /// </summary>
+    private async Task Generate(bool play, bool confirmed = false)
     {
         if (_game is not { HasData: true } game)
             return;
         var settings = Read();
         var target = game.SeedDirectory(settings.Seed);
-        if (GameRunning() && string.Equals(game.ActiveMod?.TrimEnd('\\'), target, StringComparison.OrdinalIgnoreCase))
+        if (GameRunning())
         {
-            MessageBox.Show(this, "The game is running and playing this seed. Close it first.", AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "The game is running. Close it first: a new seed replaces the current one and its saves.", AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
+        var replaces = game.SeedFolders().Count != 0 || game.HasRandomSaves;
+        if (!confirmed && replaces &&
+            MessageBox.Show(this, "This replaces your current seed: its folder and its saves (saves_rando) will be deleted. Continue?",
+                AppTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
 
         _busy = true;
         _progress.Visible = true;
@@ -431,11 +462,14 @@ public sealed class MainForm : Form
                 Generator.WriteMod(r, rooms, target, progress);
                 return r;
             });
+            var stuck = game.DeleteOtherSeeds(settings.Seed);
+            game.ClearRandomSaves();
             game.Play(settings.Seed);
             _app.Rando = settings;
             _app.GameDirectory = game.Directory;
             _app.Save();
-            SetStatus($"Seed {settings.Seed} is ready ({watch.Elapsed.TotalSeconds:0} s){(result.Enemies.Count != 0 ? $", enemies changed in {result.Enemies.Count} rooms" : "")}.");
+            SetStatus($"Seed {settings.Seed} is ready ({watch.Elapsed.TotalSeconds:0} s){(result.Enemies.Count != 0 ? $", enemies changed in {result.Enemies.Count} rooms" : "")}" +
+                      (stuck.Count != 0 ? $"; {stuck.Count} old seed folder(s) could not be deleted." : "."));
             if (play)
                 StartGame(game);
         }
@@ -508,35 +542,6 @@ public sealed class MainForm : Form
         }
         if (MessageBox.Show(this, "The spoiler log shows where everything is. Open it?", AppTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             Process.Start(new ProcessStartInfo(spoiler) { UseShellExecute = true });
-    }
-
-    private void CleanUp()
-    {
-        if (_game == null)
-            return;
-        var active = _game.ActiveMod?.TrimEnd('\\');
-        var old = _game.SeedFolders().Where(d => !string.Equals(d.FullName.TrimEnd('\\'), active, StringComparison.OrdinalIgnoreCase)).ToList();
-        if (old.Count == 0)
-            return;
-        var size = old.Sum(d => d.EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length));
-        var question = $"Delete {old.Count} seed folder{(old.Count == 1 ? "" : "s")} other than the one the game plays ({size / (1024 * 1024)} MB)?\n\n" +
-                       "Their save folders (saves_rando) are kept.";
-        if (MessageBox.Show(this, question, AppTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-            return;
-        var failed = 0;
-        foreach (var d in old)
-        {
-            try
-            {
-                d.Delete(recursive: true);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                failed++;
-            }
-        }
-        SetStatus(failed == 0 ? $"Deleted {old.Count} old seeds." : $"Deleted {old.Count - failed} old seeds; {failed} could not be deleted.");
-        RefreshGame();
     }
 
     private static string Version =>

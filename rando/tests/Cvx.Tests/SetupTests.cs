@@ -23,15 +23,49 @@ public sealed class SetupTests : IDisposable
         game.Play(42);
         var ini = game.ReadIni();
         Assert.Equal(@"rando\42", ini.Get("mod"));
-        Assert.Equal(@"saves_rando\42", ini.Get("saves"));
+        Assert.Equal("saves_rando", ini.Get("saves"));
         Assert.Equal(@"D:\my saves", ini.Get("saves_normal"));
-        Assert.True(Directory.Exists(Path.Combine(_dir, "saves_rando", "42")));
+        Assert.True(Directory.Exists(Path.Combine(_dir, "saves_rando")));
 
         game.Play(43);   // another seed keeps the first saves_normal
         Assert.Equal(@"D:\my saves", game.ReadIni().Get("saves_normal"));
 
         game.PlayNormal();
         Assert.Equal("scale=2\r\nsaves=D:\\my saves\r\nkey_up=W\r\n", File.ReadAllText(Ini));
+    }
+
+    [Fact]
+    public void ClearingRandomSavesKeepsTheFolderAndTheOwnSaves()
+    {
+        File.WriteAllText(Ini, "saves=my saves\n");
+        var game = new GameFolder(_dir);
+        Directory.CreateDirectory(Path.Combine(_dir, "my saves"));
+        File.WriteAllText(Path.Combine(_dir, "my saves", "SAVEDATA-00"), "mine");
+        game.Play(5);
+        Assert.False(game.HasRandomSaves);
+        Directory.CreateDirectory(Path.Combine(game.SavesDirectory, "BASLUS-20184"));
+        File.WriteAllText(Path.Combine(game.SavesDirectory, "BASLUS-20184", "SAVEDATA-00"), "run");
+        Directory.CreateDirectory(Path.Combine(game.SavesDirectory, "79634"));   // a per-seed folder of older versions
+        Assert.True(game.HasRandomSaves);
+
+        game.ClearRandomSaves();
+        Assert.False(game.HasRandomSaves);
+        Assert.True(Directory.Exists(game.SavesDirectory));
+        Assert.Equal("mine", File.ReadAllText(Path.Combine(_dir, "my saves", "SAVEDATA-00")));
+    }
+
+    [Fact]
+    public void OnlyTheNewSeedFolderIsKept()
+    {
+        var game = new GameFolder(_dir);
+        foreach (var seed in new[] { 1, 2, 3 })
+        {
+            Directory.CreateDirectory(game.SeedDirectory(seed));
+            File.WriteAllText(Path.Combine(game.SeedDirectory(seed), "rando.ini"), $"seed={seed}\n");
+        }
+        Assert.Empty(game.DeleteOtherSeeds(2));
+        Assert.Equal([game.SeedDirectory(2)], game.SeedFolders().Select(d => d.FullName));
+        Assert.Empty(game.DeleteOtherSeeds(2));   // nothing left to delete
     }
 
     [Fact]

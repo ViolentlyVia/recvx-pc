@@ -80,7 +80,8 @@ public sealed class IniFile
 /// <summary>
 /// The game's folder (recvx.exe and recvx.ini) and what the randomizer does to it. A seed is
 /// written to <c>rando\&lt;seed&gt;</c>; playing it sets <c>mod=</c> to that folder and
-/// <c>saves=</c> to <c>saves_rando\&lt;seed&gt;</c>, keeping the player's own <c>saves=</c> in
+/// <c>saves=</c> to <c>saves_rando</c> (one save folder for random runs, emptied when a new seed
+/// is generated), keeping the player's own <c>saves=</c> in
 /// <c>saves_normal=</c> ("*" when there was none). Playing the normal game puts that back. The
 /// same rules as recvx-config's "Play normal game".
 /// </summary>
@@ -131,7 +132,10 @@ public sealed class GameFolder
         }
     }
 
-    /// <summary>Points the game at a seed's folder, with its own save folder.</summary>
+    /// <summary>The save folder of random runs.</summary>
+    public string SavesDirectory => System.IO.Path.Combine(Directory, SavesFolder);
+
+    /// <summary>Points the game at a seed's folder, with the random runs' save folder.</summary>
     public void Play(int seed)
     {
         var ini = ReadIni();
@@ -139,9 +143,28 @@ public sealed class GameFolder
             ini.Set("saves_normal", ini.Get("saves") is { Length: > 0 } own ? own : "*");
         var id = seed.ToString(System.Globalization.CultureInfo.InvariantCulture);
         ini.Set("mod", $@"{RandoFolder}\{id}");
-        ini.Set("saves", $@"{SavesFolder}\{id}");
+        ini.Set("saves", SavesFolder);
         ini.Save();
-        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(Directory, SavesFolder, id));
+        System.IO.Directory.CreateDirectory(SavesDirectory);
+    }
+
+    /// <summary>Whether the random runs' save folder holds anything.</summary>
+    public bool HasRandomSaves =>
+        System.IO.Directory.Exists(SavesDirectory) && System.IO.Directory.EnumerateFileSystemEntries(SavesDirectory).Any();
+
+    /// <summary>
+    /// Empties the random runs' save folder, so a new seed starts with no saves (this also
+    /// removes the per-seed folders older versions made in it). Never touches the player's own saves.
+    /// </summary>
+    public void ClearRandomSaves()
+    {
+        var dir = new DirectoryInfo(SavesDirectory);
+        if (!dir.Exists)
+            return;
+        foreach (var file in dir.EnumerateFiles())
+            file.Delete();
+        foreach (var sub in dir.EnumerateDirectories())
+            sub.Delete(recursive: true);
     }
 
     /// <summary>Back to the normal game: no mod, the player's own saves.</summary>
@@ -154,6 +177,28 @@ public sealed class GameFolder
             ini.Set("saves", normal == "*" ? null : normal);
         ini.Set("saves_normal", null);
         ini.Save();
+    }
+
+    /// <summary>
+    /// One seed at a time: removes every seed folder in rando\ except <paramref name="keep"/>'s.
+    /// Returns the folders that could not be removed (in use).
+    /// </summary>
+    public IReadOnlyList<string> DeleteOtherSeeds(int keep)
+    {
+        var failed = new List<string>();
+        var kept = System.IO.Path.GetFullPath(SeedDirectory(keep)).TrimEnd('\\');
+        foreach (var d in SeedFolders().Where(d => !string.Equals(d.FullName.TrimEnd('\\'), kept, StringComparison.OrdinalIgnoreCase)))
+        {
+            try
+            {
+                d.Delete(recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                failed.Add(d.FullName);
+            }
+        }
+        return failed;
     }
 
     /// <summary>The seed folders in rando\, newest first.</summary>
