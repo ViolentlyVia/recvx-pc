@@ -153,7 +153,9 @@ in `pc/src/pc_rando.c`):
 With random doors, `rando_doors.txt` in the mod folder lists the doors that lead somewhere new,
 one per line: `<stage> <room> <case> <area> <old stage> <old room>  <new stage> <new room>
 <new case> <entrance>`. The game looks a door up where it decides where the door goes (door
-areas and script doors), so the room files keep their own door data. When a room's variant
+areas and script doors), so the room files keep their own door data. `<case>` is the case of the
+room file that is loaded, even when the room's script has already set the next room's case
+(`room_case_no`) before its door call. When a room's variant
 file does not exist, the game loads variant 0 instead of waiting forever.
 
 `recvx.log` lists each room's memory use when it loads (`room rm_SRRC.rdx: ... pool ...`): the

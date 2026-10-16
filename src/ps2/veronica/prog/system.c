@@ -1751,7 +1751,10 @@ void bhSysCallMonitor()
 #ifdef TARGET_PC
                     {
                         extern void pcLog(const char* fmt, ...);
+                        extern void pcRandoRoomLoaded(int stage, int room, int rcase);
                         unsigned char* packed = sys->rdtp;
+
+                        pcRandoRoomLoaded(sys->stg_no, sys->rom_no, sys->rcase);
 
                         sys->rdtsz = Expand((char*)sys->rdtp, sys->memp);
 

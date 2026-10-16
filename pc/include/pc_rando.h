@@ -24,6 +24,10 @@ void pcRandoStartItems(int player, unsigned int* pip);
  * case when it is. */
 int pcRandoDoor(int stage, int room, int rcase, int area, int* tstage, int* troom, int* tpos);
 
+/* The room file just loaded (system.c): pcRandoDoor matches doors on its case, which room scripts
+ * may change (room_case_no) before their own door call. */
+void pcRandoRoomLoaded(int stage, int room, int rcase);
+
 /* The room case a redirected door needs, or -1; cleared by the call. Applied when the room
  * changes (bhStartDoorDemo). */
 int pcRandoTakePendingCase(void);

@@ -290,6 +290,14 @@ typedef struct {
 static DoorMap* doors;
 static int door_count;
 static int pending_case = -1;
+static int loaded_room[3] = { -1, -1, -1 }; /* stage, room, case of the room file in memory */
+
+void pcRandoRoomLoaded(int stage, int room, int rcase)
+{
+    loaded_room[0] = stage;
+    loaded_room[1] = room;
+    loaded_room[2] = rcase;
+}
 
 static void read_doors(const char* mod_dir)
 {
@@ -338,6 +346,13 @@ int pcRandoDoor(int stage, int room, int rcase, int area, int* tstage, int* troo
     if (!active || (door_count == 0))
     {
         return 0;
+    }
+
+    /* match the room file that is loaded: scripts set sys->rcase (room_case_no) for the next
+       room before their door call, e.g. RM_0021's door to RM_0010 sets case 0 first */
+    if ((stage == loaded_room[0]) && (room == loaded_room[1]))
+    {
+        rcase = loaded_room[2];
     }
 
     for (i = 0; i < door_count; i++)
