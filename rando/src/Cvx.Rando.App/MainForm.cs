@@ -175,7 +175,7 @@ public sealed class MainForm : Form
             _weapons)));
         tabs.TabPages.Add(Page("Inventory", Column(
             _randomInventory,
-            Note("Claire and Chris each start with a knife, the weapons below, and random ammo, healing items and maybe ink ribbons. Claire keeps her lighter."),
+            Note("Claire and Chris each start with the weapons below (the knife counts as a sidearm), maybe some ammo, and one healing item. Claire keeps her lighter."),
             Row(Caption("First weapon"), _weapon1),
             Row(Caption("Second weapon"), _weapon2),
             _sidePack,

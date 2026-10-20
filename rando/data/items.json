@@ -1,5 +1,5 @@
 {
-  "_comment": "Code: Veronica X items. Names, kinds, maxPickup, slots, weaponKind and ammo come from BioRand (ReCvItemIds/ReCvItemHelper, MIT); gameMax and gameType are the max and type fields of the game's itemdata table (item.c). Edit by hand. Added by hand: ammo for the Sub Machine Gun (38) and M-100P (143, maxPickup 100).",
+  "_comment": "Code: Veronica X items. Names, kinds, maxPickup, slots, weaponKind and ammo come from BioRand (ReCvItemIds/ReCvItemHelper, MIT); gameMax and gameType are the max and type fields of the game's itemdata table (item.c). Edit by hand. Added by hand: ammo for the Sub Machine Gun (38) and M-100P (143, maxPickup 100); the Combat Knife (8) as a sidearm.",
   "items": [
     {
       "id": 0,
@@ -126,7 +126,8 @@
         "weapon"
       ],
       "gameMax": 0,
-      "gameType": 1025
+      "gameType": 1025,
+      "weaponKind": "sidearm"
     },
     {
       "id": 9,

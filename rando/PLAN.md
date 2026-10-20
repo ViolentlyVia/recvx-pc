@@ -481,6 +481,12 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
 - **Saves (owner's request):** random runs share one save folder, `saves_rando` (`saves=saves_rando`), instead of one per seed. Generating a seed empties it (`GameFolder.ClearRandomSaves`, which also removes the per-seed folders of older versions); the app refuses while the game runs and asks first when the folder holds saves. The player's own saves (`saves_normal=`) are never touched. The owner's old random saves went to the Recycle Bin.
 - **One seed at a time (owner's request):** generating deletes every other seed folder in `rando\` and the random saves once the new seed is written (`GameFolder.DeleteOtherSeeds`), after asking. "Delete old seeds..." is gone. The **Random** button only picks a new number (for a while it also generated the seed; the owner wanted it back to just the number). Deleting an old seed folder is tried again for about two seconds: OneDrive held the emptied folder for a moment, and the app reported it could not be deleted.
 
+### Starting items: knife as a weapon, less healing (2026-10-19, owner's request)
+- The Combat Knife is a sidearm now (`items.json` `weaponKind`): it is no longer always given; a Sidearm pick (or Random rolling Sidearm) can be the knife instead of a handgun. Both picks set to None means no weapon at all.
+- Custom mode places the knife once like the other weapons, unless Claire starts with it (her normal inventory has it, so without a random inventory it is not placed). It is also in the app's custom weapon list.
+- One healing item: Green Herb 60%, Red + Green mix 25%, First Aid Spray 15%. No ink ribbons.
+- Not verified in play: picking up a placed knife (the knife's `getbulletmax` amount is whatever the game has; no pickup amount is written for it).
+
 ## Risks / open items for the executing agent
 - **Don't copy BioRand's CV item writes as-is**: it writes `type` and relies on its executable patch; we write `id` (see Key facts). Treat every BioRand CV write as unverified until it is checked against the game's C code.
 - **Room memory budget** when copying enemy assets: measure it, don't guess.

@@ -16,8 +16,8 @@ public sealed record StartInventory(string Character, IReadOnlyList<InventoryIte
         Items.Where(i => items.Get(i.Type)?.WeaponKind is "sidearm" or "primary" or "powerful").Select(i => i.Type);
 
     /// <summary>
-    /// A knife, up to two weapons of the chosen kinds (loaded, often with spare ammo), then
-    /// healing items and maybe ink ribbons, in 8 slots. Two-slot weapons go first, as the game
+    /// Up to two weapons of the chosen kinds (loaded, often with spare ammo; the knife is a
+    /// sidearm), then one basic healing item, in 8 slots. Two-slot weapons go first, as the game
     /// sorts them (itemdata type bit 0x100).
     /// </summary>
     public static StartInventory Make(string character, ItemCatalog items, RandoSettings settings, Rng rng)
@@ -37,8 +37,6 @@ public sealed record StartInventory(string Character, IReadOnlyList<InventoryIte
             used += slots;
             return true;
         }
-
-        Add(8, 1);   // Combat Knife
 
         var weapons = items.Items.Where(i => i.WeaponKind is "sidearm" or "primary" or "powerful").ToList();
         var chosen = new List<ItemInfo>();
@@ -67,16 +65,8 @@ public sealed record StartInventory(string Character, IReadOnlyList<InventoryIte
             }
         }
 
-        // Healing: up to four of herbs, mixed herbs and sprays.
-        var healing = rng.Shuffle(new[] { 20, 21, 22, 23, 24, 25, 26, 27, 28, 29 });
-        for (var i = 0; i < 4; i++)
-        {
-            if (rng.NextProbability(50))
-                Add(healing[i], 1);
-        }
-
-        if (rng.NextProbability(50))
-            Add(31, rng.Next(1, 3));   // Ink Ribbon
+        // Healing: one green herb, red + green mix or spray.
+        Add(rng.NextWeighted([(21, 0.6), (25, 0.25), (20, 0.15)]), 1);
 
         return new StartInventory(character, list);
     }

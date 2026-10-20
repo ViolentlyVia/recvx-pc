@@ -12,7 +12,7 @@ public class InventoryTests
     private static int SlotsUsed(StartInventory inv) => inv.Items.Sum(i => Data.Items.Get(i.Type)?.Slots ?? 1);
 
     [Fact]
-    public void InventoriesFitAndStartWithAKnife()
+    public void InventoriesFitWithOneHealingItemAndNoInk()
     {
         for (var seed = 1; seed <= 300; seed++)
         {
@@ -22,7 +22,9 @@ public class InventoryTests
             {
                 var inv = StartInventory.Make(who, Data.Items, settings, rng);
                 Assert.InRange(SlotsUsed(inv), 1, StartInventory.Slots);
-                Assert.Contains(inv.Items, i => i.Type == 8);
+                Assert.Single(inv.Items, i => Data.Items.Get(i.Type)!.Is("heal"));
+                Assert.Contains(inv.Items, i => i.Type is 20 or 21 or 25);
+                Assert.DoesNotContain(inv.Items, i => i.Type == 31);
                 Assert.All(inv.Items, i => Assert.True(i.Count > 0));
                 // two-slot items come first, as the game sorts them
                 var twoSlot = inv.Items.Select(i => (Data.Items.Get(i.Type)?.Slots ?? 1) == 2).ToList();
@@ -45,6 +47,27 @@ public class InventoryTests
             Assert.Single(weapons);
             Assert.Equal(kind, Data.Items.Get(weapons[0])!.WeaponKind);
         }
+    }
+
+    [Fact]
+    public void TheKnifeIsASidearm()
+    {
+        var settings = new RandoSettings { RandomInventory = true, StartWeapon1 = WeaponChoice.Sidearm, StartWeapon2 = WeaponChoice.None };
+        var knives = Enumerable.Range(1, 200)
+            .Select(seed => StartInventory.Make("claire", Data.Items, settings with { Seed = seed }, Rng.For(seed, "inventory")))
+            .Count(inv => inv.Items.Any(i => i.Type == 8));
+        Assert.InRange(knives, 1, 199);
+    }
+
+    [Fact]
+    public void CustomModePlacesTheKnifeOnlyWhenNobodyStartsWithIt()
+    {
+        var settings = new RandoSettings { Seed = 5, ItemMode = ItemMode.Custom };
+        var graph = ItemGraph.Build(Data, settings);
+        var with = new ItemPlacer(graph, Data.Items, settings, Rng.For(settings.Seed, "items"), [9]).Place();
+        Assert.Contains(with.ByGlobalId.Values, a => a.Type == 8);
+        var without = new ItemPlacer(graph, Data.Items, settings, Rng.For(settings.Seed, "items"), [8]).Place();
+        Assert.DoesNotContain(without.ByGlobalId.Values, a => a.Type == 8);
     }
 
     [Fact]

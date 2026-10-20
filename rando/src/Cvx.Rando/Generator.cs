@@ -78,7 +78,8 @@ public static class Generator
                 inventories.Add(StartInventory.Make("chris", data.Items, settings, rng));
         }
 
-        var claireWeapons = inventories.FirstOrDefault(i => i.Character == "claire")?.Weapons(data.Items).ToList() ?? [];
+        // (without a random inventory Claire starts with her own knife)
+        var claireWeapons = inventories.FirstOrDefault(i => i.Character == "claire")?.Weapons(data.Items).ToList() ?? [8];
 
         DoorPlan? doors = null;
         ItemGraph? graph = null;

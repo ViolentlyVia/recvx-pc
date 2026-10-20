@@ -31,7 +31,7 @@ public sealed record RandoSettings
     public int[] Weapons { get; init; } = [];
 
     // Starting inventory (Claire's and Chris's, each made separately)
-    /// <summary>Replace the starting items: a knife, the weapons below, and random ammo, healing and ink.</summary>
+    /// <summary>Replace the starting items: the weapons below (the knife is a sidearm), maybe ammo, and one healing item.</summary>
     public bool RandomInventory { get; init; }
     public WeaponChoice StartWeapon1 { get; init; } = WeaponChoice.Sidearm;
     public WeaponChoice StartWeapon2 { get; init; } = WeaponChoice.Random;
