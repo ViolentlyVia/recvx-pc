@@ -67,6 +67,11 @@ public sealed class ItemGraph
 {
     public required RoomNode Start { get; init; }
     public required RoomNode End { get; init; }
+    /// <summary>
+    /// Random doors: one character plays the whole run with one inventory. Null: Claire, then
+    /// Chris from his handover, with separate inventories.
+    /// </summary>
+    public Character? OnlyCharacter { get; init; }
     public required IReadOnlyDictionary<string, RoomNode> Rooms { get; init; }
     public required IReadOnlyList<ItemLocation> Locations { get; init; }
 
@@ -74,27 +79,34 @@ public sealed class ItemGraph
     /// Builds the original room graph. Pickups of documents are left out (never randomized), as
     /// are entries only meant for the other door mode.
     /// </summary>
-    /// <param name="doors">Random doors: each door leads where the plan says, and the game starts in the plan's start room.</param>
+    /// <param name="doors">
+    /// Random doors: only the rooms the run uses, each door leads where the plan says, and the
+    /// game starts in the plan's start room.
+    /// </param>
     public static ItemGraph Build(RandoData data, RandoSettings settings, DoorPlan? doors = null)
     {
         var map = data.Map;
-        var rooms = map.Rooms.Keys.ToDictionary(k => k, k => new RoomNode { Id = RoomId.ParseBioRand(k), Key = k }, StringComparer.Ordinal);
+        var rooms = map.Rooms.Keys.Where(k => doors == null || doors.Rooms.Contains(k))
+            .ToDictionary(k => k, k => new RoomNode { Id = RoomId.ParseBioRand(k), Key = k }, StringComparer.Ordinal);
         RoomNode[] Nodes(string[]? keys) => (keys ?? []).Where(rooms.ContainsKey).Select(k => rooms[k]).ToArray();
         bool Applies(bool? doorRando) => doorRando == null || doorRando == settings.RandomDoors;
 
         var locations = new Dictionary<int, ItemLocation>();
         foreach (var (key, room) in map.Rooms)
         {
-            var node = rooms[key];
+            if (!rooms.TryGetValue(key, out var node))
+                continue;
             node.Requires = room.Requires ?? [];
 
             foreach (var (door, index) in (room.Doors ?? []).Select((d, i) => (d, i)))
             {
-                if (!Applies(door.DoorRando) || door.Target == null || !rooms.ContainsKey(door.Target))
+                if (!Applies(door.DoorRando) || door.Target == null || !map.Rooms.ContainsKey(door.Target))
                     continue;
                 var target = doors?.Find(key, index)?.TargetRoom ?? door.Target;
                 if (target == key && doors?.Find(key, index) != null)
                     continue;   // a dead end: leads back into its own room
+                if (!rooms.ContainsKey(target))
+                    continue;   // into a room the run does not use (a finished plan gives every such door a link)
                 node.Edges.Add(new DoorEdge
                 {
                     From = node,
@@ -142,12 +154,13 @@ public sealed class ItemGraph
         var beginEnd = map.BeginEndRooms.First(x => x.DoorRando == null || x.DoorRando == settings.RandomDoors);
         // With Chris, the logic runs to the last room of the game (BioRand's door-mode end,
         // A1E0); without, to Chris's start (BioRand's non-door end, A090).
-        var end = map.BeginEndRooms.First(x => x.DoorRando == settings.IncludeChris).End!;
+        var end = doors?.EndRoom ?? map.BeginEndRooms.First(x => x.DoorRando == settings.IncludeChris).End!;
 
         return new ItemGraph
         {
             Start = rooms[doors?.StartRoom ?? beginEnd.Start!],
             End = rooms[end],
+            OnlyCharacter = doors?.Character,
             Rooms = rooms,
             Locations = locations.Values.OrderBy(x => x.GlobalId).ToList(),
         };

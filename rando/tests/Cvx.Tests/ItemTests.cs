@@ -18,7 +18,10 @@ public class ItemTests
         // Found in play (seed 522131): taking RM_0150's statue pickup locks the door until a
         // Rusted Sword is used on the statue, so that pickup must stay the Rusted Sword.
         var settings = new RandoSettings { Seed = 1, ItemMode = ItemMode.Custom, RandomDoors = doors };
-        var graph = doors ? Generator.MakeDoors(settings, Data).Graph : ItemGraph.Build(Data, settings);
+        var graph = doors
+            ? Enumerable.Range(1, 100).Select(seed => Generator.MakeDoors(settings with { Seed = seed }, Data).Graph)
+                .First(g => g.Locations.Any(l => l.GlobalId == 8))   // a run that uses the room
+            : ItemGraph.Build(Data, settings);
         var statue = Assert.Single(graph.Locations, l => l.GlobalId == 8);
         Assert.Equal(103, statue.OriginalType);
         Assert.Equal(ItemPriority.Fixed, statue.Priority);

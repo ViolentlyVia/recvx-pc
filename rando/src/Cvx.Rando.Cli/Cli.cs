@@ -74,8 +74,11 @@ internal static class Cli
                                                  and check the result; --out also writes an
                                                  RDX_LNK.AFS with every room recompressed
               generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--inventory] [--side-pack] [--no-poison]
-                       [--doors] [--enemies] [--enemy-difficulty 0-3] [--music] [--share <code>] [--out <dir>] [--spoiler]
-                                                 randomize; --out writes the mod folder (RDX_LNK.AFS,
+                       [--doors] [--segments 1-4] [--segment-size 1-8] [--chris]
+                       [--enemies] [--enemy-difficulty 0-3] [--music] [--share <code>] [--out <dir>] [--spoiler]
+                                                 randomize (--doors: random doors, played by Claire, or
+                                                 Chris with --chris, in 1-4 segments, using 1-8 eighths
+                                                 of the rooms); --out writes the mod folder (RDX_LNK.AFS,
                                                  rando.ini, rando_doors.txt, spoiler.txt, graph.dot,
                                                  graph.dgml) for recvx-pc's mod=
               dump-script <RM_xxxx> [--from <hex>] [--to <hex>]
@@ -439,6 +442,9 @@ internal static class Cli
             NoNosferatuPoison = options.Has("no-poison"),
             StartSidePack = options.Has("side-pack"),
             RandomDoors = options.Has("doors"),
+            DoorSegments = options.Get("segments") is { } sg ? int.Parse(sg) : 4,
+            DoorSegmentSize = options.Get("segment-size") is { } sz ? int.Parse(sz) : 8,
+            DoorCharacter = options.Has("chris") ? Character.Chris : Character.Claire,
             RandomEnemies = options.Has("enemies"),
             RandomMusic = options.Has("music"),
             EnemyDifficulty = options.Get("enemy-difficulty") is { } ed ? int.Parse(ed) : 1,

@@ -53,6 +53,21 @@ public sealed record RandoSettings
 
     // Doors (Phase 6): read by the room data filters already.
     public bool RandomDoors { get; init; }
+    /// <summary>
+    /// Random doors: how many parts the run has (1-4). Each part but the last ends at a one-way
+    /// story door (the plane, the switch to Chris, the handover), the last at the end of the game.
+    /// </summary>
+    public int DoorSegments { get; init; } = 4;
+    /// <summary>Random doors: how much of the game the run uses, in eighths (1-8; 8 = every room it can).</summary>
+    public int DoorSegmentSize { get; init; } = 8;
+    /// <summary>Random doors: who plays the whole run (no switching between characters).</summary>
+    public Character DoorCharacter { get; init; } = Character.Claire;
+}
+
+public enum Character
+{
+    Claire,
+    Chris,
 }
 
 public enum ItemMode

@@ -47,6 +47,10 @@ public sealed class MainForm : Form
     private readonly CheckBox _randomEnemies = Check("Randomize enemies");
     private readonly ComboBox _enemyDifficulty = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
     private readonly CheckBox _randomDoors = Check("Random doors");
+    private readonly ComboBox _doorCharacter = Choice<Character>();
+    private readonly NumericUpDown _doorSegments = new() { Minimum = 1, Maximum = 4, Width = 60 };
+    private readonly TrackBar _doorSize = new() { Minimum = 1, Maximum = 8, TickFrequency = 1, Width = 200 };
+    private readonly Label _doorSizeText = new() { AutoSize = true, Margin = new Padding(3, 8, 3, 3) };
     private readonly CheckBox _randomMusic = Check("Shuffle the music");
 
     // actions
@@ -175,7 +179,7 @@ public sealed class MainForm : Form
             _weapons)));
         tabs.TabPages.Add(Page("Inventory", Column(
             _randomInventory,
-            Note("Claire and Chris each start with the weapons below (the knife counts as a sidearm), maybe some ammo, and one healing item. Claire keeps her lighter."),
+            Note("Claire and Chris each start with the weapons below (the knife counts as a sidearm), maybe some ammo, and one healing item. Claire keeps her lighter. With random doors, only the one who plays."),
             Row(Caption("First weapon"), _weapon1),
             Row(Caption("Second weapon"), _weapon2),
             _sidePack,
@@ -187,7 +191,13 @@ public sealed class MainForm : Form
             Row(Caption("Difficulty"), _enemyDifficulty))));
         tabs.TabPages.Add(Page("Doors", Column(
             _randomDoors,
-            Note("Doors lead to other rooms. A new game starts in the second room, and its door leads to a room where you can save. Random doors also randomize the items, so that every seed can be finished."))));
+            Note("Doors lead to other rooms, and one character plays from the start to the end of the game. The first door leads to a room where you can save. Random doors also randomize the items, so that every seed can be finished."),
+            Row(Caption("Play as"), _doorCharacter),
+            Note("Claire starts in the second room of the game; Chris starts where he arrives on Rockfort Island."),
+            Row(Caption("Segments"), _doorSegments),
+            Note("Each segment but the last ends at a one-way story door into the next (the plane, the switch to Chris, the handover), used in a random order; the last ends in the last room of the game. Chris has at most three: his part starts after the switch to him."),
+            Row(Caption("Segment size"), _doorSize, _doorSizeText),
+            Note("How much of the game the run uses, shared out over the segments: more rooms put more doors between the start and the end. Only the rooms in the run hold items."))));
         tabs.TabPages.Add(Page("Music", Column(
             _randomMusic,
             Note("Music tracks are swapped with others of their kind (area, save room, tension, boss). Event music stays."))));
@@ -235,6 +245,9 @@ public sealed class MainForm : Form
         _weapon1.SelectedIndexChanged += (_, _) => SettingsChanged();
         _weapon2.SelectedIndexChanged += (_, _) => SettingsChanged();
         _enemyDifficulty.SelectedIndexChanged += (_, _) => SettingsChanged();
+        _doorCharacter.SelectedIndexChanged += (_, _) => SettingsChanged();
+        _doorSegments.ValueChanged += (_, _) => SettingsChanged();
+        _doorSize.ValueChanged += (_, _) => SettingsChanged();
         _shareCode.Leave += (_, _) => { if (_shareCode.Text != ShareCode.Encode(Read())) LoadShareCode(_shareCode.Text); };
 
         _generate.Click += async (_, _) => await Generate(play: false);
@@ -280,6 +293,9 @@ public sealed class MainForm : Form
         _randomEnemies.Checked = s.RandomEnemies;
         _enemyDifficulty.SelectedIndex = Math.Clamp(s.EnemyDifficulty, 0, 3);
         _randomDoors.Checked = s.RandomDoors;
+        _doorCharacter.SelectedItem = s.DoorCharacter;
+        _doorSegments.Value = Math.Clamp(s.DoorSegments, 1, 4);
+        _doorSize.Value = Math.Clamp(s.DoorSegmentSize, 1, 8);
         _randomMusic.Checked = s.RandomMusic;
         _loading = false;
         SettingsChanged();
@@ -306,6 +322,9 @@ public sealed class MainForm : Form
         RandomEnemies = _randomEnemies.Checked,
         EnemyDifficulty = Math.Max(0, _enemyDifficulty.SelectedIndex),
         RandomDoors = _randomDoors.Checked,
+        DoorCharacter = _doorCharacter.SelectedItem is Character c ? c : Character.Claire,
+        DoorSegments = (int)_doorSegments.Value,
+        DoorSegmentSize = _doorSize.Value,
         RandomMusic = _randomMusic.Checked,
     };
 
@@ -320,6 +339,10 @@ public sealed class MainForm : Form
         var items = _randomItems.Checked;
         foreach (var c in new Control[] { _shuffle, _custom, _includeChris, _hiddenKeys })
             c.Enabled = items;
+        _includeChris.Enabled = items && !_randomDoors.Checked;   // random doors: one character
+        foreach (var c in new Control[] { _doorCharacter, _doorSegments, _doorSize })
+            c.Enabled = _randomDoors.Checked;
+        _doorSizeText.Text = _doorSize.Value == 8 ? "every room it can" : $"{_doorSize.Value}/8 of the rooms";
         var custom = items && _custom.Checked;
         foreach (var c in new Control[] { _ratioAmmo, _ratioHealth, _ratioInk, _ratioPowder, _ammoAmount, _weapons })
             c.Enabled = custom;

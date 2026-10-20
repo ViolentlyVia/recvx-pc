@@ -16,8 +16,8 @@ public static class Spoiler
         sb.AppendLine("==========================");
         sb.AppendLine($"Seed: {s.Seed}");
         sb.AppendLine($"Items: {(s.RandomItems ? s.ItemMode.ToString().ToLowerInvariant() : "off")}" +
-                      $"{(s.RandomItems && !s.IncludeChris ? " (Claire's half only)" : "")}");
-        sb.AppendLine($"Doors: {(s.RandomDoors ? "random" : "off")}");
+                      $"{(s.RandomItems && !s.IncludeChris && !s.RandomDoors ? " (Claire's half only)" : "")}");
+        sb.AppendLine($"Doors: {(s.RandomDoors ? $"random, {s.DoorCharacter} only, {s.DoorSegments} segments, size {s.DoorSegmentSize}/8" : "off")}");
         if (s.StartSidePack)
             sb.AppendLine("Side pack: from the start");
         sb.AppendLine($"Enemies: {(s.RandomEnemies ? $"random, difficulty {s.EnemyDifficulty}" : "off")}");
@@ -29,7 +29,13 @@ public static class Spoiler
             var start = RoomId.ParseBioRand(doors.StartRoom);
             sb.AppendLine("Doors");
             sb.AppendLine("-----");
-            sb.AppendLine($"  A new game starts in {RoomLabel(start)}.");
+            sb.AppendLine($"  {doors.Character} plays the whole run; a new game starts in {RoomLabel(start)}.");
+            sb.AppendLine($"  {doors.Rooms.Count} rooms in {doors.Segments.Count} segments:");
+            foreach (var (segment, i) in doors.Segments.Select((x, i) => (x, i)))
+            {
+                var exit = segment.Exit == doors.EndRoom ? "the end" : "a one-way door";
+                sb.AppendLine($"    {i + 1}. {RoomLabel(RoomId.ParseBioRand(segment.Entry))} to {RoomLabel(RoomId.ParseBioRand(segment.Exit))} ({exit}), {segment.Rooms.Count} rooms");
+            }
             foreach (var room in doors.Links.Values.GroupBy(l => l.Door.Room).OrderBy(g => g.Key, StringComparer.Ordinal))
             {
                 sb.AppendLine($"  {RoomLabel(RoomId.ParseBioRand(room.Key))}");
@@ -50,7 +56,7 @@ public static class Spoiler
             sb.AppendLine("----------------------------------------------");
             foreach (var a in items.KeyOrder)
             {
-                var half = a.Location.Room.IsChris ? "Chris" : "Claire";
+                var half = result.Doors?.Character.ToString() ?? (a.Location.Room.IsChris ? "Chris" : "Claire");
                 sb.AppendLine($"  {names.NameOf(a.Type),-28} {RoomLabel(a.Location.Room.Id)}  ({half})");
             }
             if (items.GivenKeys.Count != 0)

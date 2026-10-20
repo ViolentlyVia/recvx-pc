@@ -69,17 +69,27 @@ public static class Generator
         var patcher = new ItemPatcher(data, archive);
         var amounts = new Dictionary<int, int>();
 
+        // With random doors one character plays the whole run.
         var inventories = new List<StartInventory>();
+        var first = settings.RandomDoors && settings.DoorCharacter == Character.Chris ? "chris" : "claire";
         if (settings.RandomInventory)
         {
             var rng = Rng.For(settings.Seed, "inventory");
-            inventories.Add(StartInventory.Make("claire", data.Items, settings, rng));
-            if (settings.IncludeChris)
-                inventories.Add(StartInventory.Make("chris", data.Items, settings, rng));
+            if (settings.RandomDoors)
+            {
+                inventories.Add(StartInventory.Make(first, data.Items, settings, rng));
+            }
+            else
+            {
+                inventories.Add(StartInventory.Make("claire", data.Items, settings, rng));
+                if (settings.IncludeChris)
+                    inventories.Add(StartInventory.Make("chris", data.Items, settings, rng));
+            }
         }
 
-        // (without a random inventory Claire starts with her own knife)
-        var claireWeapons = inventories.FirstOrDefault(i => i.Character == "claire")?.Weapons(data.Items).ToList() ?? [8];
+        // The weapons the first player starts with (without a random inventory, Claire's and
+        // Chris's own knives).
+        var claireWeapons = inventories.FirstOrDefault(i => i.Character == first)?.Weapons(data.Items).ToList() ?? [8];
 
         DoorPlan? doors = null;
         ItemGraph? graph = null;
@@ -153,7 +163,7 @@ public static class Generator
     public static DoorLayout MakeDoors(RandoSettings settings, RandoData data, IReadOnlyCollection<int>? startWeapons = null)
     {
         settings = settings with { RandomItems = true };
-        var randomizer = new DoorRandomizer(data, SaveRoomKeys(data), settings.IncludeChris);
+        var randomizer = new DoorRandomizer(data, SaveRoomKeys(data), settings);
         for (var attempt = 0; attempt < MaxDoorAttempts; attempt++)
         {
             var plan = randomizer.Make(Rng.For(settings.Seed, $"doors{attempt}"));
@@ -248,7 +258,8 @@ public static class Generator
         if (result.Doors is { } doors)
         {
             var start = RoomId.ParseBioRand(doors.StartRoom);
-            sb.AppendLine($"start={start.Stage},{start.Room},{doors.StartEntrance},{start.Variant}");
+            var player = doors.Character == Character.Chris ? 1 : 0;
+            sb.AppendLine($"start={start.Stage},{start.Room},{doors.StartEntrance},{start.Variant},{player}");
         }
         foreach (var inventory in result.StartInventories)
         {

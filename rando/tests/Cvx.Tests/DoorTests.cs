@@ -11,20 +11,32 @@ public class DoorTests
 {
     private static readonly RandoData Data = RandoData.Load();
 
-    private static Generator.DoorLayout Make(int seed, bool chris = true) =>
-        Generator.MakeDoors(new RandoSettings { Seed = seed, RandomDoors = true, IncludeChris = chris }, Data);
+    private static RandoSettings Doors(int seed, Character who = Character.Claire, int segments = 4, int size = 8) =>
+        new() { Seed = seed, RandomDoors = true, DoorCharacter = who, DoorSegments = segments, DoorSegmentSize = size };
+
+    private static Generator.DoorLayout Make(int seed, Character who = Character.Claire, int segments = 4, int size = 8) =>
+        Generator.MakeDoors(Doors(seed, who, segments, size), Data);
+
+    /// <summary>The first layout (seeds from 1) with all of <paramref name="rooms"/> in one segment.</summary>
+    private static Generator.DoorLayout MakeWith(params string[] rooms) =>
+        Enumerable.Range(1, 200).Select(seed => Make(seed)).First(l => l.Plan.Segments.Any(x => rooms.All(x.Rooms.Contains)));
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void HundredSeedsAreAllCompletable(bool chris)
+    [InlineData(Character.Claire, 4, 8)]
+    [InlineData(Character.Claire, 1, 1)]
+    [InlineData(Character.Claire, 4, 1)]
+    [InlineData(Character.Claire, 2, 4)]
+    [InlineData(Character.Chris, 3, 8)]
+    [InlineData(Character.Chris, 1, 2)]
+    [InlineData(Character.Chris, 3, 1)]
+    public void HundredSeedsAreAllCompletable(Character who, int segments, int size)
     {
         var failures = new List<string>();
         for (var seed = 1; seed <= 100; seed++)
         {
             try
             {
-                var layout = Make(seed, chris);
+                var layout = Make(seed, who, segments, size);
                 var check = Playthrough.Check(layout.Graph, layout.Items);
                 if (!check.Completed)
                     failures.Add($"seed {seed}: {check.Message}");
@@ -76,19 +88,92 @@ public class DoorTests
     }
 
     [Theory]
-    [InlineData(20, true)]
-    [InlineData(21, true)]
-    [InlineData(22, false)]
-    public void EveryRoomOfTheGameIsStillReachable(int seed, bool chris)
+    [InlineData(20, Character.Claire, 4, 8)]
+    [InlineData(21, Character.Claire, 2, 3)]
+    [InlineData(22, Character.Chris, 3, 8)]
+    [InlineData(23, Character.Chris, 1, 1)]
+    public void EveryRoomOfTheRunIsReachableAndNoOther(int seed, Character who, int segments, int size)
     {
-        // Ignoring keys: every room the original layout reaches from the start room (one-way
-        // doors included) is reached with random doors too.
-        var settings = new RandoSettings { Seed = seed, RandomDoors = true, IncludeChris = chris };
-        var layout = Generator.MakeDoors(settings, Data);
-        var before = Reachable(ItemGraph.Build(Data, settings), DoorRandomizer.StartRoom);
-        before.Remove(DoorRandomizer.CellRoom);   // skipped
-        var after = Reachable(layout.Graph, DoorRandomizer.StartRoom);
-        Assert.Empty(before.Except(after).Order(StringComparer.Ordinal));
+        // Ignoring keys: every room the run uses is reached from the start (one-way doors
+        // included), and every door of those rooms leads into the run.
+        var layout = Make(seed, who, segments, size);
+        var reached = Reachable(layout.Graph, layout.Plan.StartRoom);
+        Assert.Equal(layout.Plan.Rooms.Order(StringComparer.Ordinal), reached.Order(StringComparer.Ordinal));
+        var randomizer = new DoorRandomizer(Data, Generator.SaveRoomKeys(Data), Doors(seed, who, segments, size));
+        foreach (var stub in randomizer.AllStubs().Where(s => layout.Plan.Rooms.Contains(s.Room)))
+        {
+            var to = layout.Plan.Find(stub.Room, stub.Index)?.TargetRoom ?? stub.OriginalTarget;
+            Assert.True(layout.Plan.Rooms.Contains(to), $"{stub} leads out of the run");
+        }
+    }
+
+    [Theory]
+    [InlineData(Character.Claire, 4, 4)]
+    [InlineData(Character.Claire, 2, 2)]
+    [InlineData(Character.Chris, 3, 3)]
+    [InlineData(Character.Chris, 4, 3)]   // Chris starts after the switch to him: one bridge fewer
+    [InlineData(Character.Claire, 1, 1)]
+    public void SegmentsEndInOneWayDoors(Character who, int segments, int expected)
+    {
+        foreach (var seed in Enumerable.Range(1, 10))
+        {
+            var plan = Make(seed, who, segments).Plan;
+            Assert.Equal(expected, plan.Segments.Count);
+            Assert.Equal(plan.StartRoom, plan.Segments[0].Entry);
+            Assert.Equal(plan.EndRoom, plan.Segments[^1].Exit);
+            for (var i = 0; i + 1 < plan.Segments.Count; i++)
+            {
+                // the exit's one-way story door leads to the next segment's entry
+                var bridge = Data.Map.Rooms[plan.Segments[i].Exit].Doors!.Single(d => d.IsBridgeEdge && d.NoReturn);
+                Assert.Equal(bridge.Target, plan.Segments[i + 1].Entry);
+            }
+            Assert.Equal(plan.Rooms.Count, plan.Segments.Sum(x => x.Rooms.Count));   // no room in two segments
+        }
+    }
+
+    [Fact]
+    public void SmallerSegmentsUseFewerRooms()
+    {
+        double Average(int size) => Enumerable.Range(1, 10).Average(seed => Make(seed, size: size).Plan.Rooms.Count);
+        var sizes = new[] { 1, 4, 8 }.Select(Average).ToList();
+        Assert.True(sizes[0] < sizes[1] && sizes[1] < sizes[2], string.Join(" ", sizes));
+    }
+
+    [Fact]
+    public void OneCharacterPlaysTheWholeRun()
+    {
+        var chris = Make(1, Character.Chris, 3);
+        Assert.Equal(DoorRandomizer.ChrisStartRoom, chris.Plan.StartRoom);
+        Assert.Equal(Character.Chris, chris.Graph.OnlyCharacter);
+        Assert.DoesNotContain(DoorRandomizer.SwitchRoom, chris.Plan.Rooms);
+        Assert.Empty(chris.Items.GivenKeys);
+        var claire = Make(1);
+        Assert.Equal(DoorRandomizer.StartRoom, claire.Plan.StartRoom);
+        Assert.Equal(Character.Claire, claire.Graph.OnlyCharacter);
+
+        // every player_change_set the run could meet is removed
+        var nops = RoomTweaks.For(new RandoSettings { RandomDoors = true }, Data).Where(t => t.Nop != null).ToList();
+        Assert.Contains(nops, t => t.Room == "70A0" && t.Nop!.Value.Contains(0x1F3140));
+        Assert.Contains(nops, t => t.Room == "A1C0" && t.Nop!.Value.Contains(0x1BBAE2));
+        Assert.Contains(nops, t => t.Room == "A200" && t.Nop!.Value.Contains(0x18753C));
+    }
+
+    [Fact]
+    public void RandoIniStartsTheRightCharacter()
+    {
+        string Ini(Character who)
+        {
+            var layout = Make(1, who, 2);
+            return Generator.RandoIni(new GenerationResult
+            {
+                Settings = Doors(1, who, 2),
+                ChangedRooms = new Dictionary<RoomId, Cvx.Formats.Rdx.RdxFile>(),
+                Doors = layout.Plan,
+                Spoiler = "",
+            });
+        }
+        Assert.Contains("start=0,1,0,0,0", Ini(Character.Claire));
+        Assert.Contains("start=7,24,0,0,1", Ini(Character.Chris));   // RM_7240, where Chris arrives
     }
 
     [Theory]
@@ -98,8 +183,7 @@ public class DoorTests
     {
         // Found in play (seed 968047): RM_0160 leads into a fenced corner of RM_0080 behind the
         // Eagle Plate door. The data only gives the plate on RM_0080's side.
-        var settings = new RandoSettings { Seed = 1, RandomDoors = doors };
-        var graph = doors ? Generator.MakeDoors(settings, Data).Graph : ItemGraph.Build(Data, settings);
+        var graph = doors ? MakeWith("1100", "1080").Graph : ItemGraph.Build(Data, new RandoSettings { Seed = 1 });
         var eagle = graph.Rooms["1100"].Edges.Where(e => e.To.Key == "1080" && !e.Redirected).ToList();
         Assert.NotEmpty(eagle);
         Assert.All(eagle, e => Assert.Contains(56, e.Requires));
@@ -112,8 +196,7 @@ public class DoorTests
     {
         // Found in play (seed 394125): RM_2000 -> RM_1100 -> RM_1090's corridor, where the
         // bookcase is a wall; it opens from the office with the Gold Lugers.
-        var settings = new RandoSettings { Seed = 1, RandomDoors = doors };
-        var graph = doors ? Generator.MakeDoors(settings, Data).Graph : ItemGraph.Build(Data, settings);
+        var graph = doors ? MakeWith("2090", "20A0").Graph : ItemGraph.Build(Data, new RandoSettings { Seed = 1 });
         var office = graph.Rooms["2090"];
         Assert.All(graph.Rooms["20A0"].Edges.Where(e => e.To == office), e => Assert.True(e.Locked));
         Assert.All(office.Edges.Where(e => e.To.Key == "20A0"), e => Assert.Contains(33, e.Requires));
@@ -124,7 +207,7 @@ public class DoorTests
     {
         // Found in play (seed 79634): a random door into RM_4011 through the plane door's pair
         // lands on the gangway, which only the bridge (set from the hangar side) connects.
-        var layout = Generator.MakeDoors(new RandoSettings { Seed = 1, RandomDoors = true }, Data);
+        var layout = Make(1);   // four segments: every bridge, the plane's too
         var plane = layout.Graph.Rooms["5011"].Edges.Where(e => e.To.Key == "6000").ToList();
         Assert.NotEmpty(plane);
         Assert.All(plane, e => Assert.False(e.Redirected));
@@ -139,8 +222,7 @@ public class DoorTests
         // Found in play (seed 79634): coming down RM_2040's attic ladder (or through a random
         // door paired with it) leaves the player on the bed canopy until the King Ant / Music
         // Box Plate puzzle on the floor lowers the ladder.
-        var settings = new RandoSettings { Seed = 1, RandomDoors = doors };
-        var graph = doors ? Generator.MakeDoors(settings, Data).Graph : ItemGraph.Build(Data, settings);
+        var graph = doors ? MakeWith("3040", "3060").Graph : ItemGraph.Build(Data, new RandoSettings { Seed = 1 });
         Assert.Contains(graph.Rooms["3040"].Edges, e => e.To.Key == "3060" && !e.Redirected && !e.Locked);
         Assert.All(graph.Rooms["3060"].Edges.Where(e => e.To.Key == "3040"), e => Assert.True(e.Locked));
     }
@@ -153,7 +235,7 @@ public class DoorTests
         // Rockfort. Seen with seed 7 in the door sweep.
         foreach (var seed in Enumerable.Range(1, 20))
         {
-            var layout = Generator.MakeDoors(new RandoSettings { Seed = seed, RandomDoors = true }, Data);
+            var layout = Make(seed);
             Assert.DoesNotContain(layout.Plan.Links.Values, l => l.TargetRoom == "6000");
             Assert.DoesNotContain(layout.Graph.Rooms.Values.SelectMany(r => r.Edges), e => e.To.Key == "6000" && e.Redirected);
             Assert.Contains(layout.Graph.Rooms["5011"].Edges, e => e.To.Key == "6000");
@@ -175,11 +257,14 @@ public class DoorTests
     {
         // Found in play (seed 306305): RM_1140 and RM_4050 are one lift; area 3 rides it and
         // area 0's exit depends on the level, not on the room file, so its doors stay as they are.
+        // (The run never uses the lift: doors into it lead back into their own rooms.)
         foreach (var seed in Enumerable.Range(1, 20))
         {
-            var plan = Generator.MakeDoors(new RandoSettings { Seed = seed, RandomDoors = true }, Data).Plan;
-            Assert.DoesNotContain(plan.Links.Values, l => l.Door.Room is "5050" or "20E0" || l.TargetRoom is "5050" or "20E0"
-                                                          || l.Door.OriginalTarget is "5050" or "20E0");
+            var plan = Make(seed).Plan;
+            Assert.DoesNotContain("5050", plan.Rooms);
+            Assert.DoesNotContain("20E0", plan.Rooms);
+            Assert.DoesNotContain(plan.Links.Values, l => l.Door.Room is "5050" or "20E0" || l.TargetRoom is "5050" or "20E0");
+            Assert.All(plan.Links.Values.Where(l => l.Door.OriginalTarget is "5050" or "20E0"), l => Assert.Equal(l.Door.Room, l.TargetRoom));
         }
     }
 
@@ -213,19 +298,12 @@ public class DoorTests
         // Found in play (seed 389349): on a fresh game RM_2050's door to RM_2040 plays a scene
         // that sends the player to RM_2030 (through a random door), and RM_2040's door back
         // does nothing. Doors like these are left out with random doors (doorRando: false).
-        var layout = Generator.MakeDoors(new RandoSettings { Seed = 1, RandomDoors = true }, Data);
+        var layout = MakeWith("3050", "3040");
         Assert.DoesNotContain(layout.Graph.Rooms["3050"].Edges, e => e.To.Key == "3040");
         Assert.DoesNotContain(layout.Graph.Rooms["3040"].Edges, e => e.To.Key == "3050");
         Assert.DoesNotContain(layout.Plan.Links.Keys, s => s.Room == "3050" && s.OriginalTarget == "3040");
         var items = ItemGraph.Build(Data, new RandoSettings { Seed = 1 });
         Assert.Contains(items.Rooms["3050"].Edges, e => e.To.Key == "3040" && !e.Locked);
-    }
-
-    [Fact]
-    public void ClaireOnlyKeepsChrisDoors()
-    {
-        var plan = Make(30, chris: false).Plan;
-        Assert.DoesNotContain(plan.Links.Values, l => RoomId.ParseBioRand(l.Door.Room).Stage == 9);
     }
 
     [Fact]
@@ -276,7 +354,7 @@ public class DoorTests
             Assert.NotEmpty(CvScriptReader.ReadOpcodes(file));
         }
         Assert.NotNull(result.DoorTable);
-        Assert.Contains("start=0,1,0,0", Generator.RandoIni(result));
+        Assert.Contains("start=0,1,0,0,0", Generator.RandoIni(result));
     }
 
     private static HashSet<string> Reachable(ItemGraph graph, string start)

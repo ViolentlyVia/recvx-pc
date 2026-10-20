@@ -3,7 +3,8 @@ namespace Cvx.Rando.Items;
 /// <summary>
 /// Plays a finished item placement through on the room graph, independently of
 /// <see cref="ItemPlacer"/>: collects every pickup it can reach, opens what the keys open, takes
-/// one-way doors only once nothing else is left, and switches inventory at Chris's handover.
+/// one-way doors only once nothing else is left, and switches inventory at Chris's handover
+/// (not with random doors: one character plays the whole run).
 /// Claire takes everything she can, so pickups she shares with Chris are gone for him (the
 /// worst case), except shared pickups that keep their original key, which behave as in the
 /// normal game.
@@ -15,7 +16,7 @@ public static class Playthrough
     public static Result Check(ItemGraph graph, ItemPlacementResult placement)
     {
         var current = graph.Start;
-        var have = StartKeys(current.IsChris, placement);
+        var have = graph.OnlyCharacter is { } only ? StartKeys(only == Character.Chris, placement) : StartKeys(current.IsChris, placement);
         var collected = new HashSet<int>();
         var visited = new HashSet<RoomNode>();
 
@@ -71,7 +72,7 @@ public static class Playthrough
 
             var exit = exits[0];
             current = exit.To;
-            if (exit.To.IsChris && !exit.From.IsChris)
+            if (graph.OnlyCharacter == null && exit.To.IsChris && !exit.From.IsChris)
             {
                 have = StartKeys(true, placement);
                 collected.RemoveWhere(g => placement.ByGlobalId.TryGetValue(g, out var a) &&

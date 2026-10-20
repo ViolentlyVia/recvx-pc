@@ -1,6 +1,7 @@
 // Key item placement after BioRand's ItemRandomiser (MIT, Copyright (c) 2022-2026 Ted John),
 // rewritten for Code: Veronica:
 // - Claire and Chris have separate inventories; the logic starts over at Chris's handover.
+//   With random doors one character plays the whole run, with one inventory.
 // - Keys a half needs but has no pickup of are handed over by the game (events, the other
 //   character) and left alone.
 // - Pickups that keep their item (fixed ones...) hand it over when reached; the logic waits for
@@ -47,6 +48,9 @@ public sealed class ItemPlacer
     private readonly IReadOnlyCollection<int> _startWeapons;
     private bool _chrisHalf;
 
+    /// <summary>Random doors: one character, one inventory, from the start to the end.</summary>
+    private bool Single => _graph.OnlyCharacter != null;
+
     /// <param name="startWeapons">Weapons Claire starts with: in custom mode they are not placed again (their ammo still is).</param>
     public ItemPlacer(ItemGraph graph, ItemCatalog items, RandoSettings settings, Rng rng, IReadOnlyCollection<int>? startWeapons = null)
     {
@@ -88,16 +92,16 @@ public sealed class ItemPlacer
     /// </summary>
     public bool KeepsOriginal(ItemLocation l) =>
         l.Priority == ItemPriority.Fixed ||
-        (!_settings.IncludeChris && l.ChrisOnly) ||
+        (!Single && !_settings.IncludeChris && l.ChrisOnly) ||
         (_items.Get(l.OriginalType)?.IsKey == true && !IsKey(l.OriginalType)) ||
-        (_settings.IncludeChris && l.InChris && l.InClaire && _chrisKeys.Contains(l.OriginalType));
+        (!Single && _settings.IncludeChris && l.InChris && l.InClaire && _chrisKeys.Contains(l.OriginalType));
 
     // ---------------------------------------------------------------- key items
 
     private void PlaceKeys()
     {
         var checkpoint = _graph.Start;
-        StartHalf(chris: false);
+        StartHalf(chris: _graph.OnlyCharacter == Character.Chris);
 
         for (var guard = 0; guard < 10000; guard++)
         {
@@ -126,7 +130,7 @@ public sealed class ItemPlacer
                     ?? throw new ItemPlacementException($"The logic is stuck after {checkpoint}: the end ({_graph.End}) cannot be reached.");
                 _log.Add($"--- through {exit} (one way) ---");
                 checkpoint = exit.To;
-                if (exit.To.IsChris && !exit.From.IsChris)
+                if (!Single && exit.To.IsChris && !exit.From.IsChris)
                 {
                     if (!_settings.IncludeChris)
                         return;
@@ -158,10 +162,12 @@ public sealed class ItemPlacer
 
     private void StartHalf(bool chris)
     {
-        _chrisHalf = chris;
         _have.Clear();
         foreach (var k in chris ? ChrisStartKeys : ClaireStartKeys)
             _have.Add(k);
+        if (Single)
+            return;   // nobody hands keys over: Copies places those too
+        _chrisHalf = chris;
 
         // Keys this half needs but has no pickup of: the game hands them over (events, the
         // other character) and the logic leaves them alone.
@@ -175,11 +181,19 @@ public sealed class ItemPlacer
     }
 
     /// <summary>Pickups this half's player can take: Claire any she reaches, Chris only his own.</summary>
-    private bool InHalf(ItemLocation l) => _chrisHalf ? l.ChrisOnly || (l.InChris && KeepsOriginal(l)) : l.InClaire;
+    private bool InHalf(ItemLocation l) => Single || (_chrisHalf ? l.ChrisOnly || (l.InChris && KeepsOriginal(l)) : l.InClaire);
 
-    /// <summary>How many of a key to place: as many as the game has of it in this half.</summary>
-    private int Copies(int type) =>
-        _graph.Locations.Count(l => l.OriginalType == type && InHalf(l) && !KeepsOriginal(l));
+    /// <summary>
+    /// How many of a key to place: as many as the game has of it in this half. A run with
+    /// random doors places one of a key whose pickups are all in rooms it does not use.
+    /// </summary>
+    private int Copies(int type)
+    {
+        var copies = _graph.Locations.Count(l => l.OriginalType == type && InHalf(l) && !KeepsOriginal(l));
+        if (copies == 0 && Single && !_graph.Locations.Any(l => l.OriginalType == type && KeepsOriginal(l)))
+            copies = 1;
+        return copies;
+    }
 
     private ItemLocation? PickLocation(IEnumerable<ItemLocation> reachable)
     {

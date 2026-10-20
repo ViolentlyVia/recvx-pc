@@ -87,7 +87,10 @@ public static class RoomTweaks
         Flag("6000", 35, 0, "story flag for random doors"),
         Flag("6000", 261, 0, "story flag for random doors"),
 
+        // Random doors: one character plays the whole run (player_change_set).
         Nop("70A0", 0x1F3140, TweakMode.DoorsOnly, "no switch to Chris here"),
+        Nop("A1C0", 0x1BBAE2, TweakMode.DoorsOnly, "no switch to Chris here"),
+        Nop("A200", 0x18753C, TweakMode.DoorsOnly, "no switch to Claire here"),
 
         Nop("8170", 0x14D26E, TweakMode.Always, "do not put Rodrigo's gift into the special slot"),
         Nop("8170", 0x14EB68, TweakMode.Always, "do not put Rodrigo's gift into the special slot"),
