@@ -14,7 +14,8 @@
  *   start_items_claire=<id>:<n>,...    Claire's other starting items (replace the defaults)
  *   start_special_chris=<id>, start_items_chris=...   the same for Chris
  *   bgm_map=<from>:<to>,...            music tracks swapped in the room scripts' music requests
- *   start=<stage>,<room>,<entrance>,<case>   where a new game starts (random doors)
+ *   start=<stage>,<room>,<entrance>,<case>[,<player>]   where a new game starts, and as whom
+ *                                      (random doors; player 0 Claire, 1 Chris; default 0)
  *
  * Random doors are listed in rando_doors.txt next to it (see read_doors).
  *
@@ -44,7 +45,7 @@ static int active;
 static int no_poison;
 static short bgm_map[256];
 static StartItems start[2] = { { -1, -1 }, { -1, -1 } };
-static int start_room[4];   /* start=: stage, room, entrance, case */
+static int start_room[5];   /* start=: stage, room, entrance, case, player */
 static int has_start;
 
 static void read_doors(const char* mod_dir);
@@ -213,9 +214,15 @@ void pcRandoInit(const char* mod_dir)
     read_start(ini, "claire", &start[0]);
     read_start(ini, "chris", &start[1]);
 
+    start_room[4] = 0;   /* Claire, when start= has no player */
     if (pcIniFileGet(ini, "start", v, sizeof(v)) &&
-        (sscanf(v, "%d,%d,%d,%d", &start_room[0], &start_room[1], &start_room[2], &start_room[3]) == 4))
+        (sscanf(v, "%d,%d,%d,%d,%d", &start_room[0], &start_room[1], &start_room[2], &start_room[3], &start_room[4]) >= 4))
     {
+        if ((start_room[4] < 0) || (start_room[4] > 1))
+        {
+            start_room[4] = 0;
+        }
+
         has_start = 1;
     }
 
@@ -440,8 +447,9 @@ int pcWarpGet(int* stage, int* room, int* pos, int* rcase, int* player)
             *room = start_room[1];
             *pos = start_room[2];
             *rcase = start_room[3];
-            pcLog("rando: new game starts in stage %d room %d entrance %d case %d",
-                  *stage, *room, *pos, *rcase);
+            *player = start_room[4];
+            pcLog("rando: new game starts in stage %d room %d entrance %d case %d as player %d",
+                  *stage, *room, *pos, *rcase, *player);
             return 1;
         }
 
