@@ -87,7 +87,8 @@ public class CharacterTests
         // the skeleton is the target's tree; the 15 parts ride on their objects, nothing else has a model
         Assert.Equal(skeleton.Objects.Select(o => (o.Child, o.Sibling)), model.Objects.Select(o => (o.Child, o.Sibling)));
         var withModels = model.Objects.Select((o, i) => (o, i)).Where(x => x.o.Model != null).Select(x => x.i).ToList();
-        Assert.Equal([1, 3, 5, 12, 13, 14, 16, 17, 18, 19, 20, 21, 23, 24, 25], withModels);
+        // (the hands ride the forearms: the game's motions do not pose the wrists, 14 and 18)
+        Assert.Equal([1, 3, 5, 12, 13, 16, 17, 19, 20, 21, 23, 24, 25], withModels);
         Assert.All(withModels, i => Assert.Equal(0u, model.Objects[i].EvalFlags & NjObject.EvalHide));
 
         // the joints are Leon's (scaled so his neck is as high as the target's): his shoulders as

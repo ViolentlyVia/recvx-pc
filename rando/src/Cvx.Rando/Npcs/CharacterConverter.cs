@@ -29,7 +29,9 @@ public static class CharacterConverter
     /// <summary>
     /// RE2 part -> the CV object it rides on, the CV object at its joint, and for limbs the RE2
     /// part and CV object its bone points to (null: keep the part's orientation; the hands use
-    /// their forearm's).
+    /// their forearm's). The hands ride the forearms, placed at the wrists: the game's NPCs move
+    /// their hands with the forearm (their wrist objects, 14 and 18, have no SKIN entry and no
+    /// vertices), so the motions do not pose the wrists, and a hand on one turns at random.
     /// </summary>
     private static readonly (int Part, int Object, int Joint, (int Part, int Object)? Bone)[] Map =
     [
@@ -44,10 +46,10 @@ public static class CharacterConverter
         (8, 5, 4, null),        // head: rides the head, joint at the neck
         (9, 12, 12, (10, 13)),  // right upper arm, forearm, hand
         (10, 13, 13, (11, 14)),
-        (11, 14, 14, null),
+        (11, 13, 14, null),
         (12, 16, 16, (13, 17)), // left upper arm, forearm, hand
         (13, 17, 17, (14, 18)),
-        (14, 18, 18, null),
+        (14, 17, 18, null),
     ];
 
     private static readonly Dictionary<int, int> HandOf = new() { [11] = 10, [14] = 13 };
@@ -120,45 +122,50 @@ public static class CharacterConverter
             });
         }
 
-        foreach (var (part, obj, joint, _) in Map)
+        // one model per object: a forearm's holds the forearm and the hand
+        foreach (var group in Map.GroupBy(m => m.Object))
         {
-            var source = pld.Mesh.Parts[part];
-            if (source.Polygons.Count == 0)
-                continue;
-            var turn = rotations[part];
-            // the torso's joint is RE2's root, placed where it is on the pelvis (most characters
-            // have the two together; some, like RE3's Nemesis, have the root well below)
-            var at = part == 0 ? bind[1] + ToCv(rest[0] - rest[1]) * scale : bind[joint];
-            var offset = at - bind[obj];
+            var obj = group.Key;
             var vertices = new List<(Vector3 Position, Vector3 Normal)>();
-            var index = new Dictionary<(int, int), int>();
-            int VertexOf(int v, int n)
-            {
-                if (!index.TryGetValue((v, n), out var i))
-                {
-                    var normal = n < source.Normals.Length ? source.Normals[n] : Vector3.UnitY;
-                    var nrm = Vector3.Transform(ToCv(normal), turn);
-                    vertices.Add((offset + Vector3.Transform(ToCv(source.Positions[v]) * scale, turn),
-                                  nrm == Vector3.Zero ? Vector3.UnitY : Vector3.Normalize(nrm)));
-                    index[(v, n)] = i = vertices.Count - 1;
-                }
-                return i;
-            }
-
             var strips = new SortedDictionary<int, List<NjStrip>>();
-            foreach (var polygon in source.Polygons)
+            foreach (var (part, _, joint, _) in group)
             {
-                var texture = TextureOf(polygon);
-                var corners = polygon.Vertices.Select((v, k) => VertexOf(v, polygon.Normals[k])).ToArray();
-                var strip = corners.Select((c, k) => new NjStripVertex((ushort)c, (short)(polygon.Uvs[k].U * 4), (short)(polygon.Uvs[k].V * 4))).ToList();
-                // CV's winding: a strip's even triangles (a, b, c) face along cross(b - a, c - a)
-                var (a, b, c) = (vertices[corners[0]], vertices[corners[1]], vertices[corners[2]]);
-                var face = Vector3.Cross(b.Position - a.Position, c.Position - a.Position);
-                var flipped = Vector3.Dot(face, a.Normal + b.Normal + c.Normal) < 0;
-                if (!strips.TryGetValue(texture, out var list))
-                    strips[texture] = list = [];
-                list.Add(new NjStrip(flipped, strip));
+                var source = pld.Mesh.Parts[part];
+                var turn = rotations[part];
+                // the torso's joint is RE2's root, placed where it is on the pelvis (most characters
+                // have the two together; some, like RE3's Nemesis, have the root well below)
+                var at = part == 0 ? bind[1] + ToCv(rest[0] - rest[1]) * scale : bind[joint];
+                var offset = at - bind[obj];
+                var index = new Dictionary<(int, int), int>();
+                int VertexOf(int v, int n)
+                {
+                    if (!index.TryGetValue((v, n), out var i))
+                    {
+                        var normal = n < source.Normals.Length ? source.Normals[n] : Vector3.UnitY;
+                        var nrm = Vector3.Transform(ToCv(normal), turn);
+                        vertices.Add((offset + Vector3.Transform(ToCv(source.Positions[v]) * scale, turn),
+                                      nrm == Vector3.Zero ? Vector3.UnitY : Vector3.Normalize(nrm)));
+                        index[(v, n)] = i = vertices.Count - 1;
+                    }
+                    return i;
+                }
+
+                foreach (var polygon in source.Polygons)
+                {
+                    var texture = TextureOf(polygon);
+                    var corners = polygon.Vertices.Select((v, k) => VertexOf(v, polygon.Normals[k])).ToArray();
+                    var strip = corners.Select((c, k) => new NjStripVertex((ushort)c, (short)(polygon.Uvs[k].U * 4), (short)(polygon.Uvs[k].V * 4))).ToList();
+                    // CV's winding: a strip's even triangles (a, b, c) face along cross(b - a, c - a)
+                    var (a, b, c) = (vertices[corners[0]], vertices[corners[1]], vertices[corners[2]]);
+                    var face = Vector3.Cross(b.Position - a.Position, c.Position - a.Position);
+                    var flipped = Vector3.Dot(face, a.Normal + b.Normal + c.Normal) < 0;
+                    if (!strips.TryGetValue(texture, out var list))
+                        strips[texture] = list = [];
+                    list.Add(new NjStrip(flipped, strip));
+                }
             }
+            if (strips.Count == 0)
+                continue;
 
             var polygons = new List<NjPolyChunk> { material };
             foreach (var (texture, list) in strips)

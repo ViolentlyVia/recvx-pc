@@ -1,0 +1,35 @@
+﻿<!-- Ported from BioRand (biorand/classic, biorand/CheckBoxList.xaml), MIT, Copyright (c) 2022-2026 Ted John. -->
+<UserControl x:Class="IntelOrca.Biohazard.BioRand.CheckBoxList"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:IntelOrca.Biohazard.BioRand"
+             mc:Ignorable="d" 
+             d:DesignHeight="200" d:DesignWidth="100">
+    <ListView x:Name="list">
+        <ListView.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="Unselect All" Click="menuUnselectAll_Click" />
+                <MenuItem Header="Select All" Click="menuSelectAll_Click" />
+                <MenuItem Header="Random" Click="menuRandom_Click" />
+            </ContextMenu>
+        </ListView.ContextMenu>
+        <ListView.ItemContainerStyle>
+            <Style TargetType="ListViewItem">
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Focusable" Value="false" />
+                <Setter Property="Padding" Value="0" />
+            </Style>
+        </ListView.ItemContainerStyle>
+        <ListView.ItemTemplate>
+            <DataTemplate>
+                <CheckBox Content="{Binding Text}"
+                          ToolTip="{Binding ToolTip}"
+                          IsChecked="{Binding IsChecked}"
+                          Checked="OnCheckBoxChanged"
+                          Unchecked="OnCheckBoxChanged" />
+            </DataTemplate>
+        </ListView.ItemTemplate>
+    </ListView>
+</UserControl>

@@ -1,7 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Cvx.Formats/Cvx.Formats.csproj" />
-    <Project Path="src/Cvx.Rando.App/Cvx.Rando.App.csproj" />
+    <Project Path="src/Biorand.App/Biorand.App.csproj" />
     <Project Path="src/Cvx.Rando.Cli/Cvx.Rando.Cli.csproj" />
     <Project Path="src/Cvx.Rando/Cvx.Rando.csproj" />
   </Folder>
