@@ -47,6 +47,15 @@ public sealed record RandoSettings
     // Music
     /// <summary>Swap music tracks within their category (area, save room, tension, boss).</summary>
     public bool RandomMusic { get; init; }
+    /// <summary>
+    /// The games whose music the shuffle draws from: "recv" (this game's own) and BioRand's
+    /// (re2, sh1...: the folders of data/bgm in its datapacks, from the player's BioRand folder).
+    /// </summary>
+    public string[] MusicGames { get; init; } = ["recv"];
+    /// <summary>NPCs (Steve, Alfred, Alexia, Wesker, Rodrigo) take each other's look and voice; Claire and Chris stay.</summary>
+    public bool RandomNpcs { get; init; }
+    /// <summary>The title call is one of BioRand's (data/title), picked by the seed.</summary>
+    public bool RandomTitleCall { get; init; }
 
     /// <summary>Nosferatu's attack never poisons (BioRand does this with random doors).</summary>
     public bool NoNosferatuPoison { get; init; }

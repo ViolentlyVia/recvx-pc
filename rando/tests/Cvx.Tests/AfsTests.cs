@@ -32,6 +32,26 @@ public class AfsTests
         Enumerable.Range(0, length).Select(i => (byte)(i * 7 + seed)).ToArray();
 
     [Fact]
+    public void EntriesCanBeAddedPastTheEnd()
+    {
+        // the music archives: other games' tracks go to entries the game's archive does not have yet
+        var files = new[] { Bytes(10, 1), Bytes(3000, 2) };
+        using var afs = AfsArchive.FromStream(new MemoryStream(MakeArchive(files)));
+        var filler = Bytes(72, 5);
+        var added = Bytes(5000, 6);
+        using var output = new MemoryStream();
+        AfsWriter.Write(afs, new Dictionary<int, byte[]> { [4] = added }, output, filler);
+        using var result = AfsArchive.FromStream(new MemoryStream(output.ToArray()));
+        Assert.Equal(5, result.Count);
+        Assert.Equal(files[0], result.ReadEntry(0));
+        Assert.Equal(files[1], result.ReadEntry(1));
+        Assert.Equal(filler, result.ReadEntry(2));
+        Assert.Equal(filler, result.ReadEntry(3));
+        Assert.Equal(added, result.ReadEntry(4));
+        Assert.All(result.Entries, e => Assert.Equal(0, e.Offset % 2048));
+    }
+
+    [Fact]
     public void ReadsEntries()
     {
         var files = new[] { Bytes(10, 1), Bytes(3000, 2), Bytes(2048, 3) };

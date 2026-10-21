@@ -75,7 +75,9 @@ internal static class Cli
                                                  RDX_LNK.AFS with every room recompressed
               generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--inventory] [--side-pack] [--no-poison]
                        [--doors] [--segments 1-4] [--segment-size 1-8] [--chris]
-                       [--enemies] [--enemy-difficulty 0-3] [--music] [--share <code>] [--out <dir>] [--spoiler]
+                       [--enemies] [--enemy-difficulty 0-3] [--music] [--music-games re2,sh1,...] [--title-call] [--npcs]
+                       [--biorand <dir>]
+                       [--share <code>] [--out <dir>] [--spoiler]
                                                  randomize (--doors: random doors, played by Claire, or
                                                  Chris with --chris, in 1-4 segments, using 1-8 eighths
                                                  of the rooms); --out writes the mod folder (RDX_LNK.AFS,
@@ -324,6 +326,24 @@ internal static class Cli
             var rs = string.Join(" ", uses.GroupBy(r => r.Room).Select(g => $"{g.Key.Name}{(g.All(r => r.Opcode == "set_next_room_bgm") ? "n" : "")}"));
             Console.WriteLine($"{t,3} disc {where} {(info is { } i ? $"{i.Seconds,6:0.0}s {(i.Loops ? "loop" : "once")} {i.Channels}ch {i.SampleRate}" : "   (none)"),-28} {uses.Count,3} uses: {rs}");
         }
+
+        // --levels: each track's loudness (RMS and peak, decoded), and the average of the
+        // tracks the shuffle uses: data/music.json's targetRms, which other games' music is matched to
+        if (options.Has("levels"))
+        {
+            var catalog = RandoData.Load().Music;
+            var levels = new List<double>();
+            foreach (var t in catalog.Categories.SelectMany(c => c.Tracks).Order())
+            {
+                var disc = discs[1].ContainsKey(t) ? 1 : 2;
+                using var afs = AfsArchive.Open(Path.Combine(data.Directory, $"BGM{disc}.AFS"));
+                var (pcm, _) = Adx.Decode(afs.ReadEntry(t));
+                var (rms, peak) = global::Cvx.Rando.Music.MusicLibrary.Level(pcm);
+                levels.Add(rms);
+                Console.WriteLine($"{t,3} rms {rms,7:0} peak {peak,5}");
+            }
+            Console.WriteLine($"average rms {levels.Average():0}");
+        }
         return 0;
     }
 
@@ -447,6 +467,9 @@ internal static class Cli
             DoorCharacter = options.Has("chris") ? Character.Chris : Character.Claire,
             RandomEnemies = options.Has("enemies"),
             RandomMusic = options.Has("music"),
+            RandomTitleCall = options.Has("title-call"),
+            RandomNpcs = options.Has("npcs"),
+            MusicGames = options.Get("music-games") is { } mg ? ["recv", .. mg.Split(',', StringSplitOptions.RemoveEmptyEntries)] : ["recv"],
             EnemyDifficulty = options.Get("enemy-difficulty") is { } ed ? int.Parse(ed) : 1,
         };
         if (options.Get("share") is { } code)
@@ -463,7 +486,10 @@ internal static class Cli
         GenerationResult result;
         try
         {
-            result = Generator.Generate(settings, RandoData.Load(), rooms);
+            var library = Cvx.Rando.Music.MusicLibrary.Find(options.Get("biorand"), AppContext.BaseDirectory, Environment.CurrentDirectory);
+            if ((settings.RandomMusic && settings.MusicGames.Any(g => g != "recv")) || settings.RandomTitleCall)
+                Console.WriteLine(library == null ? "No BioRand music found (--biorand <folder>)." : $"BioRand music: {library.Directory}, {library.Tracks.Count} tracks");
+            result = Generator.Generate(settings, RandoData.Load(), rooms, null, library);
         }
         catch (ItemPlacementException ex)
         {
@@ -478,7 +504,7 @@ internal static class Cli
         if (options.Get("out") is { } outDir)
         {
             sw.Restart();
-            Generator.WriteMod(result, rooms, outDir);
+            Generator.WriteMod(result, rooms, outDir, new Progress<string>(Console.WriteLine));
             Console.WriteLine($"Wrote {Path.GetFullPath(outDir)} ({sw.Elapsed.TotalSeconds:0.0}s)");
         }
         return 0;

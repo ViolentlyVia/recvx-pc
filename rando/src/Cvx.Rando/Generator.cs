@@ -8,6 +8,7 @@ using Cvx.Rando.Doors;
 using Cvx.Rando.Enemies;
 using Cvx.Rando.Items;
 using Cvx.Rando.Music;
+using Cvx.Rando.Npcs;
 
 namespace Cvx.Rando;
 
@@ -19,8 +20,16 @@ public sealed record GenerationResult
     public DoorPlan? Doors { get; init; }
     /// <summary>Rooms whose enemies changed.</summary>
     public IReadOnlyList<EnemyRoomChange> Enemies { get; init; } = [];
-    /// <summary>Music tracks swapped (rando.ini bgm_map).</summary>
+    /// <summary>Music tracks swapped (rando.ini bgm_map), some of them for other games' tracks.</summary>
     public IReadOnlyList<MusicSwap> Music { get; init; } = [];
+    /// <summary>Games the settings ask music from that the BioRand folder does not have.</summary>
+    public IReadOnlyList<string> MissingMusicGames { get; init; } = [];
+    /// <summary>The loudness other games' music is matched to (data/music.json targetRms).</summary>
+    public double MusicTargetRms { get; init; }
+    /// <summary>The NPCs' new looks and voices, when they are shuffled.</summary>
+    public NpcResult? Npcs { get; init; }
+    /// <summary>BioRand's title call that replaces the game's (ADV.AFS), when it is randomized.</summary>
+    public LibraryTrack? TitleCall { get; init; }
     /// <summary>Door layouts made until one could be finished.</summary>
     public int DoorAttempts { get; init; }
     /// <summary>rando_doors.txt, with random doors.</summary>
@@ -59,7 +68,9 @@ public static class Generator
     }
 
     /// <param name="progress">Told what step is running (for a status line).</param>
-    public static GenerationResult Generate(RandoSettings settings, RandoData data, RoomArchive archive, IProgress<string>? progress = null)
+    /// <param name="musicLibrary">BioRand's music, for <see cref="RandoSettings.MusicGames"/> other than this game.</param>
+    public static GenerationResult Generate(RandoSettings settings, RandoData data, RoomArchive archive, IProgress<string>? progress = null,
+        MusicLibrary? musicLibrary = null)
     {
         // Random doors need random items: with the game's own, keys end up behind the doors
         // they open.
@@ -125,9 +136,27 @@ public static class Generator
             ? new EnemyRandomizer(data, archive, settings, Rng.For(settings.Seed, "enemies")).Apply(patcher)
             : [];
 
-        var music = settings.RandomMusic && archive.Data is { } gameData
-            ? MusicRandomizer.Shuffle(data.Music, MusicRandomizer.Present(gameData), Rng.For(settings.Seed, "music"))
-            : [];
+        if (settings.RandomNpcs)
+            progress?.Report("Shuffling the NPCs...");
+        var npcs = settings.RandomNpcs ? new NpcRandomizer(data, archive, Rng.For(settings.Seed, "npcs")).Apply(patcher) : null;
+
+        List<MusicSwap> music = [];
+        List<string> missingMusic = [];
+        if (settings.RandomMusic && archive.Data is { } gameData)
+        {
+            var games = settings.MusicGames.Select(g => g.ToLowerInvariant()).ToHashSet();
+            var own = games.Contains(MusicLibrary.OwnGame);
+            var imports = musicLibrary?.Tracks.Where(t => games.Contains(t.Game)).ToList() ?? [];
+            missingMusic = games.Where(g => g != MusicLibrary.OwnGame && musicLibrary?.Games.Contains(g) != true).Order().ToList();
+            // no music of any chosen game here: the game's own, shuffled
+            if (imports.Count == 0)
+                own = true;
+            music = MusicRandomizer.Mix(data.Music, MusicRandomizer.Present(gameData), imports, own, Rng.For(settings.Seed, "music"));
+        }
+
+        var titleCall = settings.RandomTitleCall && musicLibrary is { TitleCalls.Count: > 0 } titles
+            ? Rng.For(settings.Seed, "title").NextOf(titles.TitleCalls)
+            : null;
 
         if (settings.RandomItems && settings.ItemMode == ItemMode.Custom)
             amounts = PickupAmounts(data.Items, settings, Rng.For(settings.Seed, "amounts"));
@@ -141,6 +170,10 @@ public static class Generator
             DoorAttempts = doorAttempts,
             Enemies = enemies,
             Music = music,
+            MissingMusicGames = missingMusic,
+            MusicTargetRms = data.Music.TargetRms,
+            TitleCall = titleCall,
+            Npcs = npcs,
             DoorTable = doors == null ? null : Doors.DoorTable.Write(doors, data),
             GraphDot = graph == null ? null : GraphExport.Dot(graph, data.Items, saveRooms),
             GraphDgml = graph == null ? null : GraphExport.Dgml(graph, data.Items, saveRooms),
@@ -236,6 +269,11 @@ public static class Generator
             if (result.Enemies.Count != 0)
                 progress?.Report("Writing enemy sounds...");
             EnemySounds.Write(data, result.Enemies, directory);
+            MusicWriter.Write(data, result.MusicTargetRms, result.Music, directory, progress);
+            MusicWriter.WriteTitleCall(data, result.TitleCall, directory, progress);
+            if (result.Npcs is { Voices.Count: > 0 })
+                progress?.Report("Writing the NPCs' voices...");
+            NpcRandomizer.WriteVoices(data, result.Npcs?.Voices ?? [], directory);
         }
         Write(DoorTable.FileName, result.DoorTable);
         Write("spoiler.txt", result.Spoiler);

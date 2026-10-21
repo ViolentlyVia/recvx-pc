@@ -51,11 +51,14 @@ public sealed class ItemPatcher
         return file;
     }
 
-    /// <summary>Rebuilds a room as a last step (enemy swaps); in-place edits must come first.</summary>
+    /// <summary>
+    /// Rebuilds a room as a last step (enemy and NPC swaps), after any rebuild set before;
+    /// in-place edits must come first.
+    /// </summary>
     public void SetRebuild(RoomId id, Func<RdxFile, RdxFile> rebuild)
     {
         Room(id);
-        _rebuilds[id] = rebuild;
+        _rebuilds[id] = _rebuilds.TryGetValue(id, out var earlier) ? file => rebuild(earlier(file)) : rebuild;
     }
 
     /// <summary>Blanks the opcodes that start inside <paramref name="spec"/>.</summary>

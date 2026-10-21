@@ -19,10 +19,12 @@ public sealed class RandoData
     public ItemCatalog Items { get; }
     public EnemyCatalog Enemies { get; }
     public MusicCatalog Music { get; }
+    public NpcCatalog Npcs { get; }
 
-    private RandoData(RoomMap map, IReadOnlyList<EnemyPosition> enemyPositions, ItemCatalog items, EnemyCatalog enemies, MusicCatalog music)
+    private RandoData(RoomMap map, IReadOnlyList<EnemyPosition> enemyPositions, ItemCatalog items, EnemyCatalog enemies, MusicCatalog music, NpcCatalog npcs)
     {
         Music = music;
+        Npcs = npcs;
         Map = map;
         EnemyPositions = enemyPositions;
         Items = items;
@@ -34,7 +36,8 @@ public sealed class RandoData
         Load<List<EnemyPosition>>("data/recv/enemy.json"),
         new ItemCatalog(Load<ItemCatalogFile>("data/items.json").Items),
         Load<EnemyCatalog>("data/enemies.json"),
-        Load<MusicCatalog>("data/music.json")));
+        Load<MusicCatalog>("data/music.json"),
+        Load<NpcCatalog>("data/npcs.json")));
 
     public static RandoData Load() => BuiltIn.Value;
 

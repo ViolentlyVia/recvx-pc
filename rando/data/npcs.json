@@ -1,0 +1,63 @@
+// NPCs that may take each other's look and voice. "types": their enemy types in the rooms (they
+// all run bhSubpl: the room script moves them, with motions from outside the room, on one human
+// skeleton); "look": the room and enemy entry whose model and textures they give. Claire (91)
+// and Chris (92) have cutscene models of their own and always stay themselves.
+//
+// "voices": who speaks each line the room scripts play (voice_on), by disc (VOICE1.AFS,
+// VOICE2.AFS) and entry: an audio match with BioRand's clips of this game (data/voice/<name>.recv)
+// where one was clear, else the entry the script plays it at. Only these five are listed.
+{
+  "characters": [
+    { "name": "Steve", "voice": "steve", "types": [ 93 ], "look": "RM_0030:2" },
+    { "name": "Alfred", "voice": "alfred", "types": [ 94, 96 ], "look": "RM_1020:1" },
+    { "name": "Alexia", "voice": "alexia", "types": [ 95 ], "look": "RM_2030:1" },
+    { "name": "Wesker", "voice": "wesker", "types": [ 97 ], "look": "RM_1002:1" },
+    { "name": "Rodrigo", "voice": "rodrigo", "types": [ 98 ], "look": "RM_0000:1" }
+  ],
+  "voices": {
+    "1": {
+      "0": "rodrigo", "1": "rodrigo", "2": "rodrigo", "17": "rodrigo", "18": "rodrigo", "20": "rodrigo", "21": "rodrigo", "23": "steve",
+      "24": "rodrigo", "27": "steve", "28": "steve", "30": "steve", "31": "steve", "32": "steve", "33": "steve", "34": "steve",
+      "37": "steve", "39": "rodrigo", "40": "steve", "41": "steve", "43": "steve", "44": "steve", "45": "steve", "46": "steve",
+      "47": "steve", "48": "steve", "49": "steve", "50": "steve", "52": "steve", "53": "steve", "57": "steve", "59": "steve",
+      "60": "steve", "61": "steve", "65": "steve", "66": "steve", "68": "steve", "69": "steve", "71": "steve", "72": "steve",
+      "73": "steve", "74": "steve", "79": "steve", "86": "alfred", "92": "steve", "93": "steve", "94": "steve", "97": "steve",
+      "98": "steve", "99": "steve", "100": "steve", "101": "steve", "102": "steve", "103": "steve", "104": "steve", "105": "steve",
+      "106": "steve", "107": "steve", "108": "steve", "111": "steve", "112": "steve", "115": "alfred", "116": "alfred", "117": "alfred",
+      "118": "alfred", "120": "alfred", "121": "alfred", "122": "alfred", "123": "alfred", "124": "alfred", "125": "alfred", "126": "alfred",
+      "127": "alfred", "128": "alfred", "129": "alfred", "130": "alfred", "132": "alfred", "134": "steve", "135": "steve", "139": "alfred",
+      "140": "steve", "141": "steve", "143": "steve", "148": "steve", "149": "steve", "150": "steve", "153": "steve", "155": "steve",
+      "156": "steve", "157": "steve", "160": "alfred", "161": "steve", "162": "steve", "163": "steve", "176": "steve", "177": "steve",
+      "178": "steve", "179": "steve", "180": "steve", "181": "steve", "182": "steve", "183": "steve", "184": "steve", "185": "steve",
+      "186": "steve", "187": "steve", "188": "steve", "189": "steve", "192": "steve", "193": "steve", "194": "steve", "195": "steve",
+      "196": "steve", "199": "steve", "201": "steve", "204": "steve", "207": "steve", "209": "steve", "210": "steve", "216": "steve",
+      "217": "steve", "219": "steve", "220": "steve", "221": "steve", "222": "steve", "223": "steve", "224": "rodrigo", "225": "rodrigo",
+      "226": "rodrigo", "227": "rodrigo", "228": "rodrigo", "229": "rodrigo", "231": "rodrigo", "233": "rodrigo", "234": "rodrigo", "237": "alfred",
+      "238": "alexia", "239": "alfred", "240": "alexia", "242": "alfred", "245": "alexia", "247": "alexia", "249": "alexia", "250": "alexia",
+      "253": "steve", "257": "steve", "259": "steve", "260": "steve", "263": "steve", "264": "wesker", "267": "steve", "268": "alfred",
+      "270": "steve", "272": "steve", "279": "wesker", "281": "steve", "285": "steve", "287": "steve", "288": "steve", "289": "steve",
+      "303": "alexia", "304": "alexia", "305": "alexia", "306": "alexia", "308": "steve", "310": "steve", "311": "steve", "313": "steve",
+      "314": "steve", "316": "steve", "318": "steve", "322": "steve", "323": "steve", "324": "alexia", "325": "steve", "326": "steve",
+      "327": "steve", "329": "steve", "332": "steve", "333": "steve", "334": "alexia", "335": "alexia", "337": "steve", "338": "steve",
+      "339": "steve", "340": "steve", "345": "steve", "406": "steve", "407": "steve", "409": "steve", "412": "steve", "413": "steve",
+      "417": "steve", "418": "steve", "419": "steve", "421": "steve", "451": "alexia", "453": "alexia", "472": "steve", "473": "alexia",
+      "490": "wesker", "494": "wesker", "496": "wesker", "497": "wesker", "502": "wesker", "506": "wesker", "517": "wesker", "521": "wesker",
+      "524": "wesker"
+    },
+    "2": {
+      "3": "wesker", "5": "steve", "8": "steve", "10": "steve", "18": "steve", "24": "alexia", "25": "steve", "35": "alfred",
+      "36": "alexia", "37": "steve", "38": "alfred", "39": "alfred", "40": "alfred", "41": "alfred", "42": "alfred", "44": "alexia",
+      "49": "steve", "51": "steve", "58": "steve", "59": "steve", "70": "steve", "72": "steve", "74": "steve", "88": "rodrigo",
+      "90": "rodrigo", "92": "rodrigo", "94": "rodrigo", "97": "rodrigo", "101": "rodrigo", "103": "rodrigo", "106": "wesker", "110": "wesker",
+      "111": "wesker", "112": "wesker", "113": "wesker", "115": "wesker", "118": "wesker", "135": "wesker", "137": "wesker", "138": "steve",
+      "143": "alexia", "146": "alexia", "147": "alexia", "148": "alexia", "149": "alexia", "152": "steve", "168": "alexia", "178": "steve",
+      "207": "alexia", "208": "wesker", "209": "wesker", "210": "alexia", "211": "wesker", "212": "wesker", "213": "wesker", "214": "alexia",
+      "301": "wesker", "316": "rodrigo", "342": "steve", "343": "steve", "344": "steve", "348": "steve", "352": "steve", "353": "steve",
+      "402": "steve", "403": "steve", "432": "wesker", "433": "wesker", "436": "steve", "441": "wesker", "442": "steve", "445": "steve",
+      "448": "wesker", "450": "wesker", "455": "wesker", "457": "wesker", "460": "wesker", "461": "wesker", "462": "wesker", "465": "wesker",
+      "466": "wesker", "472": "wesker", "476": "wesker", "481": "rodrigo", "483": "wesker", "484": "wesker", "485": "wesker", "489": "wesker",
+      "490": "wesker", "491": "wesker", "492": "wesker", "495": "wesker", "496": "wesker", "497": "wesker", "499": "wesker", "500": "wesker",
+      "501": "wesker", "502": "wesker", "503": "wesker", "504": "wesker", "505": "wesker", "514": "wesker"
+    }
+  }
+}

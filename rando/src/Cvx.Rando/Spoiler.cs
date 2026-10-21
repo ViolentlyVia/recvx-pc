@@ -1,6 +1,7 @@
 using System.Text;
 using Cvx.Formats;
 using Cvx.Rando.Data;
+using Cvx.Rando.Music;
 
 namespace Cvx.Rando;
 
@@ -21,7 +22,10 @@ public static class Spoiler
         if (s.StartSidePack)
             sb.AppendLine("Side pack: from the start");
         sb.AppendLine($"Enemies: {(s.RandomEnemies ? $"random, difficulty {s.EnemyDifficulty}" : "off")}");
-        sb.AppendLine($"Music: {(s.RandomMusic ? "shuffled" : "off")}");
+        sb.AppendLine($"Music: {(s.RandomMusic ? "shuffled" + MusicFrom(s, result) : "off")}");
+        sb.AppendLine($"NPCs: {(result.Npcs is { } n ? string.Join(", ", n.Looks.Select(x => $"{x.Key} as {x.Value}")) : "off")}");
+        if (s.RandomTitleCall)
+            sb.AppendLine($"Title call: {(result.TitleCall is { } t ? $"BioRand's {t.Name}" : "the game's (no BioRand folder with title calls)")}");
         sb.AppendLine();
 
         if (result.Doors is { } doors)
@@ -42,7 +46,7 @@ public static class Spoiler
                 foreach (var link in room.OrderBy(l => l.Door.Index))
                 {
                     var to = link.TargetRoom == link.Door.Room
-                        ? "back into this room"
+                        ? (link.Locked ? "locked (leads nowhere)" : "back into this room")
                         : $"{RoomLabel(RoomId.ParseBioRand(link.TargetRoom))} entrance {link.Arrival}";
                     sb.AppendLine($"    door to {link.Door.OriginalTarget,-5} -> {to}");
                 }
@@ -100,7 +104,24 @@ public static class Spoiler
             sb.AppendLine("Music (track numbers as in dump-music)");
             sb.AppendLine("-----");
             foreach (var group in result.Music.GroupBy(m => m.Category))
-                sb.AppendLine($"  {group.Key}: {string.Join(", ", group.Select(m => m.From == m.To ? $"{m.From}" : $"{m.From}->{m.To}"))}");
+            {
+                sb.AppendLine($"  {group.Key}: {string.Join(", ", group.Where(m => m.Import == null).Select(m => m.From == m.To ? $"{m.From}" : $"{m.From}->{m.To}"))}");
+                foreach (var m in group.Where(m => m.Import != null))
+                    sb.AppendLine($"    {m.From,3} -> {MusicLibrary.DisplayName(m.Import!.Game)}: {m.Import.Tag}/{m.Import.Name}");
+            }
+            sb.AppendLine();
+        }
+
+        if (result.Npcs is { } npcs)
+        {
+            sb.AppendLine("NPCs (look and voice)");
+            sb.AppendLine("---------------------");
+            foreach (var (who, look) in npcs.Looks)
+                sb.AppendLine($"  {who,-8} looks and sounds like {look}");
+            sb.AppendLine($"  {npcs.ChangedRooms.Count} rooms changed, {npcs.Voices.Count} voice lines given to the new voices.");
+            sb.AppendLine($"  Rooms: {string.Join(" ", npcs.ChangedRooms.Select(r => r.Name))}");
+            if (npcs.KeptRooms.Count != 0)
+                sb.AppendLine($"  Unchanged (room data not understood or too big): {string.Join(" ", npcs.KeptRooms.Select(r => r.Name))}");
             sb.AppendLine();
         }
 
@@ -128,4 +149,15 @@ public static class Spoiler
     }
 
     private static string RoomLabel(RoomId id) => $"{id.Name} ({id.BioRandId})";
+
+    private static string MusicFrom(RandoSettings s, GenerationResult result)
+    {
+        if (s.MusicGames.All(g => g == MusicLibrary.OwnGame))
+            return "";
+        var games = s.MusicGames.Select(MusicLibrary.DisplayName).ToList();
+        var text = $", with music from {string.Join(", ", games)}";
+        if (result.MissingMusicGames.Count != 0)
+            text += $" (not in the BioRand folder, left out: {string.Join(", ", result.MissingMusicGames.Select(MusicLibrary.DisplayName))})";
+        return text;
+    }
 }
