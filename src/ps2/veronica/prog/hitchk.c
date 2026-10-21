@@ -4681,10 +4681,36 @@ void bhCheckExmAtari(BH_PWORK* pp)
 
             {
                 extern int pcRandoDoor(int stage, int room, int rcase, int area, int* tstage, int* troom, int* tpos);
+                extern const unsigned short* pcRandoLockedText(void);
                 int tstage = sys->door.stg_no, troom = sys->door.rom_no, tpos = sys->door.pos_no;
+                int rando;
 
                 /* randomizer: random doors (rando_doors.txt, pc_rando.c) */
-                if (pcRandoDoor(sys->stg_no, sys->rom_no, sys->rcase, t, &tstage, &troom, &tpos))
+                rando = pcRandoDoor(sys->stg_no, sys->rom_no, sys->rcase, t, &tstage, &troom, &tpos);
+
+                if (rando == 2)
+                {
+                    /* a door that leads nowhere is locked: no door, a message as the game's message areas show it */
+                    pp->stflg &= ~0x80000000;
+                    sys->cb_flg &= ~0x1;
+                    sys->mes_dp = (unsigned int*)pcRandoLockedText();
+                    sys->mes_idx = 0;
+                    sys->mes_ct = 0;
+                    sys->mes_tim = 0;
+                    sys->mes_fls = 0;
+                    sys->mes_sel = 0;
+                    sys->st_flg |= 0x200;
+                    sys->st_flg &= ~(0x80000 | 0x8000 | 0x4000 | 0x1000 | 0x400 | 0x800);
+                    sys->cb_flg &= ~(0x20000000 | 0x2000 | 0x1000);
+                    sys->pad_onb  = sys->pad_on;
+                    sys->pad_psb  = sys->pad_ps;
+                    sys->pad_oldb = sys->pad_old;
+                    sys->pad_ps = 0;
+                    sys->cb_flg |= 0x20;
+                    sys->st_flg |= 0x2000;
+                    sys->st_flg |= 0x4;
+                }
+                else if (rando)
                 {
                     sys->door.stg_no = tstage;
                     sys->door.rom_no = troom;
@@ -4755,10 +4781,36 @@ void bhCheckExmAtari(BH_PWORK* pp)
 #ifdef TARGET_PC
                         {
                             extern int pcRandoDoor(int stage, int room, int rcase, int area, int* tstage, int* troom, int* tpos);
+                            extern const unsigned short* pcRandoLockedText(void);
                             int tstage = sys->door.stg_no, troom = sys->door.rom_no, tpos = sys->door.pos_no;
+                            int rando;
 
                             /* randomizer: random doors (rando_doors.txt, pc_rando.c) */
-                            if (pcRandoDoor(sys->stg_no, sys->rom_no, sys->rcase, i, &tstage, &troom, &tpos))
+                            rando = pcRandoDoor(sys->stg_no, sys->rom_no, sys->rcase, i, &tstage, &troom, &tpos);
+
+                            if (rando == 2)
+                            {
+                                /* a door that leads nowhere is locked: no door, a message as the game's message areas show it */
+                                pp->stflg &= ~0x80000000;
+                                sys->cb_flg &= ~0x1;
+                                sys->mes_dp = (unsigned int*)pcRandoLockedText();
+                                sys->mes_idx = 0;
+                                sys->mes_ct = 0;
+                                sys->mes_tim = 0;
+                                sys->mes_fls = 0;
+                                sys->mes_sel = 0;
+                                sys->st_flg |= 0x200;
+                                sys->st_flg &= ~(0x80000 | 0x8000 | 0x4000 | 0x1000 | 0x400 | 0x800);
+                                sys->cb_flg &= ~(0x20000000 | 0x2000 | 0x1000);
+                                sys->pad_onb  = sys->pad_on;
+                                sys->pad_psb  = sys->pad_ps;
+                                sys->pad_oldb = sys->pad_old;
+                                sys->pad_ps = 0;
+                                sys->cb_flg |= 0x20;
+                                sys->st_flg |= 0x2000;
+                                sys->st_flg |= 0x4;
+                            }
+                            else if (rando)
                             {
                                 sys->door.stg_no = tstage;
                                 sys->door.rom_no = troom;

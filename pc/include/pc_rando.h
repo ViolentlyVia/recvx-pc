@@ -23,6 +23,8 @@ void pcRandoStartItems(int player, unsigned int* pip);
  * rando_doors.txt lists it. Returns 1 and changes the target, arrival entrance and pending room
  * case when it is. */
 int pcRandoDoor(int stage, int room, int rcase, int area, int* tstage, int* troom, int* tpos);
+/* pcRandoDoor returned 2: the door leads nowhere and is locked; the message to show */
+const unsigned short* pcRandoLockedText(void);
 
 /* The room file just loaded (system.c): pcRandoDoor matches doors on its case, which room scripts
  * may change (room_case_no) before their own door call. */

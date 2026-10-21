@@ -287,11 +287,14 @@ void pcRandoStartItems(int player, unsigned int* pip)
  * trigger area is <area> (255: any, for script doors) and that leads to (old stage, old room)
  * leads to the new room instead, arriving at <entrance>, with the room case (variant) set on
  * the way. Doors are matched where the game sets sys->door (hitchk.c for door areas,
- * bhSetDoorDemo for script doors), so both kinds work and no room script has to change. */
+ * bhSetDoorDemo for script doors), so both kinds work and no room script has to change.
+ * An eleventh value 1 marks a door that leads nowhere (its target is its own room): a door area
+ * shows it locked instead (pcRandoDoor returns 2); a script door still goes back into its room. */
 
 typedef struct {
     short stage, room, rcase, area, ostage, oroom;
     short tstage, troom, tcase, tpos;
+    short locked;               /* the door leads nowhere: it is locked (its target is its own room) */
 } DoorMap;
 
 static DoorMap* doors;
@@ -322,10 +325,14 @@ static void read_doors(const char* mod_dir)
     while (fgets(line, sizeof(line), f) != NULL)
     {
         DoorMap d;
+        int n;
 
-        if ((line[0] == '#') || (sscanf(line, "%hd %hd %hd %hd %hd %hd %hd %hd %hd %hd",
-                                        &d.stage, &d.room, &d.rcase, &d.area, &d.ostage, &d.oroom,
-                                        &d.tstage, &d.troom, &d.tcase, &d.tpos) != 10))
+        d.locked = 0;
+        n = (line[0] == '#') ? 0 : sscanf(line, "%hd %hd %hd %hd %hd %hd %hd %hd %hd %hd %hd",
+                                          &d.stage, &d.room, &d.rcase, &d.area, &d.ostage, &d.oroom,
+                                          &d.tstage, &d.troom, &d.tcase, &d.tpos, &d.locked);
+
+        if (n < 10)
         {
             continue;
         }
@@ -389,15 +396,28 @@ int pcRandoDoor(int stage, int room, int rcase, int area, int* tstage, int* troo
         return 0;
     }
 
-    pcLog("rando: door %d %d %d area %d to %d %d -> %d %d case %d entrance %d", stage, room, rcase, area,
-          *tstage, *troom, hit->tstage, hit->troom, hit->tcase, hit->tpos);
+    pcLog("rando: door %d %d %d area %d to %d %d -> %d %d case %d entrance %d%s", stage, room, rcase, area,
+          *tstage, *troom, hit->tstage, hit->troom, hit->tcase, hit->tpos, hit->locked ? " (locked)" : "");
 
     *tstage = hit->tstage;
     *troom = hit->troom;
     *tpos = hit->tpos;
     pending_case = hit->tcase;
 
-    return 1;
+    return hit->locked ? 2 : 1;
+}
+
+/* "It's locked.", in the message codes of SYSMES.ALD (characters - 0x20, 0xFF01 space, 0xFFFF
+ * end), for doors that lead nowhere (pcRandoDoor returns 2) */
+const unsigned short* pcRandoLockedText(void)
+{
+    static const unsigned short text[] = {
+        'I' - 0x20, 't' - 0x20, '\'' - 0x20, 's' - 0x20, 0xFF01,
+        'l' - 0x20, 'o' - 0x20, 'c' - 0x20, 'k' - 0x20, 'e' - 0x20, 'd' - 0x20, '.' - 0x20, 0xFFFF
+    };
+
+    pending_case = -1;
+    return text;
 }
 
 int pcRandoTakePendingCase(void)

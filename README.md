@@ -153,7 +153,8 @@ in `pc/src/pc_rando.c`):
 
 With random doors, `rando_doors.txt` in the mod folder lists the doors that lead somewhere new,
 one per line: `<stage> <room> <case> <area> <old stage> <old room>  <new stage> <new room>
-<new case> <entrance>`. The game looks a door up where it decides where the door goes (door
+<new case> <entrance> [1]`; a trailing `1` marks a door that leads nowhere, which the game then
+shows as locked ("It's locked.") instead of opening. The game looks a door up where it decides where the door goes (door
 areas and script doors), so the room files keep their own door data. `<case>` is the case of the
 room file that is loaded, even when the room's script has already set the next room's case
 (`room_case_no`) before its door call. When a room's variant
