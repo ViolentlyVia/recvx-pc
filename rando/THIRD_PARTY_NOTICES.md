@@ -3,7 +3,8 @@
 ## BioRand
 
 Parts of this program are ported from BioRand, the classic Resident Evil randomizer:
-the room file format (`RdtCv` and its model, motion and texture lists), the PRS
+the room file format (`RdtCv` and its model, motion and texture lists), the RE2 player
+model format (`PldFile`, `Emr`, `Md1`, `TimFile`: reading BioRand's characters), the PRS
 compressor, and (in later versions) the randomization logic and the Code: Veronica
 room data in `data/`.
 

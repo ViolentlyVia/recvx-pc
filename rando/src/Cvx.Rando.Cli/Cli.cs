@@ -9,7 +9,7 @@ using Cvx.Rando.Doors;
 
 namespace Cvx.Rando.Cli;
 
-internal static class Cli
+internal static partial class Cli
 {
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 
@@ -30,6 +30,7 @@ internal static class Cli
                 "dump-room" => DumpRoom(options),
                 "dump-all" => DumpAll(options),
                 "extract-room" => ExtractRoom(options),
+                "extract-afs" => ExtractAfs(options),
                 "roundtrip" => Roundtrip(options),
                 "make-mod" => MakeMod(options, args[1..]),
                 "verify-data" => VerifyData(options),
@@ -38,6 +39,10 @@ internal static class Cli
                 "save-rooms" => ListSaveRooms(options),
                 "room-memory" => RoomMemory(options),
                 "dump-enemies" => DumpEnemies(options),
+                "dump-model" => DumpModel(options),
+                "dump-pld" => DumpPld(options),
+                "make-look-mod" => MakeLookMod(options),
+                "render-model" => RenderModel(options),
                 "swap-enemies" => SwapEnemies(options),
                 "enemy-donors" => EnemyDonors(options),
                 "dump-sounds" => DumpSounds(options),
@@ -70,6 +75,9 @@ internal static class Cli
               dump-room <RM_xxxx> [--json]       a room's enemies, items, doors and other trigger areas
               dump-all --out <file.json>         the summary of every room in one JSON file
               extract-room <RM_xxxx> --out <f>   write a room's expanded file
+              extract-afs <archive> <entry> --out <f>
+                                                 write one entry of an AFS archive as it is
+                                                 (the archive's name in the data folder, or a path)
               roundtrip [--out <dir>]            rebuild every room and the archive without changes
                                                  and check the result; --out also writes an
                                                  RDX_LNK.AFS with every room recompressed
@@ -88,6 +96,26 @@ internal static class Cli
               swap-enemies <RM_xxxx> --donor <RM_xxxx>:<enemy index> [--only <types>] [--effect <n>] [--out <dir>]
                                                  testing aid: turn a room's enemies into another
                                                  room's enemy and write a mod folder
+              dump-enemies [<RM_xxxx>] [--scripts] [--out <dir>]
+                                                 each room's enemies with their model, motion and
+                                                 texture data; --out writes them as files
+              dump-model <RM_xxxx>:<enemy> | <SYSTEM.AFS>:<entry> | <file> [--vertices] [--png <dir>]
+                                                 a model page: its blocks, each model's objects
+                                                 (skeleton: parent, position, bind position),
+                                                 meshes, SKIN weights and textures; --png writes
+                                                 the textures
+              dump-pld <file.PLD> [--vertices] [--png <dir>]
+                                                 an RE2 player model (BioRand's characters):
+                                                 skeleton, parts and texture
+              render-model <RM_xxxx>:<enemy> | <file> --out <file.png>
+                                                 a model in its bind pose from the front, the
+                                                 side and the back, textured (a file takes the
+                                                 .tex0 next to it)
+              make-look-mod --pld <file.PLD> [--slot <RM_xxxx>:<enemy>] [--skeleton <RM_xxxx>:<enemy>]
+                            [--dump <dir>] [--out <dir>]
+                                                 testing aid: an NPC entry (default RM_7220:1, Chris
+                                                 in the opening scene) takes a converted RE2
+                                                 character; --out writes a mod folder
               room-memory [--recompress] [--all]
                                                  the rooms with the least room to grow when the game
                                                  expands them (in place, in a fixed pool)
@@ -189,6 +217,21 @@ internal static class Cli
         var expanded = rooms.ReadExpanded(id);
         File.WriteAllBytes(output, expanded);
         Console.WriteLine($"{id}: {expanded.Length} bytes -> {output}");
+        return 0;
+    }
+
+    private static int ExtractAfs(Options options)
+    {
+        var name = options.Positional(0, "archive");
+        var index = int.Parse(options.Positional(1, "entry"));
+        var output = options.Require("out");
+        var path = File.Exists(name) ? name : Path.Combine(OpenData(options).Directory, name);
+        using var afs = AfsArchive.Open(path);
+        if (index < 0 || index >= afs.Count)
+            throw new ArgumentException($"{Path.GetFileName(path)} has entries 0-{afs.Count - 1}.");
+        var data = afs.ReadEntry(index);
+        File.WriteAllBytes(output, data);
+        Console.WriteLine($"{Path.GetFileName(path)} entry {index}: {data.Length} bytes -> {output}");
         return 0;
     }
 
@@ -303,6 +346,17 @@ internal static class Cli
             {
                 Console.WriteLine($"  [{e.Index,2}] type {e.Type,3} mdlver {e.ModelVersion} flg {e.Entry.Header:X} fx {e.Entry.Effect} idx {e.Entry.Index:X4}" +
                                   $"  model {e.Model.Length,7}  motion {e.Motion.Length,7}  textures [{string.Join(",", e.Textures.Select(t => $"{t}:{layout.TextureGroups[t].Length}"))}]");
+                if (options.Get("out") is { } dir)
+                {
+                    // <room>_<enemy>.model, .motion and .tex<n> (each texture entry), for format work
+                    Directory.CreateDirectory(dir);
+                    var stem = Path.Combine(dir, $"{id.Name}_{e.Index}");
+                    File.WriteAllBytes(stem + ".model", e.Model.ToArray());
+                    if (e.Motion.Length != 0)
+                        File.WriteAllBytes(stem + ".motion", e.Motion.ToArray());
+                    for (var t = 0; t < e.Textures.Count; t++)
+                        File.WriteAllBytes(stem + $".tex{t}", layout.TextureGroups[e.Textures[t]].ToArray());
+                }
             }
         }
         if (only == null)
