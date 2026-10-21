@@ -7,7 +7,13 @@ namespace Cvx.Rando.App;
 public sealed class AppSettings
 {
     public string? GameDirectory { get; set; }
+    /// <summary>BioRand's folder, for other games' music (found next to the program when not set).</summary>
+    public string? BioRandDirectory { get; set; }
     public RandoSettings Rando { get; set; } = new() { Seed = Random.Shared.Next(1, 1_000_000) };
+    /// <summary>The share code of the last seed generated: the window tells whether the options still match it.</summary>
+    public string? LastGeneratedCode { get; set; }
+    /// <summary>Where the window was (null at first run: centred).</summary>
+    public WindowPlacement? Window { get; set; }
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -55,3 +61,5 @@ public sealed class AppSettings
         }
     }
 }
+
+public sealed record WindowPlacement(int X, int Y, double Width, double Height, bool Maximized);

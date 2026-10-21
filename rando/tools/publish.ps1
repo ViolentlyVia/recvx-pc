@@ -16,7 +16,8 @@ $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $out = Join-Path $root "artifacts\publish"
 
-# WinForms does not support trimming, so the runtime is included whole (compressed).
+# Not trimmed (the data files are read with reflection-based JSON), so the runtime is included whole
+# (compressed); the Avalonia and Skia native libraries are packed in and unpacked on first run.
 dotnet publish (Join-Path $root "src\Cvx.Rando.App\Cvx.Rando.App.csproj") `
     -c Release -r win-x64 --self-contained `
     -p:PublishSingleFile=true `
@@ -26,9 +27,10 @@ dotnet publish (Join-Path $root "src\Cvx.Rando.App\Cvx.Rando.App.csproj") `
     -o $out
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 
-# The notices travel with the exe (BioRand's MIT licence asks for it).
+# The notices travel with the exe (BioRand's and the libraries' licences ask for it).
 $notices = Join-Path $out "cvx-rando-notices.txt"
-(Get-Content (Join-Path $root "LICENSE") -Raw) + "`r`n`r`n" + (Get-Content (Join-Path $root "THIRD_PARTY_NOTICES.md") -Raw) |
+(Get-Content (Join-Path $root "LICENSE") -Raw) + "`r`n`r`n" + (Get-Content (Join-Path $root "THIRD_PARTY_NOTICES.md") -Raw) +
+    "`r`n`r`n" + (Get-Content (Join-Path $root "THIRD_PARTY_NOTICES_SKIASHARP.txt") -Raw) |
     Set-Content $notices -Encoding utf8
 
 $exe = Join-Path $out "cvx-rando.exe"
