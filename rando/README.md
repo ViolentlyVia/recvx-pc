@@ -1,70 +1,89 @@
-# CVX Randomizer
+# Biorand++ (CVX Randomizer)
 
-A randomizer for **Resident Evil Code: Veronica X** on PC, for the
-[recvx-pc](https://github.com/ViolentlyVia/recvx-pc) port. It shuffles items, enemies,
-doors and music, and writes the result to a mod folder that `recvx.exe` loads instead of
-the original room files. Your game data is never changed.
+**Biorand++** is [BioRand](https://github.com/biorand/classic), the classic Resident Evil
+randomizer, with a fourth game: **Resident Evil Code: Veronica X** on PC, for the
+[recvx-pc](https://github.com/ViolentlyVia/recvx-pc) port. The window is BioRand's;
+Resident Evil 1, 2 and 3 are randomized by BioRand's own engine, as in BioRand; CV:X is
+randomized by this project's randomizer, which writes a mod folder that `recvx.exe` loads
+instead of the original files. Your game data is never changed.
 
 Work in progress. See [PLAN.md](PLAN.md) for the roadmap.
 
 ## Using it
 
-Put `cvx-rando.exe` next to `recvx.exe` (the recvx-pc share zip does), or start it and choose
-the game folder. Pick the options, then **Generate** (or **Generate and play**):
+Put `cvx-rando.exe` next to `recvx.exe` (the recvx-pc share zip does) and start it. The first
+time, it takes your settings from BioRand (its RE 1-3 folders) and from the CVX Randomizer's
+earlier window (`cvx-rando.json`: the game and BioRand folders and your CV:X options). The
+settings page (the cog) has:
 
-- the seed is written to `rando\<seed>` in the game folder;
+- **Resident Evil 1, 2, 3**: the games' folders, as in BioRand;
+- **Resident Evil CV:X (recvx-pc)**: choose `recvx.exe` in its folder;
+- **BioRand (data and datapacks)**: BioRand's folder. RE 1-3 need its data; CV:X uses its
+  music and characters. A `biorand` folder next to or above the program is found by itself.
+
+**RE 1-3** work as in BioRand: pick the options, **Generate**, then **Start RE** (the game's
+mod selection has the randomizer).
+
+**CV:X**: the seed box holds a share code (`CVX1-...`: the seed and every option; **Paste**
+one to play someone else's seed). **Generate** writes the seed to `rando\<seed>` in the game
+folder and makes it active:
+
 - `recvx.ini` gets `mod=rando\<seed>` and `saves=saves_rando`: random runs share one save
   folder, which a new seed empties (the app asks first when it holds saves, and the game must
   be closed). Your own `saves=` is kept as `saves_normal=` (`*` when you had none) and never
   touched;
-- **Play normal game** (here or in `recvx-config.exe`) removes `mod=` and gives you your own
-  saves back.
+- **Start CV:X** runs the game; **Play normal game** (here or in `recvx-config.exe`) removes
+  `mod=` and gives you your own saves back; **Spoiler Log** opens `spoiler.txt`.
 
-**Music** can also draw on other games: with BioRand on your computer (its folder with
-`datapacks`), the Music pane shows a chip for each game BioRand has music of (RE0-RE7, the
-remakes, Survivor, the Chronicles games, Silent Hill). Picked games' tracks join the shuffle by
-kind (BioRand's calm, creepy and basement tracks for areas, safe for save rooms, danger for
-tension, boss for bosses), converted to ADX and matched to the game's loudness. The app finds a
-`biorand` folder next to or above itself; **Choose...** picks another. The seed's folder then
-has its own `BGM1.AFS`/`BGM2.AFS` (about 250 and 200 MB). A share code names the games; someone
-without them in their BioRand folder gets the others. **Title call** (also in the Music pane)
-swaps the voice that says the name at the title screen for one of BioRand's title calls,
-recorded by people of its community; the seed picks which (the seed's folder then has its own
-`ADV.AFS`, 7 MB).
+CV:X's options sit in BioRand's boxes, with its own additions:
 
-**NPCs** (its own pane) shuffles the cast: Steve, Rodrigo, Alfred, Alexia and Wesker take each
-other's looks and voices, one new look each for the whole seed; Claire and Chris stay
-themselves. In every room a character appears in, they get the new one's model (their moves and
-scenes stay theirs), and each line they speak becomes a line of the new character of about the
-same length (the subtitles keep the original words). The seed's folder then has its own
-`VOICE1.AFS`/`VOICE2.AFS` (about 70 MB). This needs no BioRand.
+- **Randomize Doors**: one character (Claire or Chris) plays the whole run, in 1-4 segments
+  ending at one-way story doors, using more or fewer of the rooms (Segment Size);
+- **Randomize Items**: the game's own items shuffled, or a **custom item pool** (the
+  probabilities, the ammo amount, the weapons allowed); **Include Chris's half**; **Random
+  inventory** with **Side pack from the start**;
+- **Randomize Enemies**: other enemy types by difficulty; **No Nosferatu poison**;
+- **Randomize Music**: tracks swap with others of their kind, from Code: Veronica and the
+  other games BioRand has music of (converted to ADX and matched to the game's loudness; the
+  seed's folder then has its own `BGM1.AFS`/`BGM2.AFS`, about 250 and 200 MB);
+- **Randomize NPCs**: Steve, Rodrigo, Alfred, Alexia and Wesker take each other's looks and
+  voices, or the looks of the BioRand characters ticked in the list (right-click: RE2 cast,
+  All, None); Claire and Chris stay themselves. The seed's folder then has its own
+  `VOICE1.AFS`/`VOICE2.AFS` (about 70 MB);
+- in the settings, **Randomize title voice** plays one of BioRand's title calls at the title
+  screen, and **Door Skip (RE CVX)** turns on recvx-pc's door skip.
 
-The share code (`CVX1-...`) holds the seed and every option: paste one to play someone else's
-seed. **Spoiler log** opens `spoiler.txt` (where everything is). There is one seed at a time:
-generating a seed deletes the previous seed's folder and the random run's saves once the new
-one is written (the app asks first). **Random** only picks a new seed number; press
-**Generate** or **Generate and play** to make it. The app remembers your choices in
-`cvx-rando.json` next to it.
+There is one CV:X seed at a time: generating deletes the previous seed's folder and the random
+run's saves once the new one is written. The app remembers your choices in
+`%AppData%\biorandpp\settings.json` (BioRand's own settings are left alone).
 
 ## Projects
 
 | Project | What it is |
 |---|---|
-| `src/Cvx.Formats` | Game file formats: AFS archives, PRS compression, room files (`RM_xxxx.RDX`) |
-| `src/Cvx.Rando` | The randomizer: room data, item logic and placement, room patching, the mod folder |
-| `src/Cvx.Rando.App` | The Windows app, `cvx-rando.exe` |
+| `src/Biorand.App` | Biorand++, `cvx-rando.exe`: BioRand's window (WPF), with the CV:X tile in `MainWindow.Cvx.cs` |
+| `external/biorand` | BioRand's source (git submodule, v3.3.2): its engine for RE 1-3 |
+| `src/Cvx.Formats` | Game file formats: AFS archives, PRS compression, room files (`RM_xxxx.RDX`), models and textures |
+| `src/Cvx.Rando` | The CV:X randomizer: room data, item logic and placement, room patching, the mod folder |
 | `src/Cvx.Rando.Cli` | Command-line tool, `cvx-rando-cli.exe`, for inspecting rooms and scripted runs |
 | `data/` | Built-in data: `items.json` and the room data in `recv/` (from BioRand, corrected; see `recv/CHANGES.md`) |
 | `tests/Cvx.Tests` | Tests; the ones that need game data use `CVX_DATA` or `..\recvx-pc\build_pc\data` and are skipped when it is missing |
 
 ## Building
 
-Needs the .NET 10 SDK.
+Needs the .NET 10 SDK, and BioRand's source:
 
 ```bash
+git submodule update --init --recursive
+```
+```bash
 dotnet build
+```
+```bash
 dotnet test
 ```
+
+BioRand's data is not part of the build: the program reads it from BioRand's folder.
 
 ## Publishing
 
@@ -72,10 +91,14 @@ dotnet test
 powershell -File tools/publish.ps1
 ```
 
-builds `cvx-rando.exe` as one self-contained file (about 46 MB; players install nothing) in
+builds `cvx-rando.exe` as one self-contained file (about 63 MB; players install nothing) in
 `artifacts\publish`, with `cvx-rando-notices.txt` (the licences, which travel with the exe), and
 copies both next to `recvx.exe` in `..\recvx-pc\build_pc`. recvx-pc's `pc/tools/make_share.py`
 then puts them in the share zip. `-Target <folder>` copies elsewhere, `-NoCopy` only builds.
+
+Testing aids: `BIORANDPP_SETTINGS=<folder>` keeps the settings elsewhere;
+`BIORANDPP_SHOTS=<folder>` saves a picture of the window with each tile selected, checks that
+the CV:X tile gives back the settings it shows (`cvx_roundtrip.txt`), and closes.
 
 ## Command-line tool
 
@@ -89,10 +112,15 @@ dotnet run --project src/Cvx.Rando.Cli -- <command>
 | `dump-room <RM_xxxx> [--data <dir>] [--json]` | Shows a room's enemies, items, doors and other trigger areas |
 | `dump-all --out <file.json> [--data <dir>]` | Writes the summary of every room to one JSON file |
 | `extract-room <RM_xxxx> --out <file> [--data <dir>]` | Writes a room's expanded file |
+| `extract-afs <archive> <entry> --out <file>` | Writes one entry of an AFS archive as it is |
 | `roundtrip [--data <dir>] [--out <dir>]` | Rebuilds every room and the archive without changes and checks the result |
-| `generate [--seed <n>] [--mode shuffle\|custom] [--claire-only] [--inventory] [--side-pack] [--no-poison] [--doors] [--segments 1-4] [--segment-size 1-8] [--chris] [--enemies] [--enemy-difficulty 0-3] [--music] [--out <dir>] [--spoiler]` | Randomizes the items (`--inventory`: random starting items for Claire and Chris; `--side-pack`: both start with the side pack's extra item slots; `--no-poison`: Nosferatu does not poison; `--doors`: random doors, one character from the start to the end of the game (Claire, or Chris with `--chris`) in 1-4 segments that end at one-way story doors, using 1-8 eighths of the rooms (`--segment-size`), with the first door leading to a save room; `--enemies`: other enemy types in each room, by difficulty 0-3; `--music`: music shuffled within its category); `--out` writes the mod folder (`RDX_LNK.AFS`, `MULTSPQ1/2.AFS` for enemy sounds, `rando.ini`, `rando_doors.txt`, `spoiler.txt`, `graph.dot`, `graph.dgml`, `settings.json`) for recvx-pc's `mod=` |
+| `generate [--seed <n>] [--mode shuffle\|custom] [--claire-only] [--inventory] [--side-pack] [--no-poison] [--doors] [--segments 1-4] [--segment-size 1-8] [--chris] [--enemies] [--enemy-difficulty 0-3] [--music] [--music-games re2,sh1,...] [--title-call] [--npcs] [--npc-characters leon.re2,...] [--biorand <dir>] [--share <code>] [--out <dir>] [--spoiler]` | Randomizes CV:X; `--out` writes the mod folder (`RDX_LNK.AFS` and the other changed archives, `rando.ini`, `rando_doors.txt`, `spoiler.txt`, `graph.dot`, `graph.dgml`) for recvx-pc's `mod=` |
 | `save-rooms [--data <dir>]` | Lists the rooms with an item box or a typewriter |
-| `dump-enemies [<RM_xxxx>] [--scripts]` | Each room's enemies with the model, motion and texture data the game loads for them; `--scripts` adds the script opcodes that act on enemies |
+| `dump-enemies [<RM_xxxx>] [--scripts] [--out <dir>]` | Each room's enemies with the model, motion and texture data the game loads for them; `--out` writes them as files |
+| `dump-model <RM_xxxx>:<enemy> \| <SYSTEM.AFS>:<entry> \| <file> [--vertices] [--png <dir>]` | A model page: its skeleton, meshes, SKIN weights and textures |
+| `dump-pld <file.PLD> [--vertices] [--png <dir>]` | An RE2 player model (BioRand's characters) |
+| `render-model <RM_xxxx>:<enemy> \| <file> --out <png> [--arms-down]` | A model's bind pose (or with the arms down) from the front, side and back |
+| `make-look-mod --pld <PLD> [--slot <RM_xxxx>:<enemy>] [--out <dir>]` | Testing aid: an NPC entry takes a converted BioRand character |
 | `enemy-donors` | For each enemy type and model version, the rooms it can be copied from (for `data/enemies.json`) |
 | `swap-enemies <RM_xxxx> --donor <RM_xxxx>:<index> [--only <types>] [--effect <n>] [--out <dir>]` | Testing aid: turns a room's enemies into another room's enemy and writes a mod folder |
 | `dump-sounds <RM_xxxx>[,...]` | A room's sound pack banks (MULTSPQ1/2.AFS) |
@@ -106,5 +134,6 @@ dotnet run --project src/Cvx.Rando.Cli -- <command>
 
 ## Credits
 
-Ported in part from [BioRand](https://github.com/biorand/classic) by Ted John (IntelOrca),
-with Code: Veronica information by kapdap. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[BioRand](https://github.com/biorand/classic) by Ted John (IntelOrca) and its contributors:
+Biorand++'s window and its RE 1-3 randomizer, and parts of the CV:X randomizer; Code: Veronica
+information by kapdap. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
