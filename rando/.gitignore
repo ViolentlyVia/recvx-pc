@@ -22,3 +22,6 @@ out/
 # Local Claude Code settings
 .claude/
 artifacts/
+
+# Game and BioRand samples for format work: never commit
+samples/

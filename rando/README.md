@@ -20,6 +20,25 @@ the game folder. Pick the options, then **Generate** (or **Generate and play**):
 - **Play normal game** (here or in `recvx-config.exe`) removes `mod=` and gives you your own
   saves back.
 
+**Music** can also draw on other games: with BioRand on your computer (its folder with
+`datapacks`), the Music pane shows a chip for each game BioRand has music of (RE0-RE7, the
+remakes, Survivor, the Chronicles games, Silent Hill). Picked games' tracks join the shuffle by
+kind (BioRand's calm, creepy and basement tracks for areas, safe for save rooms, danger for
+tension, boss for bosses), converted to ADX and matched to the game's loudness. The app finds a
+`biorand` folder next to or above itself; **Choose...** picks another. The seed's folder then
+has its own `BGM1.AFS`/`BGM2.AFS` (about 250 and 200 MB). A share code names the games; someone
+without them in their BioRand folder gets the others. **Title call** (also in the Music pane)
+swaps the voice that says the name at the title screen for one of BioRand's title calls,
+recorded by people of its community; the seed picks which (the seed's folder then has its own
+`ADV.AFS`, 7 MB).
+
+**NPCs** (its own pane) shuffles the cast: Steve, Rodrigo, Alfred, Alexia and Wesker take each
+other's looks and voices, one new look each for the whole seed; Claire and Chris stay
+themselves. In every room a character appears in, they get the new one's model (their moves and
+scenes stay theirs), and each line they speak becomes a line of the new character of about the
+same length (the subtitles keep the original words). The seed's folder then has its own
+`VOICE1.AFS`/`VOICE2.AFS` (about 70 MB). This needs no BioRand.
+
 The share code (`CVX1-...`) holds the seed and every option: paste one to play someone else's
 seed. **Spoiler log** opens `spoiler.txt` (where everything is). There is one seed at a time:
 generating a seed deletes the previous seed's folder and the random run's saves once the new
@@ -53,7 +72,7 @@ dotnet test
 powershell -File tools/publish.ps1
 ```
 
-builds `cvx-rando.exe` as one self-contained file (about 47 MB; players install nothing) in
+builds `cvx-rando.exe` as one self-contained file (about 46 MB; players install nothing) in
 `artifacts\publish`, with `cvx-rando-notices.txt` (the licences, which travel with the exe), and
 copies both next to `recvx.exe` in `..\recvx-pc\build_pc`. recvx-pc's `pc/tools/make_share.py`
 then puts them in the share zip. `-Target <folder>` copies elsewhere, `-NoCopy` only builds.
