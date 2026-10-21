@@ -183,6 +183,9 @@ public sealed class DataValidator
                     else if (op.Opcode == CvOpcodes.SetDoorCall && door.Target != null &&
                              (op.Bytes.Span[4] != target.Stage || op.Bytes.Span[5] != target.Room))
                         Warn($"{label}: set_door_call at {spec} goes to stage {op.Bytes.Span[4]} room {op.Bytes.Span[5]}");
+                    else if (op.Opcode == CvOpcodes.SetDoorCall && door.Id is int used && used != 255 &&
+                             UsedArea(opcodes, op) is int checkedArea && checkedArea != used)
+                        Error($"{label}: set_door_call at {spec} runs when trigger area {checkedArea} is used (ck 0A 17 00 {checkedArea:X2}), not {used}");
                 }
             }
             else if (door.Id is int aotId && aotId != 255)
@@ -342,6 +345,49 @@ public sealed class DataValidator
                     error($"doorRando: nop {spec} removes every door setup of trigger area {area} (0x{op.Offset:X})");
             }
         }
+    }
+
+    /// <summary>
+    /// The trigger area a script door is called from: the nearest check before it in its
+    /// procedure of which area the player used (<c>ck 0A 17 00 xx 00</c>: etc_idx is xx). recvx-pc
+    /// looks script doors up by that area (room.c passes sys->etc_idx), so a door whose id is
+    /// another area is never redirected (RM_7120's door to RM_7230 is area 4, not 3).
+    /// </summary>
+    private static int? UsedArea(IReadOnlyList<CvOpcode> opcodes, CvOpcode call)
+    {
+        // the open if blocks around the call, each with the area its conditions test (null once
+        // in its else branch, where they do not hold)
+        var blocks = new Stack<(int? Area, bool Conditions)>();
+        foreach (var op in opcodes.Where(o => o.Procedure == call.Procedure))
+        {
+            if (op.Offset == call.Offset)
+                return blocks.Select(b => b.Area).FirstOrDefault(a => a != null);
+            var b = op.Bytes.Span;
+            switch (op.Name)
+            {
+                case "if":
+                    blocks.Push((null, true));
+                    continue;
+                case "ck" when blocks.Count != 0 && blocks.Peek().Conditions:
+                    if (b.Length >= 6 && b[1] == 0x0A && b[2] == 0x17 && b[5] == 0)
+                        blocks.Push((b[4], blocks.Pop().Conditions));
+                    continue;
+                case "else":
+                    if (blocks.Count != 0)
+                    {
+                        blocks.Pop();
+                        blocks.Push((null, false));
+                    }
+                    continue;
+                case "endif":
+                    if (blocks.Count != 0)
+                        blocks.Pop();
+                    continue;
+            }
+            if (blocks.Count != 0 && blocks.Peek().Conditions)
+                blocks.Push((blocks.Pop().Area, false));   // the block's body starts
+        }
+        return null;
     }
 
     /// <summary>Entrances that the doors of <paramref name="from"/> leading to <paramref name="to"/> arrive at.</summary>

@@ -4067,7 +4067,9 @@
           "entranceId": 2
         },
         {
-          "id": 3,
+          // the script calls it when trigger area 4 is used (ck 0A 17 00 04), not 3: with 3,
+          // random doors never redirected it (seed 117323 went on into RM_7230 and stuck)
+          "id": 4,
           "target": "8170",
           "entranceId": 4,
           "offsets": [ "0x18696C", "0x186970", "0x186972" ]

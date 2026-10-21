@@ -26,7 +26,16 @@ public sealed class DoorStub
 }
 
 /// <summary>Where a door leads after randomizing (to its own room when it is a dead end).</summary>
-public sealed record DoorLink(DoorStub Door, string TargetRoom, int Arrival, DoorStub? Partner);
+public sealed record DoorLink(DoorStub Door, string TargetRoom, int Arrival, DoorStub? Partner)
+{
+    /// <summary>
+    /// A dead end the player opens by hand (a door area: no script offsets, 255 is a script door): the game shows it locked
+    /// instead of taking the player through it back into the same room. Doors scripts open
+    /// still lead back into their room.
+    /// </summary>
+    public bool Locked => Partner == null && TargetRoom == Door.Room && Door.OriginalTarget != Door.Room && Door.Area != 255 &&
+                          Door.Raw.Offsets is not { Length: > 0 };
+}
 
 /// <summary>One part of a run: from its entry to its exit (a one-way story door, or the end).</summary>
 public sealed record DoorSegment(string Entry, string Exit, IReadOnlyList<string> Rooms);
@@ -525,12 +534,23 @@ public sealed class DoorRandomizer
         if (stranded.Count != 0)
             return new GrowResult(null, stranded);
 
-        // The rest pair up with each other; an odd one out is a dead end.
+        // The rest pair up with each other, each with a door of another room (two doors of one
+        // room only lead into each other: seed 117323's RM_7120); one without such a partner is
+        // a dead end.
         var rest = rng.Shuffle(segFree.Where(s => !links.ContainsKey(s)));
-        for (var i = 0; i + 1 < rest.Count; i += 2)
-            Pair(rest[i], rest[i + 1]);
-        if (rest.Count % 2 == 1)
-            DeadEnd(rest[^1]);
+        while (rest.Count != 0)
+        {
+            var a = rest[0];
+            rest.RemoveAt(0);
+            var j = rest.FindIndex(b => b.Room != a.Room);
+            if (j < 0)
+            {
+                DeadEnd(a);
+                continue;
+            }
+            Pair(a, rest[j]);
+            rest.RemoveAt(j);
+        }
         return new GrowResult(null, []);
     }
 }

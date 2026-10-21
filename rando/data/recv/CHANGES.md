@@ -102,3 +102,11 @@ cutscene its nop removes would set: `RoomTweaks` sets it when the room starts wi
 - Room variants: some variants of a mapped room are missing (RM_1121, RM_1122, RM_3010, RM_4012, RM_7030, RM_9301, RM_9302).
   - RM_3010's Handgun Bullets are the same pickup as RM_3011's.
   - **The item randomizer must give an unmapped variant's pickup the same new item as the matching pickup (same item at the same position) in the mapped variant.**
+
+## Fixes (2026-10-20, door randomizer playtests)
+
+| Room | Change | Why |
+|---|---|---|
+| 80C0 (RM_7120) | door to 8170 (RM_7230): `id` 3 -> 4 | Its script calls it when trigger area 4 is used (`ck 0A 17 00 04`); recvx-pc looks script doors up by the area in use, so it was never redirected. Seed 117323 (doors, 1 segment) went on into RM_7230, a room of no run, and its scene stuck. `verify-data` now checks every script door's id against the area its script tests. |
+
+Open: 9010 (RM_8010)'s script doors (`set_door_call` for areas 0, 1, 2 to RM_8000/RM_8001) are listed under the wrong ids and targets; the room is excluded from random doors, so nothing redirects them.

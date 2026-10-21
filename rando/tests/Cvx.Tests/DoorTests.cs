@@ -323,10 +323,57 @@ public class DoorTests
         foreach (var line in lines)
         {
             var v = line.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToArray();
-            Assert.Equal(10, v.Length);
+            Assert.InRange(v.Length, 10, 11);
             Assert.True(RoomTable.Contains(new RoomId(v[0], v[1], v[2])), line);
             Assert.True(RoomTable.Contains(new RoomId(v[6], v[7], v[8])), line);
+            if (v.Length == 11)
+            {
+                // a locked door: one the player opens (an area), leading back into its own room
+                Assert.Equal(1, v[10]);
+                Assert.NotEqual(255, v[3]);
+                Assert.Equal((v[0], v[1]), (v[6], v[7]));
+            }
         }
+    }
+
+    [Theory]
+    [InlineData(117323, 1, 1)]
+    [InlineData(5, 4, 8)]
+    [InlineData(9, 2, 2)]
+    public void NoTwoDoorsOfARoomLeadIntoEachOther(int seed, int segments, int size)
+    {
+        // seed 117323: RM_7120's doors to RM_7000 and RM_7030 were paired with each other
+        var layout = Generator.MakeDoors(Doors(seed, Character.Claire, segments, size), Data);
+        Assert.DoesNotContain(layout.Plan.Links.Values, l => l.Partner is { } p && p.Room == l.Door.Room && p != l.Door);
+    }
+
+    [Fact]
+    public void RM7120sDoorToRM7230IsTheScriptsArea4()
+    {
+        // the script calls it when trigger area 4 is used; recvx-pc looks script doors up by that
+        // area, so with the data's old id 3 it was never redirected (seed 117323 went on into
+        // RM_7230, a room of no run, and its scene stuck)
+        var door = Data.Map.Rooms["80C0"].Doors!.Single(d => d.Target == "8170");
+        Assert.Equal(4, door.Id);
+        var layout = Generator.MakeDoors(Doors(117323, Character.Claire, 1, 1) with { ItemMode = ItemMode.Custom, HiddenKeyItems = true }, Data);
+        var table = DoorTable.Write(layout.Plan, Data);
+        Assert.Contains(table.Split('\n'), l => l.StartsWith("7 12 0 4 7 23 "));
+    }
+
+    [Fact]
+    public void DoorsThatLeadNowhereAreLocked()
+    {
+        // seed 365484 (1 segment, size 1/8): RM_3160's two doors to RM_3180 lead nowhere; they
+        // were doors back into the same room, now the game shows them locked
+        var layout = Generator.MakeDoors(Doors(365484, Character.Claire, 1, 1) with { ItemMode = ItemMode.Custom, HiddenKeyItems = true }, Data);
+        var deadEnds = layout.Plan.Links.Values.Where(l => l.TargetRoom == l.Door.Room && l.Partner == null).ToList();
+        Assert.NotEmpty(deadEnds);
+        Assert.All(deadEnds.Where(l => l.Door.Area != 255 && l.Door.Raw.Offsets is not { Length: > 0 } && l.Door.OriginalTarget != l.Door.Room),
+            l => Assert.True(l.Locked, l.Door.ToString()));
+        // script doors (offsets) cannot show a lock: they lead back into their room
+        Assert.All(layout.Plan.Links.Values.Where(l => l.Door.Raw.Offsets is { Length: > 0 }), l => Assert.False(l.Locked));
+        Assert.All(layout.Plan.Links.Values.Where(l => l.Partner != null || l.TargetRoom != l.Door.Room), l => Assert.False(l.Locked));
+        Assert.All(layout.Plan.Links.Values.Where(l => l.Door.Area == 255), l => Assert.False(l.Locked));
     }
 
     [GameDataFact]
