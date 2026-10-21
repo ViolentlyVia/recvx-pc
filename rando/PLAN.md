@@ -547,3 +547,46 @@ Each phase ends in a working, testable state. Phases 1–2 are the foundation; d
 - Fixed in the data (id 4). `DataValidator` now checks every script door: the area the script's open `if` blocks test before its `set_door_call` (a forward walk with a block stack; an `else` drops its conditions) must be the door's id. That found one more, 9010 (RM_8010), excluded from random doors (left as an open item).
 - The same seed had RM_7120's doors to RM_7000 and RM_7030 paired with each other (each led to the other door of the same room). The leftover doors now pair with a door of another room; one without such a partner is a dead end (locked when it is a door area). Script doors are never marked locked (only door areas can show the lock).
 - Not verified in the game: RM_7230's scene itself (it may need story flags a run never sets: other rooms outside a run could do the same if a door leaks into them; the validator check closes that way for script doors).
+
+### BioRand's characters as NPC looks (2026-10-21, docs/handoff-character-models.md)
+Owner's answers to the handoff's questions: the RE2 cast first (after Leon); BioRand's voices for an NPC that looks like a BioRand character (later); the player's look may follow later (the converter takes any target skeleton).
+
+**The model page** (`Cvx.Formats/Models`). `bhSetEneMdl` (room.c) and the player loader (dread.c) read blocks `[u32 size][data]` until -1 (0 = an empty entry):
+- `SKIN` (`SkinData`): one entry per object in tree order (objects with eval flag 0x20000000 have none). Flag 0: nothing. Flag 3 (bit 2): this object holds skinned mesh `mno`, then a count and one word per vertex whose top byte is the object (tree order) that moves it (`npSkinConvSub` uses only the top byte; the low 24 bits are probably blend data for `npCalcSkin`). Flag 1: this object moves mesh `mno`'s vertices. The holder gets eval bit 0x80000000 and is drawn at the enemy's position only (`EasyMultiDrawTreeCnk`), its vertices skinned each frame.
+- `MASK`: the face animation (`bhInitMask`, face.c). Without one the face code does nothing (`bhControlMask`, `bhSetMask` and `bhSetLip` all check).
+- MLB model (`NjModel`, `bhMlbBinRealize`): "MDL" + status (0x80 = chunk models), header size 16, object count, texture list and object array offsets (relative to the end of the header). The objects are an array of `NJS_CNK_OBJECT` (0x34 bytes, links relocated in place). Chunk models (`NJS_CNK_MODEL`, 0x18 bytes): the radius is stored negative (`bhCnkBinRealize` relocates the lists only then). Layout of the game's files: texture list, `NJS_TEXNAME` array, names, pad to 4; objects; per object in index order: model (4-aligned), zeros to a 64-byte boundary of the page, vertex list, polygon list; then zeros to a multiple of 64 and 64 more (the rooms') or none (SYSTEM.AFS's player pages).
+- Vertex list: type 51 (`njCnkCvVnPs2`, the PS2's own): index offset, count, 56 bytes of padding (a 64-byte `HDR_PS`), then per vertex the position and normal as float4 (w = 1); end `FF 00 00 00`. Polygon list: standard Ninja chunks (`pCnkFuncTbl`): material 19 (diffuse + ambient, `7F7F7FFF`), texture 8 (id in the low 12 bits, head bits 0x34, filter 1), strips 66 (UVs 0-1023 across the texture). Strip flags seen: 0x02 (opaque), 0x0A (alpha), 0x1A (alpha, double-sided: hair). Winding: a strip's even triangles (a, b, c) face along cross(b - a, c - a), odd ones the other way, and a negative length flips them all (Steve: 2,789 of 2,798 agree with the vertex normals).
+- **Round trip**: every enemy model page of the 205 rooms (759 pages, 1,489 models, every strip chunk re-encoded) and SYSTEM.AFS 10-14 write back byte for byte (`ModelTests`). Player pages also hold basic models (status 0x13, kept as bytes).
+
+**Textures** (`TextureEntry`, `bhSetMemPvpTexture` in ps2_texture.c): records `[code][size][24 bytes "CDCD..."][data]` until -1 (some entries stop without one; RM_5680's last is cut off by the end of the room). A `TIM2` record is one texture, in the order of the model's texture names: `TIM2_PICTUREHEADER_EX` (0xD0 bytes, padded to 0x100; the global index at +8), the image, the palette. The characters' textures are all 8-bit (image type 5), with 256 RGBA colours in CSM1 order (entries 8-15 and 16-23 of each 32 swapped) and alpha 0-0x80; sizes 32-256, square. **The global index identifies a texture in the game's cache** (`SearchNumber`, ps2_NaTextureFunction.c): textures with the same index are shared, so converted textures use indexes from 0x3A00000 (every room texture is below: `ConvertedTexturesHaveGlobalIndexesOfTheirOwn`).
+
+**The NPC skeleton**: types 91-98 all have it, 27 objects in the same tree; the bone lengths differ a little per character. Y is up, the characters face -Z with their right side toward +X, are about 17-18 units tall, and are bound in a T-pose (arms along ±X, every angle 0). Steve's (RM_0030 entry 2) bind positions:
+
+| Object | Parent | Bind position | What |
+|---|---|---|---|
+| 0 | - | 0, 0, 0 | root |
+| 1 | 0 | 0, 11.04, -0.16 | hips (holds the skinned body: 1,470 vertices) |
+| 2 | 1 | 0, 11.04, -0.16 | waist (spine bend) |
+| 3 | 2 | 0, 12.90, 0.00 | chest |
+| 4 | 3 | 0, 15.00, 0.40 | neck |
+| 5 | 4 | 0, 15.45, 0.42 | head (975 of the body's vertices: the face) |
+| 6-10 | 5 | about 0, 15.9-16.2, -0.4 | face parts (rigid models, no SKIN): mouth and jaw pieces, the eyes (8 left, 10 right) |
+| 11 / 15 | 3 | ±0.21, 12.90, 0.00 | right / left collarbone |
+| 12 / 16 | 11 / 15 | ±1.70, 14.05, 0.30 | shoulder (upper arm) |
+| 13 / 17 | 12 / 16 | ±3.98, 14.00, 0.30 | elbow (forearm; it also moves the hand's vertices) |
+| 14 / 18 | 13 / 17 | ±6.40, 13.98, 0.30 | wrist (no SKIN entry) |
+| 19 / 23 | 1 | ±0.80, 9.55, -0.10 | hip (thigh) |
+| 20 / 24 | 19 / 23 | ±0.70, 6.00, 0.25 | knee (shin) |
+| 21 / 25 | 20 / 24 | ±0.60, 1.40, 0.80 | ankle (foot) |
+| 22 / 26 | 21 / 25 | ±0.66, 0.21, -0.26 | toes |
+
+`dump-model RM_0030:2` prints it (any page: `RM_xxxx:<enemy>`, `SYSTEM.AFS:<entry>` or a file; `--vertices`, and `--png <dir>` for the textures). Claire's page in the rooms (91) has a second model: 31 objects, vertex type 34, no polygons (not drawn as a mesh).
+
+**RE2's PLD** (`Pld`, ported from biohazard-utils): a directory of 4 chunks (EDD animations, EMR skeleton, MD1 mesh, TIM texture). EMR: 15 joints, offsets from the parent (int16), lists of children. MD1: 19 parts (15 + 4 one-vertex dummies), each triangles + quads with a normal index and UV per corner, a texture page and a CLUT. Y is down, the characters face +X with their right side toward -Z, arms hanging down, about 3,000 units tall. Joints: 0 torso (the root, at the waist), 1 pelvis, 2-4 right thigh/shin/foot, 5-7 left, 8 head (from the neck), 9-11 right upper arm/forearm/hand, 12-14 left. Leon, Ada and Hunk: an 8-bit TIM of 512x256 with 4 CLUTs of 256; the parts use page 0 (pixels 0-127) with CLUT 0 and page 1 (128-255) with CLUT 1 (UVs 0-127 within a page). The TIM's image block length is wrong in BioRand's files (the size is used instead). `dump-pld <file> [--vertices] [--png <dir>]`. `classic.zip` has 36 RE2 characters (26 pld0, 10 pld1).
+
+**The converter** (`Npcs/CharacterConverter`): the target's 27 objects are kept (positions, tree, eval flags, minus the hide flag where a part goes); no SKIN and no MASK. Each RE2 part becomes one rigid chunk model (type 51 vertices, one strip per triangle or quad, grouped by texture) on the object it rides: torso -> chest (3, placed from the waist 2), pelvis -> 1, head -> 5 (placed from the neck 4), arms -> 12-14 / 16-18, legs -> 19-21 / 23-25. Axes: (x, y, z) -> (-z, -y, -x) (a rotation, not a mirror), scaled by the ratio of the leg lengths (hip to ankle). Upper arms, forearms, thighs and shins are turned (the shortest turn) so each bone points where CV's does (arms down -> T-pose); hands take their forearm's turn. Textures: one 256x256 8-bit picture per (page, CLUT) used, with the page on the left (its last column repeated) and PS1 colour 0 transparent; the TIM2 head comes from a 256x256 texture of the target. Leon: model 27.6 KB and textures 134 KB (Chris's: 171 KB and 345 KB). Rendered from the converted data (`render-model <RM_xxxx>:<enemy> | <file> --out <png>`: the bind pose from the front, side and back, back faces culled) next to Chris's own model: Leon, Ada and Hunk stand on the ground at Chris's height, face the right way (R.P.D. reads on the front) and have every part in place.
+
+**Test mod**: `make-look-mod --pld <PLD> [--slot RM_7220:1] [--skeleton <RM_xxxx>:<enemy>] [--dump <dir>] --out <dir>` puts a converted character into an NPC entry (default: Chris in RM_7220's opening scene) and writes a mod folder. Not for seeds: Chris stays Chris. `extract-afs <archive> <entry> --out <f>` and `dump-enemies --out <dir>` (each enemy's page, motion and texture entries as files) were added for samples.
+
+- In the game (owner, 2026-10-21): the Leon test mod (`RECVX_MOD=rando\look-leon`, `RECVX_WARP=7,22`, new game) loads and Leon plays RM_7220's opening scene in Chris's place: the engine takes a page with no SKIN and no MASK and the converted textures.
+- Not checked in detail yet: how the rigid parts look in motion (gaps at the joints), the lighting, the textures' transparency and filtering.
