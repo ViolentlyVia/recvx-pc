@@ -166,7 +166,9 @@ public sealed record Md1Part(Vector3[] Positions, Vector3[] Normals, IReadOnlyLi
 /// <summary>
 /// A triangle or quad (quads in the PS1's order: 0, 1, 2 and 1, 3, 2 are its triangles).
 /// UVs are pixels within texture page <see cref="Page"/> (128 pixels wide at 8 bits, 256 at
-/// 4 bits); <see cref="Clut"/> is the PS1 CLUT id (row = (id >> 6) - the texture's CLUT y).
+/// 4 bits). <see cref="Clut"/> is the PS1 CLUT id as stored, which BioRand's characters do not
+/// keep right: page N looks right only with CLUT N (measured on all 95 of the owner's copy,
+/// and BioRand's converter writes the ids that way), so the page decides the CLUT.
 /// </summary>
 public sealed record Md1Polygon(int[] Vertices, int[] Normals, (byte U, byte V)[] Uvs, int Page, int Clut);
 
@@ -181,7 +183,7 @@ public sealed class PsxTim
     /// <summary>The CLUTs: 16-bit PS1 colours, <see cref="ClutColors"/> each.</summary>
     public required ushort[][] Cluts { get; init; }
     public required int ClutColors { get; init; }
-    /// <summary>The CLUTs' VRAM y (a CLUT id's row is <c>(id >> 6) - ClutY</c>).</summary>
+    /// <summary>The CLUTs' VRAM y as the TIM names it (480 or 0 in BioRand's characters).</summary>
     public required int ClutY { get; init; }
 
     public static PsxTim Read(ReadOnlySpan<byte> data)

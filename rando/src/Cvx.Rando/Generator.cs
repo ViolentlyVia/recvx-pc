@@ -69,8 +69,9 @@ public static class Generator
 
     /// <param name="progress">Told what step is running (for a status line).</param>
     /// <param name="musicLibrary">BioRand's music, for <see cref="RandoSettings.MusicGames"/> other than this game.</param>
+    /// <param name="characters">BioRand's characters, for <see cref="RandoSettings.NpcCharacters"/>.</param>
     public static GenerationResult Generate(RandoSettings settings, RandoData data, RoomArchive archive, IProgress<string>? progress = null,
-        MusicLibrary? musicLibrary = null)
+        MusicLibrary? musicLibrary = null, CharacterLibrary? characters = null)
     {
         // Random doors need random items: with the game's own, keys end up behind the doors
         // they open.
@@ -138,7 +139,9 @@ public static class Generator
 
         if (settings.RandomNpcs)
             progress?.Report("Shuffling the NPCs...");
-        var npcs = settings.RandomNpcs ? new NpcRandomizer(data, archive, Rng.For(settings.Seed, "npcs")).Apply(patcher) : null;
+        var npcs = settings.RandomNpcs
+            ? new NpcRandomizer(data, archive, Rng.For(settings.Seed, "npcs"), characters, settings.NpcCharacters).Apply(patcher)
+            : null;
 
         List<MusicSwap> music = [];
         List<string> missingMusic = [];

@@ -1,4 +1,5 @@
 using Cvx.Formats;
+using Cvx.Formats.Models;
 using Cvx.Formats.Rdx;
 using Cvx.Rando.Data;
 using Cvx.Rando.Enemies;
@@ -10,10 +11,20 @@ namespace Cvx.Rando.Npcs;
 public sealed record VoiceSwap(int Disc, int Entry, string Speaker, int FromDisc, int FromEntry);
 
 /// <summary>What the NPC shuffle did.</summary>
-/// <param name="Looks">Character -> the character whose look and voice they take.</param>
+/// <param name="Looks">Character -> the character whose look and voice they take: another NPC, or one of BioRand's (its id, e.g. leon.re2).</param>
 /// <param name="KeptRooms">Rooms whose NPCs could not be changed (their data is not understood or would not fit).</param>
+/// <param name="MissingCharacters">BioRand characters the settings ask for that the BioRand folder does not have (or that could not be read).</param>
 public sealed record NpcResult(IReadOnlyDictionary<string, string> Looks, IReadOnlyList<RoomId> ChangedRooms,
-    IReadOnlyList<RoomId> KeptRooms, IReadOnlyList<VoiceSwap> Voices);
+    IReadOnlyList<RoomId> KeptRooms, IReadOnlyList<VoiceSwap> Voices)
+{
+    public IReadOnlyList<string> MissingCharacters { get; init; } = [];
+
+    /// <summary>A look as the spoiler and the window say it: "Wesker", "Leon (RE2)".</summary>
+    public static string LookName(string look) => IsBioRand(look) ? CharacterLibrary.DisplayName(look) : look;
+
+    /// <summary>BioRand characters' ids have the game after a dot (the game's NPCs' names have none).</summary>
+    public static bool IsBioRand(string look) => look.Contains('.');
+}
 
 /// <summary>
 /// NPCs take each other's look and voice (one new look per character for the whole seed, as in
@@ -21,14 +32,37 @@ public sealed record NpcResult(IReadOnlyDictionary<string, string> Looks, IReadO
 /// scripts, and get the other character's model and textures (the motions are not in the rooms,
 /// and the human cast shares one skeleton). The voice: each line they speak becomes a line of
 /// the other character of about the same length, from the game's own voice archives.
+/// With BioRand's characters picked (<paramref name="characters"/>), they are looks too: one is
+/// converted onto the skeleton of the NPC who takes it (<see cref="CharacterConverter"/>), and
+/// that NPC keeps their own voice.
 /// </summary>
-public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng)
+public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, CharacterLibrary? library = null, IReadOnlyList<string>? characters = null)
 {
     public NpcResult Apply(ItemPatcher rooms)
     {
         var cast = data.Npcs.Characters;
-        var looks = Derange(cast.Select(c => c.Name).ToList());
         var byName = cast.ToDictionary(c => c.Name);
+
+        // BioRand's characters the settings ask for, in the library's order
+        var picked = (characters ?? []).Select(c => c.ToLowerInvariant()).ToHashSet();
+        var plds = new Dictionary<string, Pld>();
+        foreach (var c in library?.Characters.Where(c => picked.Contains(c.Id)) ?? [])
+        {
+            try
+            {
+                var pld = Pld.Read(CharacterLibrary.ReadPld(c));
+                if (pld.Armature.Count >= 15 && pld.Mesh.Parts.Count >= 15)
+                    plds[c.Id] = pld;
+            }
+            catch (Exception ex) when (ex is InvalidDataException or NotSupportedException or IOException or IndexOutOfRangeException or ArgumentOutOfRangeException)
+            {
+                // left out: it is reported missing
+            }
+        }
+        var missing = picked.Where(c => !plds.ContainsKey(c)).Order(StringComparer.Ordinal).ToList();
+
+        var names = cast.Select(c => c.Name).ToList();
+        var looks = plds.Count == 0 ? Derange(names) : Assign(names, [.. names, .. plds.Keys]);
 
         // the donors: each character's model page and textures
         var donors = new Dictionary<string, (ReadOnlyMemory<byte> Model, ReadOnlyMemory<byte>[] Textures)>();
@@ -38,6 +72,24 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng)
             var layout = RdxEnemyLayout.Read(archive.ReadRoom(room));
             var e = layout.Enemies[index];
             donors[c.Name] = (e.Model, e.Textures.Select(t => layout.TextureGroups[t]).ToArray());
+        }
+
+        // each NPC's new look: another NPC's model, or a BioRand character made for their own
+        // skeleton (texture global indexes of their own per NPC: two can share a room)
+        var lookOf = new Dictionary<string, (ReadOnlyMemory<byte> Model, ReadOnlyMemory<byte>[] Textures)>();
+        foreach (var (c, k) in cast.Select((c, k) => (c, k)))
+        {
+            var look = looks[c.Name];
+            if (!NpcResult.IsBioRand(look))
+            {
+                lookOf[c.Name] = donors[look];
+                continue;
+            }
+            var (model, textures) = donors[c.Name];
+            var skeleton = ModelPage.Read(model.Span).Models.First();
+            var template = textures.SelectMany(t => TextureEntry.Read(t.Span).Pictures).First(p => p.Width == 256 && p.Height == 256 && p.ImageType == 5);
+            var converted = CharacterConverter.Convert(plds[look], skeleton, template, CharacterConverter.FirstGlobalIndex + (uint)k * 16);
+            lookOf[c.Name] = (converted.Page.ToBytes(), [converted.Textures.ToBytes()]);
         }
 
         var typeOf = cast.SelectMany(c => c.Types.Select(t => (t, c.Name))).ToDictionary(x => x.t, x => x.Name);
@@ -57,7 +109,7 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng)
             }
             var plan = targets.ToDictionary(e => e.Index, e =>
             {
-                var (model, textures) = donors[looks[typeOf[e.Type]]];
+                var (model, textures) = lookOf[typeOf[e.Type]];
                 return new RdxEnemyDonor(id, e.Index, e.Type, e.ModelVersion, e.Entry.Effect, (byte)(e.Entry.Index >> 8), model, e.Motion, textures);
             });
             try
@@ -78,7 +130,23 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng)
             changed.Add(id);
         }
 
-        return new NpcResult(looks, changed, kept, Voices(looks, byName));
+        return new NpcResult(looks, changed, kept, Voices(looks, byName)) { MissingCharacters = missing };
+    }
+
+    /// <summary>
+    /// Every character gets another look of the pool, no two the same: the pool in a random
+    /// order, each character taking the first look left that is not their own.
+    /// </summary>
+    private Dictionary<string, string> Assign(List<string> names, List<string> pool)
+    {
+        var order = rng.Shuffle(pool);
+        var result = new Dictionary<string, string>();
+        foreach (var name in names)
+        {
+            var look = order.First(l => l != name && !result.ContainsValue(l));
+            result[name] = look;
+        }
+        return result;
     }
 
     /// <summary>Every character gets another's look (a random derangement).</summary>
@@ -125,7 +193,8 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng)
         foreach (var line in lines)
         {
             var who = byName.Values.FirstOrDefault(c => c.Voice == line.Speaker);
-            if (who == null || looks[who.Name] == who.Name)
+            // BioRand's characters: the NPC keeps their voice (for now)
+            if (who == null || looks[who.Name] == who.Name || NpcResult.IsBioRand(looks[who.Name]))
                 continue;
             var newVoice = voiceOf[looks[who.Name]];
             var pick = lines.Where(l => l.Speaker == newVoice)

@@ -54,6 +54,12 @@ public sealed record RandoSettings
     public string[] MusicGames { get; init; } = ["recv"];
     /// <summary>NPCs (Steve, Alfred, Alexia, Wesker, Rodrigo) take each other's look and voice; Claire and Chris stay.</summary>
     public bool RandomNpcs { get; init; }
+    /// <summary>
+    /// BioRand's characters that may be NPC looks too (their ids, e.g. "leon.re2": the folders of
+    /// data/re2/pld0 and pld1 in its datapacks, from the player's BioRand folder). Empty: the
+    /// NPCs only take each other's looks.
+    /// </summary>
+    public string[] NpcCharacters { get; init; } = [];
     /// <summary>The title call is one of BioRand's (data/title), picked by the seed.</summary>
     public bool RandomTitleCall { get; init; }
 

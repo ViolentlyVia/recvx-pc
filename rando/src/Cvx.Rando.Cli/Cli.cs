@@ -83,7 +83,8 @@ internal static partial class Cli
                                                  RDX_LNK.AFS with every room recompressed
               generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--inventory] [--side-pack] [--no-poison]
                        [--doors] [--segments 1-4] [--segment-size 1-8] [--chris]
-                       [--enemies] [--enemy-difficulty 0-3] [--music] [--music-games re2,sh1,...] [--title-call] [--npcs]
+                       [--enemies] [--enemy-difficulty 0-3] [--music] [--music-games re2,sh1,...] [--title-call]
+                       [--npcs] [--npc-characters leon.re2,ada.re2,...]
                        [--biorand <dir>]
                        [--share <code>] [--out <dir>] [--spoiler]
                                                  randomize (--doors: random doors, played by Claire, or
@@ -107,10 +108,10 @@ internal static partial class Cli
               dump-pld <file.PLD> [--vertices] [--png <dir>]
                                                  an RE2 player model (BioRand's characters):
                                                  skeleton, parts and texture
-              render-model <RM_xxxx>:<enemy> | <file> --out <file.png>
-                                                 a model in its bind pose from the front, the
-                                                 side and the back, textured (a file takes the
-                                                 .tex0 next to it)
+              render-model <RM_xxxx>:<enemy> | <file> --out <file.png> [--arms-down]
+                                                 a model in its bind pose (or with the arms down)
+                                                 from the front, the side and the back, textured
+                                                 (a file takes the .tex0 next to it)
               make-look-mod --pld <file.PLD> [--slot <RM_xxxx>:<enemy>] [--skeleton <RM_xxxx>:<enemy>]
                             [--dump <dir>] [--out <dir>]
                                                  testing aid: an NPC entry (default RM_7220:1, Chris
@@ -524,6 +525,7 @@ internal static partial class Cli
             RandomTitleCall = options.Has("title-call"),
             RandomNpcs = options.Has("npcs"),
             MusicGames = options.Get("music-games") is { } mg ? ["recv", .. mg.Split(',', StringSplitOptions.RemoveEmptyEntries)] : ["recv"],
+            NpcCharacters = options.Get("npc-characters") is { } nc ? nc.Split(',', StringSplitOptions.RemoveEmptyEntries) : [],
             EnemyDifficulty = options.Get("enemy-difficulty") is { } ed ? int.Parse(ed) : 1,
         };
         if (options.Get("share") is { } code)
@@ -543,7 +545,12 @@ internal static partial class Cli
             var library = Cvx.Rando.Music.MusicLibrary.Find(options.Get("biorand"), AppContext.BaseDirectory, Environment.CurrentDirectory);
             if ((settings.RandomMusic && settings.MusicGames.Any(g => g != "recv")) || settings.RandomTitleCall)
                 Console.WriteLine(library == null ? "No BioRand music found (--biorand <folder>)." : $"BioRand music: {library.Directory}, {library.Tracks.Count} tracks");
-            result = Generator.Generate(settings, RandoData.Load(), rooms, null, library);
+            var characters = settings.RandomNpcs && settings.NpcCharacters.Length != 0
+                ? Cvx.Rando.Npcs.CharacterLibrary.Find(options.Get("biorand"), AppContext.BaseDirectory, Environment.CurrentDirectory)
+                : null;
+            if (settings.RandomNpcs && settings.NpcCharacters.Length != 0)
+                Console.WriteLine(characters == null ? "No BioRand characters found (--biorand <folder>)." : $"BioRand characters: {characters.Directory}, {characters.Characters.Count}");
+            result = Generator.Generate(settings, RandoData.Load(), rooms, null, library, characters);
         }
         catch (ItemPlacementException ex)
         {

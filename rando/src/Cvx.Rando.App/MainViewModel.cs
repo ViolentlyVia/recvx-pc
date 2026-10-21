@@ -4,6 +4,7 @@ using Cvx.Formats;
 using Cvx.Rando.Data;
 using Cvx.Rando.Items;
 using Cvx.Rando.Music;
+using Cvx.Rando.Npcs;
 using Cvx.Rando.Setup;
 
 namespace Cvx.Rando.App;
@@ -40,6 +41,9 @@ public sealed class MainViewModel : ViewModelBase
     private MusicLibrary? _library;
     /// <summary>Games the settings ask music from that the BioRand folder does not have (kept for the share code).</summary>
     private List<string> _missingMusic = [];
+    private CharacterLibrary? _characters;
+    /// <summary>BioRand characters the settings ask for that the BioRand folder does not have (kept for the share code).</summary>
+    private List<string> _missingCharacters = [];
     private bool _loading;
     private bool _busy;
     private string? _status;
@@ -215,7 +219,9 @@ public sealed class MainViewModel : ViewModelBase
             : _sidePack || _noPoison ? "Default weapons" : "Default start",
         "enemies" => _randomEnemies ? $"{Difficulties[_difficulty]} difficulty" : "Original enemies",
         "doors" => _randomDoors ? $"{Characters[_character]}, {_doorSegments} segment{(_doorSegments > 1 ? "s" : "")}" : "Original doors",
-        "npcs" => _randomNpcs ? "Looks and voices shuffled" : "Original cast",
+        "npcs" => !_randomNpcs ? "Original cast"
+            : NpcCharacterCount == 0 ? "Looks and voices shuffled"
+            : $"Shuffled + {NpcCharacterCount} BioRand character{(NpcCharacterCount > 1 ? "s" : "")}",
         _ => (!_randomMusic ? "Original music"
             : OtherMusicGames == 0 ? "Shuffled by kind"
             : $"{(MusicGames[0].IsOn ? "CV + " : "")}{OtherMusicGames} other game{(OtherMusicGames > 1 ? "s" : "")}")
@@ -223,6 +229,7 @@ public sealed class MainViewModel : ViewModelBase
     };
 
     private int OtherMusicGames => MusicGames.Count(g => g.IsOn && g.Id != MusicLibrary.OwnGame);
+    private int NpcCharacterCount => NpcCharacters.Count(c => c.IsOn);
 
     internal bool Master(string key) => key switch
     {
@@ -283,6 +290,10 @@ public sealed class MainViewModel : ViewModelBase
         foreach (var chip in MusicGames)
             chip.Load(games.Contains(chip.Id));
         _missingMusic = games.Where(g => MusicGames.All(c => c.Id != g)).Order(StringComparer.Ordinal).ToList();
+        var characters = s.NpcCharacters.Select(c => c.ToLowerInvariant()).ToHashSet();
+        foreach (var chip in NpcCharacters)
+            chip.Load(characters.Contains(chip.Id));
+        _missingCharacters = characters.Where(c => NpcCharacters.All(x => x.Id != c)).Order(StringComparer.Ordinal).ToList();
         _loading = false;
         Update();
     }
@@ -317,6 +328,7 @@ public sealed class MainViewModel : ViewModelBase
         // this game first, then the others by name: one order, one share code
         MusicGames = MusicGames.Where(g => g.IsOn).Select(g => g.Id).Concat(_missingMusic)
             .OrderBy(g => g == MusicLibrary.OwnGame ? 0 : 1).ThenBy(g => g, StringComparer.Ordinal).ToArray(),
+        NpcCharacters = NpcCharacters.Where(c => c.IsOn).Select(c => c.Id).Concat(_missingCharacters).Order(StringComparer.Ordinal).ToArray(),
     };
 
     /// <summary>A setting was changed by the player: the last action's message gives way to the notice.</summary>
@@ -413,9 +425,42 @@ public sealed class MainViewModel : ViewModelBase
         : "Needs BioRand's folder: its base datapack has the title calls. Without it the game's own plays.";
     public bool TitleCallsFound => _library is { TitleCalls.Count: > 0 };
 
-    /// <summary>BioRand's music: the folder chosen before, or a "biorand" folder next to or above the program or the game.</summary>
+    // ------------------------------------------------------------------ BioRand's characters (NPC looks)
+
+    /// <summary>Each character of the BioRand folder that can be an NPC look.</summary>
+    public IReadOnlyList<CharacterChip> NpcCharacters { get; private set; } = [];
+    public bool CharactersFound => _characters != null;
+    public string CharactersNote => _characters is { } l
+        ? $"{l.Characters.Count} characters in BioRand's folder. The ones picked join the looks the NPCs can take (an NPC who takes one keeps their own voice)."
+        : "Needs BioRand's folder (the one with datapacks): its characters can be NPC looks too.";
+    public string MissingCharactersText => _missingCharacters.Count == 0 ? ""
+        : $"Not in your BioRand folder, left out: {string.Join(", ", _missingCharacters.Select(CharacterLibrary.DisplayName))}.";
+    public bool HasMissingCharacters => _missingCharacters.Count != 0;
+
+    public void PickRe2Characters() => PickCharacters(c => c.Id.EndsWith(".re2", StringComparison.Ordinal));
+    public void PickAllCharacters() => PickCharacters(_ => true);
+    public void PickNoCharacters() => PickCharacters(_ => false);
+
+    private void PickCharacters(Func<CharacterChip, bool> on)
+    {
+        _loading = true;
+        foreach (var chip in NpcCharacters)
+            chip.Load(on(chip));
+        _loading = false;
+        Changed();
+    }
+
+    /// <summary>BioRand's music and characters: the folder chosen before, or a "biorand" folder next to or above the program or the game.</summary>
     private void FindMusic()
     {
+        _characters = CharacterLibrary.Find(_app.BioRandDirectory, AppContext.BaseDirectory, _game?.Directory);
+        var picked = NpcCharacters.Where(c => c.IsOn).Select(c => c.Id).Concat(_missingCharacters).ToHashSet();
+        NpcCharacters = _characters?.Characters.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(c => new CharacterChip(c.Id, c.Name, $"{c.Id} ({Path.GetFileName(c.Source)})", Changed)).ToList() ?? [];
+        foreach (var chip in NpcCharacters)
+            chip.Load(picked.Contains(chip.Id));
+        _missingCharacters = picked.Where(c => NpcCharacters.All(x => x.Id != c)).Order(StringComparer.Ordinal).ToList();
+
         _library = MusicLibrary.Find(_app.BioRandDirectory, AppContext.BaseDirectory, _game?.Directory);
         var counts = _library?.Tracks.GroupBy(t => t.Game).ToDictionary(g => g.Key, g => g.Count()) ?? [];
         var on = MusicGames.Where(g => g.IsOn).Select(g => g.Id).Concat(_missingMusic).ToHashSet();
@@ -550,7 +595,7 @@ public sealed class MainViewModel : ViewModelBase
             var (result, stuck) = await Task.Run(() =>
             {
                 using var rooms = RoomArchive.Open(new GameData(game.DataDirectory));
-                var r = Generator.Generate(settings, _data, rooms, progress, _library);
+                var r = Generator.Generate(settings, _data, rooms, progress, _library, _characters);
                 Generator.WriteMod(r, rooms, target, progress);
                 var old = game.DeleteOtherSeeds(settings.Seed);
                 game.ClearRandomSaves();
@@ -675,6 +720,17 @@ public sealed class WeaponChip(int id, string name, Action changed) : ViewModelB
 
 /// <summary>A game whose music may play (Music pane).</summary>
 public sealed class MusicGameChip(string id, string name, string tip, Action changed) : ViewModelBase
+{
+    private bool _on;
+    public string Id => id;
+    public string Name => name;
+    public string Tip => tip;
+    public bool IsOn { get => _on; set { if (Set(ref _on, value)) changed(); } }
+    internal void Load(bool on) => Set(ref _on, on, nameof(IsOn));
+}
+
+/// <summary>One of BioRand's characters that may be an NPC look (NPCs pane).</summary>
+public sealed class CharacterChip(string id, string name, string tip, Action changed) : ViewModelBase
 {
     private bool _on;
     public string Id => id;

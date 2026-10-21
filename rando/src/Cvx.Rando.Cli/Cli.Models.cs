@@ -165,7 +165,7 @@ internal static partial class Cli
                 var max = part.Positions.Aggregate(Vector3.Max);
                 var pages = part.Polygons.Select(p => $"{p.Page}/{(p.Clut >> 6) - tim.ClutY}").Distinct().Order();
                 line += $"  {part.Positions.Length} vertices, {part.Polygons.Count(p => p.Vertices.Length == 3)} triangles, {part.Polygons.Count(p => p.Vertices.Length == 4)} quads, " +
-                        $"box {V(min)} to {V(max)}, page/clut [{string.Join(",", pages)}]";
+                        $"box {V(min)} to {V(max)}, page/clut id [{string.Join(",", pages)}]";
             }
             Console.WriteLine(line);
             if (options.Has("vertices"))
@@ -244,14 +244,34 @@ internal static partial class Cli
 
     private static int RenderModel(Options options)
     {
-        // A model page's first model in its bind pose, textured, from the front, the right side
-        // and the back (back faces culled by the strips' winding), to check a conversion by eye.
+        // A model page's first model in its bind pose (or with the arms down), textured, from the
+        // front, the right side and the back (back faces culled by the strips' winding), to check
+        // a conversion by eye.
         var (name, bytes, textures) = LoadModelPage(options, options.Positional(0, "model (RM_xxxx:<enemy> or a file)"));
         var output = options.Require("out");
         var page = ModelPage.Read(bytes);
         var model = page.Models.First();
         var pictures = textures.Count == 0 ? [] : TextureEntry.Read(textures[0]).Pictures.Select(p => (p.Width, p.Height, Rgba: p.ToRgba())).ToList();
         var bind = model.BindPositions();
+        // --arms-down: the human skeleton's arms (12 and 16 with what hangs from them) turned
+        // 75 degrees down about the forward axis, the way the game's motions hold them
+        var pose = Enumerable.Range(0, model.Objects.Count).Select(_ => Matrix4x4.Identity).ToArray();
+        if (options.Has("arms-down") && model.Objects.Count >= 19)
+        {
+            var parents = model.Parents();
+            foreach (var (shoulder, sign) in new[] { (12, -1f), (16, 1f) })
+            {
+                var turn = Matrix4x4.CreateTranslation(-bind[shoulder]) * Matrix4x4.CreateRotationZ(sign * 75 * MathF.PI / 180) * Matrix4x4.CreateTranslation(bind[shoulder]);
+                for (var i = 0; i < model.Objects.Count; i++)
+                {
+                    for (var a = i; a != -1; a = parents[a])
+                    {
+                        if (a == shoulder)
+                            pose[i] = turn;
+                    }
+                }
+            }
+        }
         var triangles = new List<(Vector3[] P, Vector2[] Uv, int Texture)>();
         for (var o = 0; o < model.Objects.Count; o++)
         {
@@ -262,7 +282,7 @@ internal static partial class Cli
             {
                 var n = chunk.IndexOffset;
                 foreach (var (p, _) in chunk.Ps2Vertices())
-                    vertices[n++] = bind[o] + p;
+                    vertices[n++] = Vector3.Transform(bind[o] + p, pose[o]);
             }
             var texture = 0;
             foreach (var c in polygons)

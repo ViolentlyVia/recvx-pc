@@ -2,6 +2,7 @@ using System.Text;
 using Cvx.Formats;
 using Cvx.Rando.Data;
 using Cvx.Rando.Music;
+using Cvx.Rando.Npcs;
 
 namespace Cvx.Rando;
 
@@ -23,7 +24,7 @@ public static class Spoiler
             sb.AppendLine("Side pack: from the start");
         sb.AppendLine($"Enemies: {(s.RandomEnemies ? $"random, difficulty {s.EnemyDifficulty}" : "off")}");
         sb.AppendLine($"Music: {(s.RandomMusic ? "shuffled" + MusicFrom(s, result) : "off")}");
-        sb.AppendLine($"NPCs: {(result.Npcs is { } n ? string.Join(", ", n.Looks.Select(x => $"{x.Key} as {x.Value}")) : "off")}");
+        sb.AppendLine($"NPCs: {(result.Npcs is { } n ? string.Join(", ", n.Looks.Select(x => $"{x.Key} as {NpcResult.LookName(x.Value)}")) : "off")}");
         if (s.RandomTitleCall)
             sb.AppendLine($"Title call: {(result.TitleCall is { } t ? $"BioRand's {t.Name}" : "the game's (no BioRand folder with title calls)")}");
         sb.AppendLine();
@@ -117,7 +118,13 @@ public static class Spoiler
             sb.AppendLine("NPCs (look and voice)");
             sb.AppendLine("---------------------");
             foreach (var (who, look) in npcs.Looks)
-                sb.AppendLine($"  {who,-8} looks and sounds like {look}");
+            {
+                sb.AppendLine(NpcResult.IsBioRand(look)
+                    ? $"  {who,-8} looks like {NpcResult.LookName(look)} from BioRand, voice unchanged"
+                    : $"  {who,-8} looks and sounds like {look}");
+            }
+            if (npcs.MissingCharacters.Count != 0)
+                sb.AppendLine($"  Not in the BioRand folder, left out: {string.Join(", ", npcs.MissingCharacters.Select(NpcResult.LookName))}");
             sb.AppendLine($"  {npcs.ChangedRooms.Count} rooms changed, {npcs.Voices.Count} voice lines given to the new voices.");
             sb.AppendLine($"  Rooms: {string.Join(" ", npcs.ChangedRooms.Select(r => r.Name))}");
             if (npcs.KeptRooms.Count != 0)

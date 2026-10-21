@@ -9,16 +9,20 @@ public sealed record ConvertedCharacter(ModelPage Page, TextureEntry Textures);
 /// <summary>
 /// Turns an RE2 player model (BioRand's characters) into a model page for Code: Veronica's
 /// human NPCs. The NPCs share one skeleton of 27 objects (see PLAN.md, "The NPC skeleton"),
-/// and their motions come from outside the room, so the new page keeps the target's objects
-/// (tree, bind positions, eval flags) and puts each rigid RE2 part on the object it rides on.
-/// No SKIN block (each part moves with its object, <c>EasyMultiDrawTreeCnk</c>) and no MASK
-/// block (the face code does nothing without one, <c>bhInitMask</c>).
+/// and their motions come from outside the room, so the new page keeps the target's object
+/// tree (and eval flags) and puts each rigid RE2 part on the object it rides on. No SKIN block
+/// (each part moves with its object, <c>EasyMultiDrawTreeCnk</c>) and no MASK block (the face
+/// code does nothing without one, <c>bhInitMask</c>).
 /// </summary>
 /// <remarks>
 /// Placement: RE2 is Y-down, facing +X, right side -Z, arms hanging down; CV is Y-up, facing
 /// -Z, right side +X, arms out (T-pose). A part's vertices are turned into CV's axes, scaled
-/// by the ratio of the two skeletons' leg lengths, put at the CV object that matches the RE2
-/// joint, and limbs are turned so each bone points the way CV's does.
+/// so the neck stands as high above the ankles as the target's (<see cref="Stature"/>: every
+/// character as tall as the NPC, a child too, with their own proportions), put at the CV object that matches the RE2
+/// joint, and limbs are turned so each bone points the way CV's does. The joints themselves
+/// move to the character's own proportions (<see cref="Fit"/>): the game's motions only turn
+/// the objects (only the root has position keys), so the bone lengths are the model's, and a
+/// wide character's arms hang from their own shoulders instead of the target's.
 /// </remarks>
 public static class CharacterConverter
 {
@@ -29,7 +33,7 @@ public static class CharacterConverter
     /// </summary>
     private static readonly (int Part, int Object, int Joint, (int Part, int Object)? Bone)[] Map =
     [
-        (0, 3, 2, null),        // torso: rides the chest, joint at the waist
+        (0, 3, 1, null),        // torso: rides the chest, joint placed from the pelvis (see Convert)
         (1, 1, 1, null),        // pelvis
         (2, 19, 19, (3, 20)),   // right thigh, shin, foot
         (3, 20, 20, (4, 21)),
@@ -67,9 +71,11 @@ public static class CharacterConverter
         if (pld.Armature.Count < 15 || pld.Mesh.Parts.Count < 15)
             throw new InvalidDataException($"The PLD has {pld.Armature.Count} joints and {pld.Mesh.Parts.Count} parts, not RE2's 15.");
 
-        var bind = skeleton.BindPositions();
         var rest = pld.Armature.RestPositions();
-        var scale = (Leg(bind, 19, 21) + Leg(bind, 23, 25)) / (Leg(rest, 2, 4) + Leg(rest, 5, 7));
+        var target = skeleton.BindPositions();
+        var scale = Stature(target, 4, 21, 25) / Stature(rest.Select(ToCv).ToArray(), 8, 4, 7);
+        var bind = Fit(skeleton, target, rest, scale);
+        var parents = skeleton.Parents();
 
         var rotations = new Dictionary<int, Quaternion>();
         foreach (var (part, obj, _, bone) in Map)
@@ -81,12 +87,12 @@ public static class CharacterConverter
         foreach (var (hand, forearm) in HandOf)
             rotations[hand] = rotations[forearm];
 
-        // textures: one per (page, CLUT) the parts use
+        // textures: one per page the parts use, each with its own CLUT (see Md1Polygon)
         var tim = pld.Texture;
         var keys = new List<(int Page, int Clut)>();
         int TextureOf(Md1Polygon p)
         {
-            var key = (p.Page, Math.Clamp((p.Clut >> 6) - tim.ClutY, 0, tim.Cluts.Length - 1));
+            var key = (p.Page, Math.Min(p.Page, tim.Cluts.Length - 1));
             var i = keys.IndexOf(key);
             if (i < 0)
             {
@@ -101,14 +107,14 @@ public static class CharacterConverter
         var stripBits = templateModel?.Polygons?.FirstOrDefault(c => c.Kind == NjPolyKind.Strip)?.HeadBits ?? 0x02;
 
         var model = new NjModel { Status = skeleton.Status, Textures = [] };
-        foreach (var o in skeleton.Objects)
+        foreach (var (o, i) in skeleton.Objects.Select((o, i) => (o, i)))
         {
+            // the fitted joints, unscaled (the parts are placed for scale 1)
             model.Objects.Add(new NjObject
             {
                 EvalFlags = o.EvalFlags,
-                Position = o.Position,
+                Position = parents[i] == -1 ? bind[i] : bind[i] - bind[parents[i]],
                 Angle = o.Angle,
-                Scale = o.Scale,
                 Child = o.Child,
                 Sibling = o.Sibling,
             });
@@ -120,7 +126,10 @@ public static class CharacterConverter
             if (source.Polygons.Count == 0)
                 continue;
             var turn = rotations[part];
-            var offset = bind[joint] - bind[obj];
+            // the torso's joint is RE2's root, placed where it is on the pelvis (most characters
+            // have the two together; some, like RE3's Nemesis, have the root well below)
+            var at = part == 0 ? bind[1] + ToCv(rest[0] - rest[1]) * scale : bind[joint];
+            var offset = at - bind[obj];
             var vertices = new List<(Vector3 Position, Vector3 Normal)>();
             var index = new Dictionary<(int, int), int>();
             int VertexOf(int v, int n)
@@ -160,15 +169,15 @@ public static class CharacterConverter
             var min = vertices.Select(v => v.Position).Aggregate(Vector3.Min);
             var max = vertices.Select(v => v.Position).Aggregate(Vector3.Max);
             var center = (min + max) / 2;
-            var target = model.Objects[obj];
-            target.Model = new NjChunkModel
+            var holder = model.Objects[obj];
+            holder.Model = new NjChunkModel
             {
                 Vertices = [NjVertexChunk.Ps2(vertices)],
                 Polygons = polygons,
                 Center = center,
                 Radius = Math.Max(0.01f, vertices.Max(v => Vector3.Distance(v.Position, center))),
             };
-            target.EvalFlags &= ~NjObject.EvalHide;
+            holder.EvalFlags &= ~NjObject.EvalHide;
         }
 
         var pictures = new List<Tim2Picture>();
@@ -181,6 +190,59 @@ public static class CharacterConverter
         var page = new ModelPage();
         page.Blocks.Add(ModelPageBlock.FromModel(model));
         return new ConvertedCharacter(page, TextureEntry.FromPictures(pictures));
+    }
+
+    /// <summary>
+    /// The target's joints moved to the character's proportions: the neck, shoulders and hips
+    /// where the character's are from their pelvis (the target's hips object), and each
+    /// arm and leg bone the character's length along the target's direction. Then the whole
+    /// body is moved up or down so the ankles stay at the target's height (the feet on the
+    /// ground). Collarbones, toes and the face's objects keep their places relative to their
+    /// parents.
+    /// </summary>
+    private static Vector3[] Fit(NjModel skeleton, Vector3[] target, Vector3[] rest, float scale)
+    {
+        var p = (Vector3[])target.Clone();
+        var parents = skeleton.Parents();
+        var under = Enumerable.Range(0, p.Length).Select(i =>
+            Enumerable.Range(0, p.Length).Where(j => Above(parents, i, j)).ToArray()).ToArray();
+        void Move(int obj, Vector3 to)
+        {
+            var d = to - p[obj];
+            foreach (var j in under[obj])
+                p[j] += d;
+        }
+        Vector3 Re2(int part, int from) => ToCv(rest[part] - rest[from]) * scale;
+        void Bone(int obj, int parentObj, int part, int parentPart) =>
+            Move(obj, p[parentObj] + Vector3.Normalize(target[obj] - target[parentObj]) * Vector3.Distance(rest[part], rest[parentPart]) * scale);
+
+        Move(4, p[1] + Re2(8, 1));      // neck: the head's joint (from the pelvis)
+        Move(12, p[1] + Re2(9, 1));     // shoulders
+        Move(16, p[1] + Re2(12, 1));
+        Bone(13, 12, 10, 9);            // elbows, wrists
+        Bone(14, 13, 11, 10);
+        Bone(17, 16, 13, 12);
+        Bone(18, 17, 14, 13);
+        Move(19, p[1] + Re2(2, 1));     // hips (from the pelvis)
+        Move(23, p[1] + Re2(5, 1));
+        Bone(20, 19, 3, 2);             // knees, ankles
+        Bone(21, 20, 4, 3);
+        Bone(24, 23, 6, 5);
+        Bone(25, 24, 7, 6);
+        var lift = (target[21].Y + target[25].Y - p[21].Y - p[25].Y) / 2;
+        Move(1, p[1] + new Vector3(0, lift, 0));
+        return p;
+    }
+
+    /// <summary>Whether <paramref name="obj"/> is <paramref name="j"/> or above it in the tree.</summary>
+    private static bool Above(int[] parents, int obj, int j)
+    {
+        for (; j != -1; j = parents[j])
+        {
+            if (j == obj)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -216,7 +278,8 @@ public static class CharacterConverter
     /// <summary>RE2's axes to CV's: (x, y, z) -> (-z, -y, -x), a rotation (no mirroring).</summary>
     private static Vector3 ToCv(Vector3 v) => new(-v.Z, -v.Y, -v.X);
 
-    private static float Leg(Vector3[] p, int hip, int ankle) => Vector3.Distance(p[hip], p[ankle]);
+    /// <summary>How high the neck is above the ankles (CV's axes, Y up).</summary>
+    public static float Stature(Vector3[] p, int neck, int rightAnkle, int leftAnkle) => p[neck].Y - (p[rightAnkle].Y + p[leftAnkle].Y) / 2;
 
     /// <summary>The shortest turn taking direction <paramref name="from"/> to <paramref name="to"/>.</summary>
     private static Quaternion Turn(Vector3 from, Vector3 to)

@@ -401,7 +401,7 @@
               <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
                 <StackPanel Spacing="6">
                   <TextBlock Classes="title" Text="NPCs" />
-                  <TextBlock Classes="desc" Text="The game's characters take each other's looks and voices: one new look each, for the whole seed. Claire and Chris stay themselves." />
+                  <TextBlock Classes="desc" Text="The game's characters take each other's looks and voices (or the looks of BioRand's characters picked below): one new look each, for the whole seed. Claire and Chris stay themselves." />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Top" Margin="24,4,0,0">
                   <TextBlock Text="{Binding NpcsState}" FontSize="12" Classes="muted" VerticalAlignment="Center" />
@@ -440,7 +440,46 @@
                     <TextBlock Classes="note" Text="Each line they speak becomes a line of the new character of about the same length, so the words won't match the subtitles." />
                   </StackPanel>
                 </Border>
+                <Border Classes="row" IsEnabled="{Binding RandomNpcs}">
+                  <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Spacing="2">
+                        <TextBlock Classes="label" Text="BioRand characters" />
+                        <TextBlock Classes="note" MaxWidth="520" Text="{Binding CharactersNote}" Classes.warn="{Binding !CharactersFound}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top" Margin="24,0,0,0" IsVisible="{Binding CharactersFound}">
+                        <Button Content="RE2 cast" Command="{Binding PickRe2Characters}" />
+                        <Button Content="All" Command="{Binding PickAllCharacters}" />
+                        <Button Content="None" Command="{Binding PickNoCharacters}" />
+                      </StackPanel>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding NpcCharacters}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <WrapPanel />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:CharacterChip">
+                          <ToggleButton Classes="chip" Content="{Binding Name}" IsChecked="{Binding IsOn}" ToolTip.Tip="{Binding Tip}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border IsVisible="{Binding HasMissingCharacters}" Background="{StaticResource WarnBg}" CornerRadius="8" Padding="12,10">
+                      <TextBlock Text="{Binding MissingCharactersText}" Foreground="{StaticResource WarnText}" FontSize="12.5" TextWrapping="Wrap" />
+                    </Border>
+                  </StackPanel>
+                </Border>
               </StackPanel>
+              <Border Classes="row">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="label" Text="BioRand folder" />
+                    <TextBlock Classes="note" MaxWidth="520" Text="{Binding MusicFolderText}" Classes.warn="{Binding !MusicFolderFound}" />
+                  </StackPanel>
+                  <Button Grid.Column="1" Content="Choose…" Command="{Binding ChooseMusicFolder}" Margin="24,0,0,0" VerticalAlignment="Center" />
+                </Grid>
+              </Border>
             </StackPanel>
 
             <!-- Music -->
