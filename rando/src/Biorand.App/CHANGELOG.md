@@ -6,5 +6,7 @@
 - CV:X: items (shuffle or a custom mix), starting inventory, enemies, random doors (one
   character, 1-4 segments), music from BioRand's other games, BioRand's title calls, NPC looks
   and voices, and BioRand's characters as NPC looks. Seeds are shared as CVX1- codes.
+- CV:X enemies as in BioRand: a slider per kind, and random enemy placements (how many rooms
+  have enemies, how many on average, save rooms or not).
 - BioRand's data (for RE 1-3) and its music and characters (for CV:X) are read from BioRand's
   folder, set in the settings.

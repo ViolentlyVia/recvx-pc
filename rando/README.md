@@ -41,8 +41,20 @@ CV:X's options sit in BioRand's boxes, with its own additions:
   ending at one-way story doors, using more or fewer of the rooms (Segment Size);
 - **Randomize Items**: the game's own items shuffled, or a **custom item pool** (the
   probabilities, the ammo amount, the weapons allowed); **Include Chris's half**; **Random
-  inventory** with **Side pack from the start**;
-- **Randomize Enemies**: other enemy types by difficulty; **No Nosferatu poison**;
+  inventory** with **Side pack from the start**. Rooms that change once you have a key item
+  (the courtyard's gate, the King Ant Object's rooms, the card readers...) change when you
+  get that item wherever it is now (the spoiler's "Story checks");
+- **Randomize Enemies**: each room's ordinary enemies become another kind (in their own
+  places). As in BioRand, each kind's slider sets how often it comes (None = never) and
+  Difficulty how many of one kind a room may hold; all sliders at the middle keep the
+  difficulty's own mix. Moth, Spotter, Albinoid, Anatomist and Tyrant are not yet tested in
+  the game and start at None. **No Nosferatu poison**.
+  **Random enemy placements**, as in BioRand: of the rooms that can take them (not boss
+  rooms, rooms with enemy events, or save rooms unless **Allow enemies in save rooms**),
+  **Rooms with enemies** sets the share that have enemies, from 1 to twice the **average
+  number** less one each, in random places on the room's floor; the others have none. The
+  places are worked out from each room's walls and floor (`enemy-spots` below draws them),
+  away from the entrances and doors. Killed enemies stay dead, as the game's own do.
 - **Randomize Music**: tracks swap with others of their kind, from Code: Veronica and the
   other games BioRand has music of (converted to ADX and matched to the game's loudness; the
   seed's folder then has its own `BGM1.AFS`/`BGM2.AFS`, about 250 and 200 MB);
@@ -114,8 +126,9 @@ dotnet run --project src/Cvx.Rando.Cli -- <command>
 | `extract-room <RM_xxxx> --out <file> [--data <dir>]` | Writes a room's expanded file |
 | `extract-afs <archive> <entry> --out <file>` | Writes one entry of an AFS archive as it is |
 | `roundtrip [--data <dir>] [--out <dir>]` | Rebuilds every room and the archive without changes and checks the result |
-| `generate [--seed <n>] [--mode shuffle\|custom] [--claire-only] [--inventory] [--side-pack] [--no-poison] [--doors] [--segments 1-4] [--segment-size 1-8] [--chris] [--enemies] [--enemy-difficulty 0-3] [--music] [--music-games re2,sh1,...] [--title-call] [--npcs] [--npc-characters leon.re2,...] [--biorand <dir>] [--share <code>] [--out <dir>] [--spoiler]` | Randomizes CV:X; `--out` writes the mod folder (`RDX_LNK.AFS` and the other changed archives, `rando.ini`, `rando_doors.txt`, `spoiler.txt`, `graph.dot`, `graph.dgml`) for recvx-pc's `mod=` |
+| `generate [--seed <n>] [--mode shuffle\|custom] [--claire-only] [--inventory] [--side-pack] [--no-poison] [--doors] [--segments 1-4] [--segment-size 1-8] [--chris] [--enemies] [--enemy-difficulty 0-3] [--enemy-ratios Zombie=4,Hunter=7,...] [--enemy-placements] [--enemy-quantity 0-15] [--enemy-rooms 0-7] [--enemies-in-save-rooms] [--music] [--music-games re2,sh1,...] [--title-call] [--npcs] [--npc-characters leon.re2,...] [--biorand <dir>] [--share <code>] [--out <dir>] [--spoiler]` | Randomizes CV:X; `--out` writes the mod folder (`RDX_LNK.AFS` and the other changed archives, `rando.ini`, `rando_doors.txt`, `spoiler.txt`, `graph.dot`, `graph.dgml`) for recvx-pc's `mod=` |
 | `save-rooms [--data <dir>]` | Lists the rooms with an item box or a typewriter |
+| `enemy-spots [<RM_xxxx>] [--png <dir>]` | Where random enemy placements may start enemies in each room; `--png` draws each floor from above (walls, the reachable floor, the places, entrances, known enemy places) |
 | `dump-enemies [<RM_xxxx>] [--scripts] [--out <dir>]` | Each room's enemies with the model, motion and texture data the game loads for them; `--out` writes them as files |
 | `dump-model <RM_xxxx>:<enemy> \| <SYSTEM.AFS>:<entry> \| <file> [--vertices] [--png <dir>]` | A model page: its skeleton, meshes, SKIN weights and textures |
 | `dump-pld <file.PLD> [--vertices] [--png <dir>]` | An RE2 player model (BioRand's characters) |
