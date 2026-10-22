@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Media;
 using Cvx.Formats;
 using Cvx.Rando;
 using Cvx.Rando.Data;
@@ -102,10 +103,8 @@ namespace IntelOrca.Biohazard.BioRand
             chkIncludeDocuments.Visibility = not;
             chkAlternativeRoute.Visibility = not;
             chkProtectSoftLock.Visibility = not;
-            chkRandomEnemyPlacements.Visibility = not;
-            listEnemies.Visibility = not;
-            pieEnemies.Visibility = not;
-            txtEnemiesNote.Visibility = not;
+            // random placements and the per-enemy sliders work as BioRand's
+            chkRandomEnemyPlacements.Visibility = Visibility.Visible;
             // the character list's menu (BioRand's: Unselect All, Select All, Random) gets the RE2 cast
             _cvxRe2Cast ??= new MenuItem { Header = "Select RE2 Cast" };
             _cvxRe2Cast.Click -= CvxRe2Cast_Click;
@@ -142,6 +141,9 @@ namespace IntelOrca.Biohazard.BioRand
             listBGMs.Names = CvxMusicGames.Select(MusicLibrary.DisplayName).ToArray();
             listBGMs.ToolTips = CvxMusicGames.Select(g => (object)(g == MusicLibrary.OwnGame ? "This game's own music"
                 : $"{_cvxMusic!.Tracks.Count(t => t.Game == g)} tracks in BioRand")).ToArray();
+            listEnemies.ItemsSource = _cvxData.Enemies.Types
+                .Select(k => new SliderListItem(k.Name, k.Untested ? 0 : EnemyKind.DefaultRatio, EnemyKind.MaxRatio))
+                .ToList();
             listNPCs.Names = CvxCharacterList.Select(c => c.Name).ToArray();
             listNPCs.ToolTips = CvxCharacterList.Select(c => (object)$"{c.Id} ({Path.GetFileName(c.Source)})").ToArray();
 
@@ -185,7 +187,16 @@ namespace IntelOrca.Biohazard.BioRand
                 chkCvxSidePack.IsChecked = s.StartSidePack;
 
                 chkRngEnemies.IsChecked = s.RandomEnemies;
+                chkRandomEnemyPlacements.IsChecked = s.RandomEnemyPlacements;
+                chkEnemyRestrictedRooms.IsChecked = s.EnemiesInSaveRooms;
+                sliderEnemyCount.Value = Math.Clamp(s.EnemyQuantity, 0, 15);
+                sliderEnemyRooms.Value = Math.Clamp(s.EnemyRooms, 0, 7);
                 sliderEnemyDifficulty.Value = Math.Clamp(s.EnemyDifficulty, 0, 3);
+                if (listEnemies.ItemsSource is IEnumerable<SliderListItem> enemyItems)
+                {
+                    foreach (var (item, kind) in enemyItems.Zip(_cvxData.Enemies.Types))
+                        item.Value = kind.RatioIn(s);
+                }
                 chkCvxNoPoison.IsChecked = s.NoNosferatuPoison;
 
                 chkRngBgm.IsChecked = s.RandomMusic;
@@ -218,6 +229,7 @@ namespace IntelOrca.Biohazard.BioRand
                 btnPlayNormal.Visibility = game?.ActiveSeed != null ? Visibility.Visible : Visibility.Collapsed;
 
                 UpdateHints();
+                UpdateEnemyBarCvx();
             }
             UpdateEnabledUi();
             panelRandomInventory.IsEnabled = true;
@@ -256,7 +268,12 @@ namespace IntelOrca.Biohazard.BioRand
                 StartWeapon2 = (WeaponChoice)Math.Max(0, dropdownWeapon1.SelectedIndex),
                 StartSidePack = chkCvxSidePack.IsChecked == true,
                 RandomEnemies = chkRngEnemies.IsChecked == true,
+                RandomEnemyPlacements = chkRandomEnemyPlacements.IsChecked == true,
+                EnemiesInSaveRooms = chkEnemyRestrictedRooms.IsChecked == true,
+                EnemyQuantity = (int)sliderEnemyCount.Value,
+                EnemyRooms = (int)sliderEnemyRooms.Value,
                 EnemyDifficulty = (int)sliderEnemyDifficulty.Value,
+                EnemyRatios = CvxEnemyRatios(),
                 NoNosferatuPoison = chkCvxNoPoison.IsChecked == true,
                 RandomMusic = chkRngBgm.IsChecked == true,
                 MusicGames = CvxMusicGames.Where((g, i) => i < musicValues.Length && musicValues[i])
@@ -269,6 +286,38 @@ namespace IntelOrca.Biohazard.BioRand
                 RandomTitleCall = chkRandomizeTitleVoice.IsChecked == true,
             };
             SaveSettings();
+        }
+
+        /// <summary>
+        /// The per-enemy sliders as settings: none when every kind is at its default (the
+        /// difficulty's own mix, as before the sliders), else every kind's ratio.
+        /// </summary>
+        private Dictionary<string, int> CvxEnemyRatios()
+        {
+            if (listEnemies.ItemsSource is not IEnumerable<SliderListItem> items)
+                return _cvx.EnemyRatios;
+            var ratios = items.Zip(_cvxData.Enemies.Types).ToDictionary(x => x.Second.Name, x => (int)x.First.Value);
+            var defaults = _cvxData.Enemies.Types.All(k => ratios[k.Name] == (k.Untested ? 0 : EnemyKind.DefaultRatio));
+            return defaults ? [] : ratios;
+        }
+
+        /// <summary>The bar under the enemy list (BioRand's <c>UpdateEnemyPie</c>): each kind's share.</summary>
+        private void UpdateEnemyBarCvx()
+        {
+            pieEnemies.Records.Clear();
+            foreach (var kind in _cvxData.Enemies.Types)
+            {
+                var ratio = kind.RatioIn(_cvx);
+                if (ratio == 0)
+                    continue;
+                pieEnemies.Records.Add(new PieChart.Record
+                {
+                    Name = kind.Name,
+                    Value = ratio,
+                    Color = (Color)ColorConverter.ConvertFromString(kind.Colour),
+                });
+            }
+            pieEnemies.Update();
         }
 
         /// <summary>Picks of a share code that this computer's BioRand folder does not have: kept, so the code stays the same.</summary>

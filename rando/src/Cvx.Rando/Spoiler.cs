@@ -22,7 +22,7 @@ public static class Spoiler
         sb.AppendLine($"Doors: {(s.RandomDoors ? $"random, {s.DoorCharacter} only, {s.DoorSegments} segments, size {s.DoorSegmentSize}/8" : "off")}");
         if (s.StartSidePack)
             sb.AppendLine("Side pack: from the start");
-        sb.AppendLine($"Enemies: {(s.RandomEnemies ? $"random, difficulty {s.EnemyDifficulty}" : "off")}");
+        sb.AppendLine($"Enemies: {(s.RandomEnemies ? $"random, difficulty {s.EnemyDifficulty}" + EnemyMix(s, data) : "off")}");
         sb.AppendLine($"Music: {(s.RandomMusic ? "shuffled" + MusicFrom(s, result) : "off")}");
         sb.AppendLine($"NPCs: {(result.Npcs is { } n ? string.Join(", ", n.Looks.Select(x => $"{x.Key} as {NpcResult.LookName(x.Value)}")) : "off")}");
         if (s.RandomTitleCall)
@@ -87,16 +87,39 @@ public static class Spoiler
             sb.AppendLine();
         }
 
-        if (result.Enemies.Count != 0)
+        if (result.StoryFlags.Count != 0)
+        {
+            // rooms that check another room's pickup for a key item now check where the item is
+            sb.AppendLine("Story checks (item flags other rooms read)");
+            sb.AppendLine("------------");
+            foreach (var group in result.StoryFlags.Where(c => c.To != null && c.Why.StartsWith("follows ", StringComparison.Ordinal) && c.Why != "follows its spot")
+                         .GroupBy(c => (c.Why, c.To)).OrderBy(g => g.Key.Why, StringComparer.Ordinal))
+                sb.AppendLine($"  {group.Key.Why["follows ".Length..]} (flag {group.Key.To}): {string.Join(", ", group.Select(c => c.Room.Name).Distinct())}");
+            foreach (var c in result.StoryFlags.Where(c => c.Why.EndsWith("(unchanged)", StringComparison.Ordinal)).DistinctBy(c => (c.Room, c.Why)))
+                sb.AppendLine($"  {c.Room.Name}: {c.Why}");
+            foreach (var c in result.StoryFlags.Where(c => c.To == null))
+                sb.AppendLine($"  {c.Room.Name}: {c.Why}");
+            sb.AppendLine();
+        }
+
+        if (result.Enemies.Count != 0 || result.EnemiesCleared.Count != 0)
         {
             string Name(int type) => data.Enemies.Types.FirstOrDefault(k => k.Type == type)?.Name ?? $"enemy {type}";
             sb.AppendLine("Enemies");
             sb.AppendLine("-------");
             foreach (var c in result.Enemies)
             {
-                var was = string.Join(", ", c.OldTypes.GroupBy(t => t).Select(g => $"{g.Count()} {Name(g.Key)}"));
-                sb.AppendLine($"  {RoomLabel(c.Room)}  {was} -> {c.NewKind.Name}{(c.SoundFrom == null ? "  (sounds unchanged)" : "")}");
+                var was = c.OldTypes.Count == 0 ? "none" : string.Join(", ", c.OldTypes.GroupBy(t => t).Select(g => $"{g.Count()} {Name(g.Key)}"));
+                var now = c.Moved ? $"{c.Count} {c.NewKind.Name}" : c.NewKind.Name;
+                var placed = c.Moved
+                    ? $"  (new places{(c.Added != 0 ? $", {c.Added} more" : "")}{(c.Hidden != 0 ? $", {c.Hidden} gone" : "")})"
+                    : "";
+                sb.AppendLine($"  {RoomLabel(c.Room)}  {was} -> {now}{placed}{(c.SoundFrom == null ? "  (sounds unchanged)" : "")}");
             }
+            foreach (var room in result.EnemiesCleared)
+                sb.AppendLine($"  {RoomLabel(room)}  no enemies");
+            if (result.SharedEnemyFlags != 0)
+                sb.AppendLine($"  ({result.SharedEnemyFlags} new enemies share a death flag with another room's: killing one also clears the other)");
             sb.AppendLine();
         }
 
@@ -167,4 +190,9 @@ public static class Spoiler
             text += $" (not in the BioRand folder, left out: {string.Join(", ", result.MissingMusicGames.Select(MusicLibrary.DisplayName))})";
         return text;
     }
+
+    private static string EnemyMix(RandoSettings s, RandoData data) =>
+        s.EnemyRatios.Count == 0 ? ""
+            : ", mix " + string.Join(", ", data.Enemies.Types.Select(k => $"{k.Name} {k.RatioIn(s)}/{EnemyKind.MaxRatio}"));
 }
+

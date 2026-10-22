@@ -43,6 +43,24 @@ public sealed record RandoSettings
     public bool RandomEnemies { get; init; }
     /// <summary>0 easy, 1 normal, 2 hard, 3 very hard: which types come up and how many may share a room.</summary>
     public int EnemyDifficulty { get; init; } = 1;
+    /// <summary>
+    /// How often each kind comes up (data/enemies.json's names, 0 = never to 7; a kind left out
+    /// has its default: 4, or 0 for an untested kind). Empty: the difficulty's own mix (each
+    /// kind weighted by its difficulty), as before; with ratios the difficulty only sets how
+    /// many of a kind a room may hold, as in BioRand.
+    /// </summary>
+    public Dictionary<string, int> EnemyRatios { get; init; } = [];
+    /// <summary>
+    /// BioRand's random enemy placements: rooms get a random number of enemies in random places
+    /// on their floor, and some rooms none. Off: enemies keep their places and number.
+    /// </summary>
+    public bool RandomEnemyPlacements { get; init; }
+    /// <summary>Random placements: the average number of enemies in a room that has them, less one (BioRand's slider, 0-15).</summary>
+    public int EnemyQuantity { get; init; } = 2;
+    /// <summary>Random placements: how many of the rooms that can have enemies have them, in sevenths (BioRand's slider, 0-7).</summary>
+    public int EnemyRooms { get; init; } = 5;
+    /// <summary>Random placements: save rooms can get enemies too.</summary>
+    public bool EnemiesInSaveRooms { get; init; }
 
     // Music
     /// <summary>Swap music tracks within their category (area, save room, tension, boss).</summary>

@@ -52,8 +52,13 @@ public sealed class ItemPlacer
     private bool Single => _graph.OnlyCharacter != null;
 
     /// <param name="startWeapons">Weapons Claire starts with: in custom mode they are not placed again (their ammo still is).</param>
-    public ItemPlacer(ItemGraph graph, ItemCatalog items, RandoSettings settings, Rng rng, IReadOnlyCollection<int>? startWeapons = null)
+    private readonly StoryFlags.FlagRule? _flagRule;
+
+    /// <param name="flagRule">Keys whose pickup flag other rooms read go to pickups with a flag (<see cref="StoryFlags"/>).</param>
+    public ItemPlacer(ItemGraph graph, ItemCatalog items, RandoSettings settings, Rng rng, IReadOnlyCollection<int>? startWeapons = null,
+        StoryFlags.FlagRule? flagRule = null)
     {
+        _flagRule = flagRule;
         _startWeapons = startWeapons ?? [];
         _graph = graph;
         _items = items;
@@ -148,7 +153,7 @@ public sealed class ItemPlacer
             var copies = Copies(key);
             for (var i = 0; i < copies; i++)
             {
-                var location = PickLocation(search.Locations)
+                var location = PickLocation(search.Locations, key)
                     ?? throw new ItemPlacementException(
                         $"No free pickup for {_items.NameOf(key)} near {checkpoint} (try another seed).");
                 Assign(location, key, true);
@@ -195,9 +200,12 @@ public sealed class ItemPlacer
         return copies;
     }
 
-    private ItemLocation? PickLocation(IEnumerable<ItemLocation> reachable)
+    private ItemLocation? PickLocation(IEnumerable<ItemLocation> reachable, int key)
     {
         var free = reachable.Where(l => !_assigned.ContainsKey(l.GlobalId) && !KeepsOriginal(l) && (!_chrisHalf || l.ChrisOnly)).ToList();
+        // a key other rooms check by its pickup flag goes where a flag says it was taken (when one is free)
+        if (_flagRule is { } rule && rule.Keys.Contains(key) && free.Where(l => rule.Locations.Contains(l.GlobalId)).ToList() is { Count: > 0 } flagged)
+            free = flagged;
         var normal = free.Where(l => l.Priority == ItemPriority.Normal ||
                                      (_settings.HiddenKeyItems && l.Priority == ItemPriority.Hidden)).ToList();
         var pool = normal.Count != 0 ? normal : free;

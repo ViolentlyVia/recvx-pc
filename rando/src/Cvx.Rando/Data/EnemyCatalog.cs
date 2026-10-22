@@ -16,7 +16,13 @@ public sealed class EnemyCatalog
 
 public sealed class EnemyKind
 {
+    /// <summary>A kind's ratio when the settings do not give one (BioRand's sliders start there; 0-7).</summary>
+    public const int DefaultRatio = 4;
+    public const int MaxRatio = 7;
+
     public string Name { get; set; } = "";
+    /// <summary>Names it had before: settings that use them still count for it.</summary>
+    public string[] Aliases { get; set; } = [];
     public int Type { get; set; }
     /// <summary>Model version, when the type has several looks that act differently (Hunter, Sweeper).</summary>
     public int? Version { get; set; }
@@ -30,6 +36,23 @@ public sealed class EnemyKind
     public string[] Donors { get; set; } = [];
     /// <summary>The behaviour (<c>type</c> field) of placed enemies.</summary>
     public short Effect { get; set; }
+    /// <summary>Its collision radius (<c>ar</c>): random placements start it where it has this much room.</summary>
+    public float Radius { get; set; } = 4;
+    /// <summary>Its colour in the window's enemy bar ("#rrggbb").</summary>
+    public string Colour { get; set; } = "#808080";
+    /// <summary>Not yet seen working in the game: never placed unless the settings give it a ratio.</summary>
+    public bool Untested { get; set; }
+
+    /// <summary>Its ratio in these settings' mix (0-7).</summary>
+    public int RatioIn(RandoSettings settings)
+    {
+        foreach (var name in Aliases.Prepend(Name))
+        {
+            if (settings.EnemyRatios.TryGetValue(name, out var r))
+                return Math.Clamp(r, 0, MaxRatio);
+        }
+        return Untested ? 0 : DefaultRatio;
+    }
 
     public int MaxAt(int difficulty) => Max.Length == 0 ? int.MaxValue : Max[Math.Clamp(difficulty, 0, Max.Length - 1)];
 

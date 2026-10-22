@@ -20,6 +20,10 @@ public sealed record GenerationResult
     public DoorPlan? Doors { get; init; }
     /// <summary>Rooms whose enemies changed.</summary>
     public IReadOnlyList<EnemyRoomChange> Enemies { get; init; } = [];
+    /// <summary>Random enemy placements: rooms left without enemies.</summary>
+    public IReadOnlyList<RoomId> EnemiesCleared { get; init; } = [];
+    /// <summary>Random enemy placements: new enemies that share a death flag with another room's.</summary>
+    public int SharedEnemyFlags { get; init; }
     /// <summary>Music tracks swapped (rando.ini bgm_map), some of them for other games' tracks.</summary>
     public IReadOnlyList<MusicSwap> Music { get; init; } = [];
     /// <summary>Games the settings ask music from that the BioRand folder does not have.</summary>
@@ -38,6 +42,8 @@ public sealed record GenerationResult
     public string? GraphDot { get; init; }
     public string? GraphDgml { get; init; }
     public IReadOnlyList<RoomPatch> Patches { get; init; } = [];
+    /// <summary>Item flags rooms read as story progress, pointed at the items' new spots (see <see cref="Items.StoryFlags"/>).</summary>
+    public IReadOnlyList<StoryFlagChange> StoryFlags { get; init; } = [];
     /// <summary>Pickup amount per item type (rando.ini pickup_amounts); empty keeps the game's.</summary>
     public IReadOnlyDictionary<int, int> PickupAmounts { get; init; } = new Dictionary<int, int>();
     /// <summary>Claire's and Chris's starting items, when randomized.</summary>
@@ -78,6 +84,7 @@ public static class Generator
         if (settings.RandomDoors)
             settings = settings with { RandomItems = true };
         ItemPlacementResult? items = null;
+        List<StoryFlagChange> storyFlags = [];
         var patcher = new ItemPatcher(data, archive);
         var amounts = new Dictionary<int, int>();
 
@@ -111,7 +118,7 @@ public static class Generator
         {
             saveRooms = SaveRoomKeys(data);
             progress?.Report("Making the door layout...");
-            var layout = MakeDoors(settings, data, claireWeapons);
+            var layout = MakeDoors(settings, data, claireWeapons, StoryFlags.Rule(archive, data, settings));
             (doors, graph, doorAttempts) = (layout.Plan, layout.Graph, layout.Attempts);
             if (settings.RandomItems)
                 items = layout.Items;
@@ -120,22 +127,25 @@ public static class Generator
         {
             progress?.Report("Placing items...");
             graph = ItemGraph.Build(data, settings);
-            items = PlaceItems(data, settings, graph, claireWeapons);
+            items = PlaceItems(data, settings, graph, claireWeapons, StoryFlags.Rule(archive, data, settings));
         }
         if (items != null)
         {
             progress?.Report("Patching rooms...");
             patcher.Apply(items, settings);
             RoomTweaks.Apply(patcher, settings, data);
+            var swap = RoomTweaks.TieCourtyardToEmblem(patcher, archive, data, items, settings);
+            storyFlags = StoryFlags.Apply(patcher, archive, data, items, settings, swap);
         }
         if (settings.StartSidePack)
             RoomTweaks.ApplySidePack(patcher);
 
         if (settings.RandomEnemies)
             progress?.Report("Choosing enemies...");
-        var enemies = settings.RandomEnemies
-            ? new EnemyRandomizer(data, archive, settings, Rng.For(settings.Seed, "enemies")).Apply(patcher)
-            : [];
+        var enemyRandomizer = settings.RandomEnemies
+            ? new EnemyRandomizer(data, archive, settings, Rng.For(settings.Seed, "enemies"), Rng.For(settings.Seed, "placements"))
+            : null;
+        var enemies = enemyRandomizer?.Apply(patcher) ?? [];
 
         if (settings.RandomNpcs)
             progress?.Report("Shuffling the NPCs...");
@@ -172,6 +182,8 @@ public static class Generator
             Doors = doors,
             DoorAttempts = doorAttempts,
             Enemies = enemies,
+            EnemiesCleared = enemyRandomizer?.Cleared ?? [],
+            SharedEnemyFlags = enemyRandomizer?.SharedFlags ?? 0,
             Music = music,
             MissingMusicGames = missingMusic,
             MusicTargetRms = data.Music.TargetRms,
@@ -181,6 +193,7 @@ public static class Generator
             GraphDot = graph == null ? null : GraphExport.Dot(graph, data.Items, saveRooms),
             GraphDgml = graph == null ? null : GraphExport.Dgml(graph, data.Items, saveRooms),
             Patches = patcher.Patches,
+            StoryFlags = storyFlags,
             PickupAmounts = amounts,
             StartInventories = inventories,
             Spoiler = "",
@@ -188,15 +201,18 @@ public static class Generator
         return result with { Spoiler = Spoiler.Write(result, data) };
     }
 
-    private static ItemPlacementResult PlaceItems(RandoData data, RandoSettings settings, ItemGraph graph, IReadOnlyCollection<int> startWeapons) =>
-        new ItemPlacer(graph, data.Items, settings, Rng.For(settings.Seed, "items"), startWeapons).Place();
+    private static ItemPlacementResult PlaceItems(RandoData data, RandoSettings settings, ItemGraph graph, IReadOnlyCollection<int> startWeapons,
+        StoryFlags.FlagRule? flagRule) =>
+        new ItemPlacer(graph, data.Items, settings, Rng.For(settings.Seed, "items"), startWeapons, flagRule).Place();
 
     public sealed record DoorLayout(DoorPlan Plan, ItemGraph Graph, ItemPlacementResult Items, int Attempts);
 
     /// <summary>
     /// Door layouts until one the item logic can finish, checked again by <see cref="Playthrough"/>.
     /// </summary>
-    public static DoorLayout MakeDoors(RandoSettings settings, RandoData data, IReadOnlyCollection<int>? startWeapons = null)
+    /// <param name="flagRule">See <see cref="StoryFlags.Rule"/>.</param>
+    public static DoorLayout MakeDoors(RandoSettings settings, RandoData data, IReadOnlyCollection<int>? startWeapons = null,
+        StoryFlags.FlagRule? flagRule = null)
     {
         settings = settings with { RandomItems = true };
         var randomizer = new DoorRandomizer(data, SaveRoomKeys(data), settings);
@@ -209,7 +225,7 @@ public static class Generator
             ItemPlacementResult placement;
             try
             {
-                placement = PlaceItems(data, settings, graph, startWeapons ?? []);
+                placement = PlaceItems(data, settings, graph, startWeapons ?? [], flagRule);
             }
             catch (ItemPlacementException)
             {

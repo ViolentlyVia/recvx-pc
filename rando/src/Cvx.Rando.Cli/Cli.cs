@@ -45,6 +45,7 @@ internal static partial class Cli
                 "render-model" => RenderModel(options),
                 "swap-enemies" => SwapEnemies(options),
                 "enemy-donors" => EnemyDonors(options),
+                "enemy-spots" => EnemySpotsCommand(options),
                 "dump-sounds" => DumpSounds(options),
                 "dump-music" => DumpMusic(options),
                 "bench-prs" => BenchPrs(options),
@@ -83,13 +84,16 @@ internal static partial class Cli
                                                  RDX_LNK.AFS with every room recompressed
               generate [--seed <n>] [--mode shuffle|custom] [--claire-only] [--inventory] [--side-pack] [--no-poison]
                        [--doors] [--segments 1-4] [--segment-size 1-8] [--chris]
-                       [--enemies] [--enemy-difficulty 0-3] [--music] [--music-games re2,sh1,...] [--title-call]
+                       [--enemies] [--enemy-difficulty 0-3] [--enemy-ratios Zombie=4,Hunter=7,...]
+                       [--enemy-placements] [--enemy-quantity 0-15] [--enemy-rooms 0-7] [--enemies-in-save-rooms]
+                       [--music] [--music-games re2,sh1,...] [--title-call]
                        [--npcs] [--npc-characters leon.re2,ada.re2,...]
                        [--biorand <dir>]
                        [--share <code>] [--out <dir>] [--spoiler]
                                                  randomize (--doors: random doors, played by Claire, or
                                                  Chris with --chris, in 1-4 segments, using 1-8 eighths
-                                                 of the rooms); --out writes the mod folder (RDX_LNK.AFS,
+                                                 of the rooms; --enemy-placements: random places, about
+                                                 quantity+1 enemies a room in rooms/7 of the rooms); --out writes the mod folder (RDX_LNK.AFS,
                                                  rando.ini, rando_doors.txt, spoiler.txt, graph.dot,
                                                  graph.dgml) for recvx-pc's mod=
               dump-script <RM_xxxx> [--from <hex>] [--to <hex>]
@@ -97,6 +101,9 @@ internal static partial class Cli
               swap-enemies <RM_xxxx> --donor <RM_xxxx>:<enemy index> [--only <types>] [--effect <n>] [--out <dir>]
                                                  testing aid: turn a room's enemies into another
                                                  room's enemy and write a mod folder
+              enemy-spots [<RM_xxxx>] [--png <dir>]
+                                                 where random enemy placements may put enemies in
+                                                 each room (--png: a picture of each floor)
               dump-enemies [<RM_xxxx>] [--scripts] [--out <dir>]
                                                  each room's enemies with their model, motion and
                                                  texture data; --out writes them as files
@@ -527,6 +534,14 @@ internal static partial class Cli
             MusicGames = options.Get("music-games") is { } mg ? ["recv", .. mg.Split(',', StringSplitOptions.RemoveEmptyEntries)] : ["recv"],
             NpcCharacters = options.Get("npc-characters") is { } nc ? nc.Split(',', StringSplitOptions.RemoveEmptyEntries) : [],
             EnemyDifficulty = options.Get("enemy-difficulty") is { } ed ? int.Parse(ed) : 1,
+            // Zombie=4,Hunter=7: BioRand's per-enemy sliders (0-7)
+            EnemyRatios = options.Get("enemy-ratios") is { } er
+                ? er.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Split('=')).ToDictionary(x => x[0], x => int.Parse(x[1]))
+                : [],
+            RandomEnemyPlacements = options.Has("enemy-placements"),
+            EnemyQuantity = options.Get("enemy-quantity") is { } eq ? int.Parse(eq) : 2,
+            EnemyRooms = options.Get("enemy-rooms") is { } erm ? int.Parse(erm) : 5,
+            EnemiesInSaveRooms = options.Has("enemies-in-save-rooms"),
         };
         if (options.Get("share") is { } code)
         {

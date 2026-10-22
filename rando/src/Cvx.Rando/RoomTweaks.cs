@@ -57,8 +57,9 @@ public static class RoomTweaks
 
         // Not ported: BioRand also made RM_0010 and RM_0050 always load RM_0021 and RM_0031. The
         // game loads the event versions (RM_0020: the explosion and zombies rising from the
-        // graves; RM_0030) once the pickup in RM_0080 is taken (item flag 4) and goes back to
-        // RM_0021/RM_0031 afterwards; forcing the later versions skipped those events.
+        // graves; RM_0030) until the pickup in RM_0080 is taken (item flag 4: `ck 07:4` with
+        // value 1 is true while the flag is clear) and RM_0021/RM_0031 after; forcing the later
+        // versions skipped those events. See TieCourtyardToEmblem.
 
         Nop("1070", 0x1819AE, TweakMode.Always, "the window cutscene plays when the item is taken"),
 
@@ -134,6 +135,47 @@ public static class RoomTweaks
         new("1010", TweakMode.Always, "start with the side pack") { Flag = (1, 6, 0) },
         new("1010", TweakMode.Always, "start with the side pack") { Flag = (1, 7, 0) },
     ];
+
+    /// <summary>The Sp Alloy Emblem, which opens the courtyard's gate (RM_0031, to RM_0100).</summary>
+    public const int SpAlloyEmblem = 86;
+    /// <summary>The item flag by which RM_0010 and RM_0050 load the courtyard's gate version.</summary>
+    public const int CourtyardFlag = 4;
+
+    /// <summary>
+    /// The courtyard's gate (RM_0031's script door to RM_0100) opens with the Sp Alloy Emblem, but
+    /// the game loads that version of the courtyard only once item flag 4 is set: the pickup in
+    /// RM_0080 (the Padlock Key's spot). Before it, the courtyard is RM_0030, where the gate does
+    /// nothing ("There's no need to use it now"), so a seed that puts the emblem before that
+    /// pickup could strand the player at the gate (owner's seed 300378). The pickup holding the
+    /// emblem takes flag 4 and RM_0080's takes the emblem spot's flag: holding the emblem is
+    /// what switches the courtyard. The rooms' other uses of the two flags are left to
+    /// <see cref="StoryFlags.Apply"/>.
+    /// </summary>
+    /// <returns>The emblem spot's flag that changed, or null when nothing changed.</returns>
+    public static int? TieCourtyardToEmblem(ItemPatcher rooms, RoomArchive archive, RandoData data, ItemPlacementResult items, RandoSettings settings)
+    {
+        // the emblem's pickup: its room and trigger area
+        var spot = data.Map.Rooms
+            .SelectMany(r => (r.Value.Items ?? []).Select(i => (Room: r.Key, Item: i)))
+            .FirstOrDefault(x => x.Item.GlobalId is int g && (x.Item.DoorRando is not bool dr || dr == settings.RandomDoors) &&
+                                 items.ByGlobalId.TryGetValue(g, out var a) && a.Type == SpAlloyEmblem);
+        if (spot.Item == null)
+            return null;
+        var uses = PickupFlags.Uses(archive);
+        var room = RoomId.ParseBioRand(spot.Room);
+        var pickup = uses.FirstOrDefault(u => u.IsPickup && u.Room == room && u.Area == spot.Item.Id);
+        if (pickup == null || pickup.Flag == CourtyardFlag)
+            return null;   // given by a script, or already in RM_0080's spot
+        var flag = pickup.Flag;
+        foreach (var use in uses.Where(u => u.IsPickup))
+        {
+            if (use.Flag == flag)
+                PickupFlags.Retarget(rooms, use, CourtyardFlag);
+            else if (use.Flag == CourtyardFlag)
+                PickupFlags.Retarget(rooms, use, flag);
+        }
+        return flag;
+    }
 
     public static void ApplySidePack(ItemPatcher rooms)
     {

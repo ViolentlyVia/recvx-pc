@@ -30,8 +30,17 @@ public sealed class ItemPatcher
     /// The rooms that changed, ready for <see cref="RoomArchive.WriteModified"/>. Rooms with
     /// opcodes added to their start procedure are rebuilt here, after every in-place change.
     /// </summary>
-    public IReadOnlyDictionary<RoomId, RdxFile> ChangedRooms =>
-        _rooms.Keys.ToDictionary(id => id, Current);
+    public IReadOnlyDictionary<RoomId, RdxFile> ChangedRooms
+    {
+        get
+        {
+            // (rooms in parallel: rebuilds take a while, and each only reads its own room)
+            var ids = _rooms.Keys.ToArray();
+            var files = new RdxFile[ids.Length];
+            Parallel.For(0, ids.Length, i => files[i] = Current(ids[i]));
+            return ids.Zip(files).ToDictionary(x => x.First, x => x.Second);
+        }
+    }
 
     private readonly Dictionary<RoomId, List<byte>> _startOpcodes = [];
     private readonly Dictionary<RoomId, Func<RdxFile, RdxFile>> _rebuilds = [];
@@ -73,6 +82,10 @@ public sealed class ItemPatcher
     /// <summary>Whether an opcode in <paramref name="spec"/> is one of <paramref name="opcodes"/>.</summary>
     public bool RangeHas(RoomId id, OffsetSpec spec, IReadOnlyCollection<byte> opcodes) =>
         CvScriptReader.ReadOpcodes(new RdxFile(Room(id))).Any(o => spec.Contains(o.Offset) && opcodes.Contains(o.Opcode));
+
+    /// <summary>Whether the room still has <paramref name="op"/> as it was (no earlier change blanked or altered it).</summary>
+    public bool Intact(RoomId id, CvOpcode op) =>
+        !_rooms.TryGetValue(id, out var bytes) || bytes.AsSpan(op.Offset, op.Length).SequenceEqual(op.Bytes.Span);
 
     /// <summary>Changes one byte inside an opcode.</summary>
     public void PatchByte(RoomId id, int offset, byte value)
@@ -219,8 +232,8 @@ public sealed class ItemPatcher
             if (siblings.Count == 0)
                 continue;
 
-            var bytes = Room(variant);
-            var file = new RdxFile(bytes);
+            // (the room only counts as changed once one of its pickups is)
+            var file = _rooms.TryGetValue(variant, out var read) ? new RdxFile(read) : _archive.ReadRoom(variant);
             var items = file.Items;
             var tableOffset = file.TableOffsetOf(RdxTable.Items);
             for (var i = 0; i < items.Length; i++)
@@ -233,6 +246,7 @@ public sealed class ItemPatcher
                     if (items[i].ItemId != p.From || Distance(items[i].Position, s.Position) > 2f)
                         continue;
                     var offset = tableOffset + i * 36 + 4;
+                    var bytes = Room(variant);
                     bytes[offset] = (byte)p.To;
                     bytes[offset + 1] = (byte)(p.To >> 8);
                     Patches.Add(new RoomPatch(variant, p.GlobalId, p.From, p.To, $"item slot {i} (as {p.Room})"));
