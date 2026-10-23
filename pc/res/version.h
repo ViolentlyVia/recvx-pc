@@ -1,5 +1,5 @@
 /* PC port: version shown in the programs' file properties (recvx.rc, recvx-config.rc). */
 #pragma once
 
-#define RECVX_VERSION_NUM 0, 9, 92, 0
-#define RECVX_VERSION_STR "0.9.92"
+#define RECVX_VERSION_NUM 0, 9, 93, 0
+#define RECVX_VERSION_STR "0.9.93"

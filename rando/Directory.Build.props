@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
-    <Version>0.9.92</Version>
+    <Version>0.9.93</Version>
     <Product>CVX Randomizer</Product>
   </PropertyGroup>
 </Project>

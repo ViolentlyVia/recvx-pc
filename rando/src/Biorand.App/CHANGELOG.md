@@ -1,5 +1,13 @@
 # Biorand++
 
+## 0.9.93
+- CV:X random doors with Claire start as a new game does: the opening, Claire waking in the
+  cell and Rodrigo letting her out. The cell's door, the first of the game, is the first random
+  door. Chris's runs keep their start. Every random-door seed gets a new layout.
+- CV:X random doors: no layout where a door lets you into rooms you cannot get back out of with
+  the keys you have (a door locked on one side only).
+- Biorand++ gives back the memory a seed used once it is written (it stayed at about 5 GB).
+
 ## 0.9.92
 - Biorand++ now ships with recvx-pc and has its version (0.9.92); it lives in recvx-pc's
   rando folder.
