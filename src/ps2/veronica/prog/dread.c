@@ -40,7 +40,14 @@ void bhReadPlayerData()
     mdlp = plp->mdl;
     
     plp->mdl_n = 0;
-    
+
+#ifdef TARGET_PC
+    /* a model with no SKIN block before it (the randomizer's converted characters: rigid parts
+       on the skeleton) must not keep the previous player file's skin pointer */
+    for (i = 0; i < 16; i++)
+        plp->skp[i] = NULL;
+#endif
+
     while ((dt1 = *(unsigned int*)plmdlp) != -1)
     {
         if (dt1 != 0)
