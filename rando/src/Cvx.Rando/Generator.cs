@@ -147,10 +147,11 @@ public static class Generator
             : null;
         var enemies = enemyRandomizer?.Apply(patcher) ?? [];
 
-        if (settings.RandomNpcs)
-            progress?.Report("Shuffling the NPCs...");
-        var npcs = settings.RandomNpcs
-            ? new NpcRandomizer(data, archive, Rng.For(settings.Seed, "npcs"), characters, settings.NpcCharacters).Apply(patcher)
+        if (settings.RandomNpcs || settings.RandomPlayers)
+            progress?.Report(settings.RandomNpcs ? "Shuffling the NPCs..." : "Changing Claire and Chris...");
+        var npcs = settings.RandomNpcs || settings.RandomPlayers
+            ? new NpcRandomizer(data, archive, Rng.For(settings.Seed, "npcs"), characters, settings.NpcCharacters,
+                settings.RandomPlayers ? PlayerLooks(settings, characters) : null, shuffle: settings.RandomNpcs).Apply(patcher)
             : null;
 
         List<MusicSwap> music = [];
@@ -199,6 +200,29 @@ public static class Generator
             Spoiler = "",
         };
         return result with { Spoiler = Spoiler.Write(result, data) };
+    }
+
+    /// <summary>
+    /// Who Claire and Chris become: the chosen BioRand character, or a random one of the
+    /// folder's (never both the same). Empty without a BioRand folder.
+    /// </summary>
+    public static Dictionary<string, string> PlayerLooks(RandoSettings settings, CharacterLibrary? library)
+    {
+        var result = new Dictionary<string, string>();
+        if (library == null || library.Characters.Count == 0)
+            return result;
+        var rng = Rng.For(settings.Seed, "players");
+        foreach (var (name, chosen) in new[] { ("Claire", settings.ClaireLook), ("Chris", settings.ChrisLook) })
+        {
+            if (!string.IsNullOrWhiteSpace(chosen))
+            {
+                result[name] = chosen.Trim().ToLowerInvariant();
+                continue;
+            }
+            var pool = library.Characters.Select(c => c.Id).Where(id => !result.ContainsValue(id)).ToList();
+            result[name] = pool[rng.Next(pool.Count)];
+        }
+        return result;
     }
 
     private static ItemPlacementResult PlaceItems(RandoData data, RandoSettings settings, ItemGraph graph, IReadOnlyCollection<int> startWeapons,

@@ -14,12 +14,14 @@ public class NpcTests
     [Fact]
     public void TheCastLeavesClaireAndChrisAlone()
     {
-        // their cutscene models (91, 92) always stay: the player looks like themselves
+        // the NPC shuffle never takes their cutscene models (91, 92): only the players' own
+        // option changes them (Data.Npcs.Players)
         var types = Data.Npcs.Characters.SelectMany(c => c.Types).ToList();
         Assert.DoesNotContain(91, types);
         Assert.DoesNotContain(92, types);
         Assert.Equal(types.Count, types.Distinct().Count());
-        var voices = Data.Npcs.Characters.Select(c => c.Voice).ToHashSet();
+        Assert.Equal(new[] { 91, 92 }, Data.Npcs.Players.SelectMany(p => p.Types).Order());
+        var voices = Data.Npcs.Characters.Concat(Data.Npcs.Players).Select(c => c.Voice).ToHashSet();
         Assert.All(Data.Npcs.Voices.Values.SelectMany(d => d.Values), v => Assert.Contains(v, voices));
     }
 

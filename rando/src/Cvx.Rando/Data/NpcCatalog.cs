@@ -4,6 +4,11 @@ namespace Cvx.Rando.Data;
 public sealed class NpcCatalog
 {
     public List<NpcCharacter> Characters { get; set; } = [];
+    /// <summary>
+    /// Claire and Chris: never shuffled with the NPCs, but each may take a BioRand character's
+    /// look (their cutscene models, types 91 and 92) and voice (<see cref="RandoSettings.RandomPlayers"/>).
+    /// </summary>
+    public List<NpcCharacter> Players { get; set; } = [];
     /// <summary>Disc ("1", "2") -> VOICE?.AFS entry -> the speaker's <see cref="NpcCharacter.Voice"/>.</summary>
     public Dictionary<string, Dictionary<int, string>> Voices { get; set; } = [];
 }

@@ -78,6 +78,15 @@ public sealed record RandoSettings
     /// NPCs only take each other's looks.
     /// </summary>
     public string[] NpcCharacters { get; init; } = [];
+    /// <summary>
+    /// Claire and Chris take the look (cutscene models) and voice of BioRand characters
+    /// (<see cref="ClaireLook"/>, <see cref="ChrisLook"/>), from the player's BioRand folder.
+    /// </summary>
+    public bool RandomPlayers { get; init; }
+    /// <summary>Who Claire becomes: a BioRand character's id (e.g. "leon.re2"), or empty for a random one.</summary>
+    public string ClaireLook { get; init; } = "";
+    /// <summary>Who Chris becomes: a BioRand character's id, or empty for a random one (not Claire's).</summary>
+    public string ChrisLook { get; init; } = "";
     /// <summary>The title call is one of BioRand's (data/title), picked by the seed.</summary>
     public bool RandomTitleCall { get; init; }
 

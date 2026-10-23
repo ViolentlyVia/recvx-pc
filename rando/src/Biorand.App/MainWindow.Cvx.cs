@@ -131,8 +131,17 @@ namespace IntelOrca.Biohazard.BioRand
             _cvxMusic = MusicLibrary.Find(_settings.BioRandPath, AppContext.BaseDirectory, _settings.GamePathCv);
             _cvxCharacters = CharacterLibrary.Find(_settings.BioRandPath, AppContext.BaseDirectory, _settings.GamePathCv);
 
-            // collapsed (BioRand hides them): the doors box moves up to the top of its column
-            chkPlayer.Visibility = Visibility.Collapsed;
+            // BioRand's player box: who Claire and Chris become (BioRand's characters), when there are any
+            lblPlayer0.Text = "Claire becomes:";
+            lblPlayer1.Text = "Chris becomes:";
+            lblPlayer1.Visibility = Visibility.Visible;
+            dropdownPlayer1.Visibility = Visibility.Visible;
+            dropdownPlayer0Container.Child ??= dropdownPlayer0;
+            dropdownPlayer1Container.Child ??= dropdownPlayer1;
+            chkSwapCharacters.Visibility = Visibility.Collapsed;
+            chkPlayer.ToolTip = "Claire and Chris look and sound like BioRand characters: their cutscene models and the lines of theirs the randomizer knows.";
+            chkPlayer.Visibility = CvxCharacterList.Count != 0 ? Visibility.Visible : Visibility.Collapsed;
+            // collapsed (BioRand hides it): the doors box moves up to the top of its column
             chkCutscenes.Visibility = Visibility.Collapsed;
             chkEnemySkins.Visibility = Visibility.Hidden;
             chkRngBgm.Visibility = Visibility.Visible;
@@ -206,6 +215,10 @@ namespace IntelOrca.Biohazard.BioRand
                 chkRngChars.IsChecked = s.RandomNpcs;
                 var picked = s.NpcCharacters.Select(c => c.ToLowerInvariant()).ToHashSet();
                 listNPCs.Values = CvxCharacterList.Select(c => picked.Contains(c.Id)).ToArray();
+
+                chkPlayer.IsChecked = s.RandomPlayers;
+                FillCvxPlayer(dropdownPlayer0, s.ClaireLook);
+                FillCvxPlayer(dropdownPlayer1, s.ChrisLook);
 
                 // BioRand's hints (completion estimate, item pie) read these
                 _config.RandomDoors = s.RandomDoors;
@@ -284,9 +297,40 @@ namespace IntelOrca.Biohazard.BioRand
                     .Concat(MissingCvx(_cvx.NpcCharacters, CvxCharacterList.Select(c => c.Id).ToList()))
                     .Order(StringComparer.Ordinal).ToArray(),
                 RandomTitleCall = chkRandomizeTitleVoice.IsChecked == true,
+                RandomPlayers = chkPlayer.IsChecked == true,
+                ClaireLook = CvxPlayerChoice(dropdownPlayer0),
+                ChrisLook = CvxPlayerChoice(dropdownPlayer1),
             };
             SaveSettings();
         }
+
+        /// <summary>
+        /// A player drop-down: Random, then BioRand's characters, and the chosen one when this
+        /// BioRand folder lacks it (a share code's pick is kept, as the character list does).
+        /// </summary>
+        private void FillCvxPlayer(ComboBox dropdown, string chosen)
+        {
+            var ids = new List<string> { "" };
+            var names = new List<string> { "Random" };
+            foreach (var c in CvxCharacterList)
+            {
+                ids.Add(c.Id);
+                names.Add(c.Name);
+            }
+            chosen = chosen.Trim().ToLowerInvariant();
+            if (chosen.Length != 0 && !ids.Contains(chosen))
+            {
+                ids.Add(chosen);
+                names.Add($"{CharacterLibrary.DisplayName(chosen)} (not in the BioRand folder)");
+            }
+            dropdown.Tag = ids;
+            dropdown.ItemsSource = names;
+            dropdown.SelectedIndex = Math.Max(0, ids.IndexOf(chosen));
+        }
+
+        /// <summary>The BioRand id a player drop-down holds; empty for Random.</summary>
+        private static string CvxPlayerChoice(ComboBox dropdown) =>
+            dropdown.Tag is List<string> ids && dropdown.SelectedIndex > 0 && dropdown.SelectedIndex < ids.Count ? ids[dropdown.SelectedIndex] : "";
 
         /// <summary>
         /// The per-enemy sliders as settings: none when every kind is at its default (the

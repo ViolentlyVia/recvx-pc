@@ -38,34 +38,53 @@ public sealed record NpcResult(IReadOnlyDictionary<string, string> Looks, IReadO
 /// With BioRand's characters picked (<paramref name="characters"/>), they are looks too: one is
 /// converted onto the skeleton of the NPC who takes it (<see cref="CharacterConverter"/>), and
 /// that NPC's lines become that character's clips from BioRand's voice folder, as BioRand does.
+/// Claire and Chris (<paramref name="players"/>: name -> BioRand id) take their BioRand look the
+/// same way, in their cutscene models, and their lines that the data knows become that
+/// character's clips; with <paramref name="shuffle"/> off the NPCs stay themselves.
 /// </summary>
-public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, CharacterLibrary? library = null, IReadOnlyList<string>? characters = null)
+public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, CharacterLibrary? library = null, IReadOnlyList<string>? characters = null,
+    IReadOnlyDictionary<string, string>? players = null, bool shuffle = true)
 {
     public NpcResult Apply(ItemPatcher rooms)
     {
-        var cast = data.Npcs.Characters;
+        var npcs = data.Npcs.Characters;
+        var playerLooks = (players ?? new Dictionary<string, string>()).ToDictionary(x => x.Key, x => x.Value.ToLowerInvariant());
+        var cast = npcs.Concat(data.Npcs.Players.Where(p => playerLooks.ContainsKey(p.Name))).ToList();
         var byName = cast.ToDictionary(c => c.Name);
 
         // BioRand's characters the settings ask for, in the library's order
-        var picked = (characters ?? []).Select(c => c.ToLowerInvariant()).ToHashSet();
-        var plds = new Dictionary<string, Pld>();
-        foreach (var c in library?.Characters.Where(c => picked.Contains(c.Id)) ?? [])
+        Dictionary<string, Pld> Read(IReadOnlySet<string> ids)
         {
-            try
+            var plds = new Dictionary<string, Pld>();
+            foreach (var c in library?.Characters.Where(c => ids.Contains(c.Id)) ?? [])
             {
-                var pld = Pld.Read(CharacterLibrary.ReadPld(c));
-                if (pld.Armature.Count >= 15 && pld.Mesh.Parts.Count >= 15)
-                    plds[c.Id] = pld;
+                try
+                {
+                    var pld = Pld.Read(CharacterLibrary.ReadPld(c));
+                    if (pld.Armature.Count >= 15 && pld.Mesh.Parts.Count >= 15)
+                        plds[c.Id] = pld;
+                }
+                catch (Exception ex) when (ex is InvalidDataException or NotSupportedException or IOException or IndexOutOfRangeException or ArgumentOutOfRangeException)
+                {
+                    // left out: it is reported missing
+                }
             }
-            catch (Exception ex) when (ex is InvalidDataException or NotSupportedException or IOException or IndexOutOfRangeException or ArgumentOutOfRangeException)
-            {
-                // left out: it is reported missing
-            }
+            return plds;
         }
-        var missing = picked.Where(c => !plds.ContainsKey(c)).Order(StringComparer.Ordinal).ToList();
+        var picked = (shuffle ? characters ?? [] : []).Select(c => c.ToLowerInvariant()).ToHashSet();
+        var plds = Read(picked);
+        var forPlayers = Read(playerLooks.Values.ToHashSet());
+        var missing = picked.Concat(playerLooks.Values).Where(c => !plds.ContainsKey(c) && !forPlayers.ContainsKey(c))
+            .Distinct().Order(StringComparer.Ordinal).ToList();
 
-        var names = cast.Select(c => c.Name).ToList();
-        var looks = plds.Count == 0 ? Derange(names) : Assign(names, [.. names, .. plds.Keys]);
+        var names = npcs.Select(c => c.Name).ToList();
+        var looks = !shuffle ? names.ToDictionary(n => n, n => n)
+            : plds.Count == 0 ? Derange(names) : Assign(names, [.. names, .. plds.Keys]);
+        // a player whose character could not be read stays themselves
+        foreach (var (name, look) in playerLooks)
+            looks[name] = forPlayers.ContainsKey(look) ? look : name;
+        foreach (var (id, pld) in forPlayers)
+            plds.TryAdd(id, pld);
 
         // the donors: each character's model page and textures
         var donors = new Dictionary<string, (ReadOnlyMemory<byte> Model, ReadOnlyMemory<byte>[] Textures)>();
@@ -82,6 +101,8 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, 
         var lookOf = new Dictionary<string, (ReadOnlyMemory<byte> Model, ReadOnlyMemory<byte>[] Textures)>();
         foreach (var (c, k) in cast.Select((c, k) => (c, k)))
         {
+            if (looks[c.Name] == c.Name)
+                continue;
             var look = looks[c.Name];
             if (!NpcResult.IsBioRand(look))
             {

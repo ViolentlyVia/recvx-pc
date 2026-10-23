@@ -249,6 +249,78 @@ public class CharacterTests
     }
 
     [BioRandFact]
+    public void ClaireAndChrisTakeBioRandLooksAndVoices()
+    {
+        using var rooms = RoomArchive.Open(TestData.Open());
+        var data = RandoData.Load();
+        var library = CharacterLibrary.Open(BioRandData.Directory)!;
+
+        // chosen, or random and never both the same
+        var chosen = Generator.PlayerLooks(new RandoSettings { Seed = 1, ClaireLook = "Leon.re2", ChrisLook = "ada.re2" }, library);
+        Assert.Equal(new Dictionary<string, string> { ["Claire"] = "leon.re2", ["Chris"] = "ada.re2" }, chosen);
+        foreach (var seed in Enumerable.Range(1, 20))
+        {
+            var random = Generator.PlayerLooks(new RandoSettings { Seed = seed }, library);
+            Assert.NotEqual(random["Claire"], random["Chris"]);
+            Assert.All(random.Values, id => Assert.NotNull(library.Get(id)));
+        }
+        Assert.Empty(Generator.PlayerLooks(new RandoSettings { Seed = 1 }, null));
+
+        // the players only: the NPCs stay themselves
+        var patcher = new ItemPatcher(data, rooms);
+        var result = new NpcRandomizer(data, rooms, Rng.For(5, "npcs"), library, ["hunk.re2"], chosen, shuffle: false).Apply(patcher);
+        Assert.All(data.Npcs.Characters, c => Assert.Equal(c.Name, result.Looks[c.Name]));
+        Assert.Equal("leon.re2", result.Looks["Claire"]);
+        Assert.Equal("ada.re2", result.Looks["Chris"]);
+        Assert.Empty(result.KeptRooms);
+
+        // their cutscene models (91, 92) become converted pages; nobody else's changes
+        var claire = data.Npcs.Players.Single(p => p.Name == "Claire");
+        var chris = data.Npcs.Players.Single(p => p.Name == "Chris");
+        foreach (var id in result.ChangedRooms)
+        {
+            var after = RdxEnemyLayout.Read(patcher.ChangedRooms[id]);
+            var before = RdxEnemyLayout.Read(rooms.ReadRoom(id));
+            Assert.True(after.IsConsistent, $"{id}");
+            Assert.Contains(after.Enemies, e => claire.Types.Contains(e.Type) || chris.Types.Contains(e.Type));
+            foreach (var (e, was) in after.Enemies.Zip(before.Enemies))
+            {
+                var player = claire.Types.Contains(e.Type) || chris.Types.Contains(e.Type);
+                Assert.Equal(player, !e.Model.Span.SequenceEqual(was.Model.Span));
+                if (player)
+                    Assert.Equal(CharacterConverter.SkeletonObjects, ModelPage.Read(e.Model.Span).Models.Single().Objects.Count);
+            }
+        }
+        Assert.Contains(RoomId.ParseName("RM_0000"), result.ChangedRooms);
+        Assert.Contains(RoomId.ParseName("RM_7220"), result.ChangedRooms);
+
+        // every line the data gives them becomes a clip of their new character; nobody else's changes
+        foreach (var (player, look) in new[] { (claire, "leon.re2"), (chris, "ada.re2") })
+        {
+            var lines = data.Npcs.Voices.Values.Sum(d => d.Values.Count(s => s == player.Voice));
+            Assert.True(lines >= 30, $"{player.Name}: {lines} lines");
+            var theirs = result.Voices.Where(v => v.Speaker == player.Voice).ToList();
+            Assert.Equal(lines, theirs.Count);
+            Assert.All(theirs, v => Assert.Equal(look, v.Clip?.Character));
+        }
+        Assert.All(result.Voices, v => Assert.Contains(v.Speaker, new[] { claire.Voice, chris.Voice }));
+    }
+
+    [Fact]
+    public void PlayerLooksLeaveShareCodesAlone()
+    {
+        var settings = new RandoSettings { Seed = 5 };
+        var json = Json(ShareCode.Encode(settings));
+        Assert.DoesNotContain(nameof(RandoSettings.RandomPlayers), json);
+        Assert.DoesNotContain(nameof(RandoSettings.ClaireLook), json);
+        var picked = settings with { RandomPlayers = true, ClaireLook = "leon.re2" };
+        Assert.True(ShareCode.TryDecode(ShareCode.Encode(picked), out var back, out _));
+        Assert.True(back!.RandomPlayers);
+        Assert.Equal("leon.re2", back.ClaireLook);
+        Assert.Equal("", back.ChrisLook);
+    }
+
+    [BioRandFact]
     public void BioRandCharactersBecomeNpcLooks()
     {
         var data = RandoData.Load();

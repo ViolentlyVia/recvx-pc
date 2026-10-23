@@ -88,12 +88,15 @@ internal static partial class Cli
                        [--enemy-placements] [--enemy-quantity 0-15] [--enemy-rooms 0-7] [--enemies-in-save-rooms]
                        [--music] [--music-games re2,sh1,...] [--title-call]
                        [--npcs] [--npc-characters leon.re2,ada.re2,...]
+                       [--players] [--claire-look <id>] [--chris-look <id>]
                        [--biorand <dir>]
                        [--share <code>] [--out <dir>] [--spoiler]
                                                  randomize (--doors: random doors, played by Claire, or
                                                  Chris with --chris, in 1-4 segments, using 1-8 eighths
                                                  of the rooms; --enemy-placements: random places, about
-                                                 quantity+1 enemies a room in rooms/7 of the rooms); --out writes the mod folder (RDX_LNK.AFS,
+                                                 quantity+1 enemies a room in rooms/7 of the rooms; --players:
+                                                 Claire and Chris look and sound like BioRand characters,
+                                                 the ids given or random); --out writes the mod folder (RDX_LNK.AFS,
                                                  rando.ini, rando_doors.txt, spoiler.txt, graph.dot,
                                                  graph.dgml) for recvx-pc's mod=
               dump-script <RM_xxxx> [--from <hex>] [--to <hex>]
@@ -533,6 +536,9 @@ internal static partial class Cli
             RandomNpcs = options.Has("npcs"),
             MusicGames = options.Get("music-games") is { } mg ? ["recv", .. mg.Split(',', StringSplitOptions.RemoveEmptyEntries)] : ["recv"],
             NpcCharacters = options.Get("npc-characters") is { } nc ? nc.Split(',', StringSplitOptions.RemoveEmptyEntries) : [],
+            RandomPlayers = options.Has("players"),
+            ClaireLook = options.Get("claire-look") ?? "",
+            ChrisLook = options.Get("chris-look") ?? "",
             EnemyDifficulty = options.Get("enemy-difficulty") is { } ed ? int.Parse(ed) : 1,
             // Zombie=4,Hunter=7: BioRand's per-enemy sliders (0-7)
             EnemyRatios = options.Get("enemy-ratios") is { } er
@@ -560,10 +566,11 @@ internal static partial class Cli
             var library = Cvx.Rando.Music.MusicLibrary.Find(options.Get("biorand"), AppContext.BaseDirectory, Environment.CurrentDirectory);
             if ((settings.RandomMusic && settings.MusicGames.Any(g => g != "recv")) || settings.RandomTitleCall)
                 Console.WriteLine(library == null ? "No BioRand music found (--biorand <folder>)." : $"BioRand music: {library.Directory}, {library.Tracks.Count} tracks");
-            var characters = settings.RandomNpcs && settings.NpcCharacters.Length != 0
+            var wantCharacters = (settings.RandomNpcs && settings.NpcCharacters.Length != 0) || settings.RandomPlayers;
+            var characters = wantCharacters
                 ? Cvx.Rando.Npcs.CharacterLibrary.Find(options.Get("biorand"), AppContext.BaseDirectory, Environment.CurrentDirectory)
                 : null;
-            if (settings.RandomNpcs && settings.NpcCharacters.Length != 0)
+            if (wantCharacters)
                 Console.WriteLine(characters == null ? "No BioRand characters found (--biorand <folder>)." : $"BioRand characters: {characters.Directory}, {characters.Characters.Count}");
             result = Generator.Generate(settings, RandoData.Load(), rooms, null, library, characters);
         }

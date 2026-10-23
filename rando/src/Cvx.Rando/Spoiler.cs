@@ -24,7 +24,11 @@ public static class Spoiler
             sb.AppendLine("Side pack: from the start");
         sb.AppendLine($"Enemies: {(s.RandomEnemies ? $"random, difficulty {s.EnemyDifficulty}" + EnemyMix(s, data) : "off")}");
         sb.AppendLine($"Music: {(s.RandomMusic ? "shuffled" + MusicFrom(s, result) : "off")}");
-        sb.AppendLine($"NPCs: {(result.Npcs is { } n ? string.Join(", ", n.Looks.Select(x => $"{x.Key} as {NpcResult.LookName(x.Value)}")) : "off")}");
+        string Looks(IEnumerable<string> who) => string.Join(", ", who.Where(w => result.Npcs!.Looks.ContainsKey(w))
+            .Select(w => $"{w} as {NpcResult.LookName(result.Npcs!.Looks[w])}"));
+        sb.AppendLine($"NPCs: {(s.RandomNpcs && result.Npcs != null ? Looks(data.Npcs.Characters.Select(c => c.Name)) : "off")}");
+        if (s.RandomPlayers)
+            sb.AppendLine($"Claire and Chris: {(result.Npcs != null && Looks(data.Npcs.Players.Select(c => c.Name)) is { Length: > 0 } p ? p : "unchanged (no BioRand folder with characters)")}");
         if (s.RandomTitleCall)
             sb.AppendLine($"Title call: {(result.TitleCall is { } t ? $"BioRand's {t.Name}" : "the game's (no BioRand folder with title calls)")}");
         sb.AppendLine();
@@ -138,9 +142,9 @@ public static class Spoiler
 
         if (result.Npcs is { } npcs)
         {
-            sb.AppendLine("NPCs (look and voice)");
-            sb.AppendLine("---------------------");
-            foreach (var (who, look) in npcs.Looks)
+            sb.AppendLine(s.RandomPlayers ? "Characters (look and voice)" : "NPCs (look and voice)");
+            sb.AppendLine(s.RandomPlayers ? "---------------------------" : "---------------------");
+            foreach (var (who, look) in npcs.Looks.Where(x => x.Key != x.Value))
             {
                 sb.AppendLine(NpcResult.IsBioRand(look)
                     ? $"  {who,-8} looks and sounds like {NpcResult.LookName(look)} (BioRand's model and voice clips)"

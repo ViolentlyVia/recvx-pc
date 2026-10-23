@@ -64,6 +64,10 @@ CV:X's options sit in BioRand's boxes, with its own additions:
   RE2 cast, All, None; each line becomes one of that character's clips of about the same
   length, as in BioRand, the subtitles keeping the game's words); Claire and Chris stay themselves. The seed's folder then has its own
   `VOICE1.AFS`/`VOICE2.AFS` (about 70 MB);
+- **Change Player Character** (BioRand's box): Claire and Chris become BioRand characters,
+  each picked in its drop-down or Random (never both the same): their cutscene models and the
+  lines of theirs the randomizer knows (116) take that character's look and voice
+  clips. Their gameplay model is not changed yet;
 - in the settings, **Randomize title voice** plays one of BioRand's title calls at the title
   screen, and **Door Skip (RE CVX)** turns on recvx-pc's door skip.
 
