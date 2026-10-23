@@ -50,12 +50,17 @@ include the seed's share code or its `spoiler.txt`.
 
 ## Building
 
-Requirements:
+The quick way: run **`build.bat`** (double-click it in a checkout, or download it with
+`build.ps1` from a release and run it in an empty folder, where it clones this repository
+first). It checks for the tools below, offers to install the missing ones with winget, fetches
+the submodules and builds everything into `build_pc`. `-NoRando` builds only the game, `-Yes`
+installs without asking.
+
+To build by hand, the requirements are:
 
 - Windows with **Visual Studio 2022 Build Tools** (the "Desktop development with C++" workload,
-  which includes the x86 compiler). The build expects it at
-  `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`; if Visual Studio is
-  installed elsewhere (e.g. Community edition), change `VCVARS` in `pc/tools/msvc.py`.
+  which includes the x86 compiler), or any Visual Studio 2022 edition with it (`pc/tools/msvc.py`
+  finds it with `vswhere`).
 - **Python 3**, for the port.
 - The **.NET 10 SDK**, for the randomizer.
 
