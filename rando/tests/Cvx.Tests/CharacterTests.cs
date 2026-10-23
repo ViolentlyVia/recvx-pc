@@ -17,7 +17,7 @@ public sealed class BioRandFactAttribute : FactAttribute
     public BioRandFactAttribute()
     {
         if (BioRandData.ClassicPack == null)
-            Skip = "BioRand's datapacks/classic.zip not found (a \"biorand\" folder next to or above the tests).";
+            Skip = "BioRand's datapacks/classic.zip not found (a \"biorand\" folder next to or above the tests, or build_pc\\biorand).";
         else if (TestData.Directory == null)
             Skip = "Game data not found (set CVX_DATA or build the port's build_pc\\data).";
     }
@@ -27,13 +27,20 @@ internal static class BioRandData
 {
     public static string? ClassicPack { get; } = Find();
 
+    /// <summary>The BioRand folder that holds <see cref="ClassicPack"/>.</summary>
+    public static string? Directory => ClassicPack == null ? null : Path.GetDirectoryName(Path.GetDirectoryName(ClassicPack));
+
     private static string? Find()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
         {
-            var path = Path.Combine(dir.FullName, "biorand", "datapacks", "classic.zip");
-            if (File.Exists(path))
-                return path;
+            // a "biorand" folder, or the one next to the port's recvx.exe (build_pc\biorand)
+            foreach (var folder in new[] { "biorand", Path.Combine("build_pc", "biorand") })
+            {
+                var path = Path.Combine(dir.FullName, folder, "datapacks", "classic.zip");
+                if (File.Exists(path))
+                    return path;
+            }
         }
         return null;
     }
@@ -51,6 +58,30 @@ internal static class BioRandData
 public class CharacterTests
 {
     private const string Leon = "data/re2/pld0/leon.re2/PL00.PLD";
+
+    [BioRandFact]
+    public void VoiceClipsBecomeTheGamesVoiceLines()
+    {
+        var library = CharacterLibrary.Open(BioRandData.Directory)!;
+        var leon = library.VoiceClips("leon.re2");
+        Assert.True(leon.Count >= 100, $"{leon.Count} clips");
+        Assert.All(leon, c => Assert.True(c.Seconds > 0, c.Name));
+        Assert.Contains(leon, c => c.IsPlain);
+        Assert.Contains(leon, c => !c.HasNoKind);   // _radio
+        Assert.Equal(library.VoiceClips("leon.re2").Select(c => c.Name), library.VoiceClips("leon.re2$variant").Select(c => c.Name));
+
+        // as a line of the game: one-shot mono ADX, as long as the clip, as loud as the line it replaces
+        using var afs = AfsArchive.Open(Path.Combine(TestData.Directory!, "VOICE1.AFS"));
+        var original = afs.ReadEntry(23);   // one of Steve's
+        var clip = leon.First(c => c.IsPlain);
+        var (pcm, rate) = Adx.Decode(NpcRandomizer.ClipAsAdx(clip, original));
+        Assert.Single(pcm);
+        Assert.InRange(pcm[0].Length / (double)rate, clip.Seconds - 0.1, clip.Seconds + 0.1);
+        // (or as loud as it goes without clipping: a clip with peaks near full scale stays quieter)
+        var want = Cvx.Rando.Music.MusicLibrary.Level(Adx.Decode(original).Channels).Rms;
+        var (rms, peak) = Cvx.Rando.Music.MusicLibrary.Level(pcm);
+        Assert.True(rms <= want * 1.3 && (rms >= want * 0.7 || peak >= 30000), $"rms {rms:0}, peak {peak}, the line's rms {want:0}");
+    }
 
     [BioRandFact]
     public void ReadsAnRe2Character()
@@ -222,7 +253,7 @@ public class CharacterTests
     {
         var data = RandoData.Load();
         using var rooms = RoomArchive.Open(TestData.Open());
-        var library = CharacterLibrary.Find(null, AppContext.BaseDirectory)!;
+        var library = CharacterLibrary.Open(BioRandData.Directory)!;
         var names = data.Npcs.Characters.Select(c => c.Name).ToList();
 
         // nothing picked: the shuffle is the one it always was
@@ -245,9 +276,17 @@ public class CharacterTests
             Assert.Empty(result.KeptRooms);
             seen.UnionWith(result.Looks.Values.Where(NpcResult.IsBioRand));
 
-            // an NPC with a BioRand look keeps their voice
-            var bioRand = result.Looks.Where(x => NpcResult.IsBioRand(x.Value)).Select(x => data.Npcs.Characters.Single(c => c.Name == x.Key).Voice).ToHashSet();
-            Assert.DoesNotContain(result.Voices, v => bioRand.Contains(v.Speaker));
+            // an NPC with a BioRand look speaks that character's clips (every line: they all have clips)
+            foreach (var (name, look) in result.Looks.Where(x => NpcResult.IsBioRand(x.Value)))
+            {
+                var voice = data.Npcs.Characters.Single(c => c.Name == name).Voice;
+                var theirs = result.Voices.Where(v => v.Speaker == voice).ToList();
+                Assert.NotEmpty(theirs);
+                Assert.All(theirs, v => Assert.Equal(look.Split('$')[0], v.Clip?.Character));
+                Assert.Equal(data.Npcs.Voices.Values.Sum(d => d.Values.Count(s => s == voice)), theirs.Count);
+            }
+            // the others' lines are the game's own
+            Assert.All(result.Voices.Where(v => v.Clip == null), v => Assert.True(v.FromDisc is 1 or 2));
 
             // their entries get a page with no SKIN, on the human skeleton, and the rooms still read
             foreach (var id in result.ChangedRooms)

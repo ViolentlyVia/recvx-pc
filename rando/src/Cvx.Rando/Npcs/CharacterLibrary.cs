@@ -15,6 +15,22 @@ public sealed record LibraryCharacter(string Id, string Source, string? Entry)
 }
 
 /// <summary>
+/// One of a BioRand character's voice clips (<c>data/voice/&lt;character&gt;/&lt;name&gt;.ogg</c>). As in
+/// BioRand, the name carries tags: <c>_kind</c> (radio, doom...) and <c>-name</c> conditions (said
+/// only with that character there, or not there for <c>-noname</c>).
+/// </summary>
+/// <param name="Source">The datapack zip, or the OGG file for a loose folder.</param>
+/// <param name="Entry">The clip's entry in the zip; null for a loose file.</param>
+public sealed record VoiceClip(string Character, string Name, string Source, string? Entry, double Seconds)
+{
+    /// <summary>A plain line: no kind and no conditions.</summary>
+    public bool IsPlain => !Path.GetFileNameWithoutExtension(Name).AsSpan().ContainsAny('_', '-');
+
+    /// <summary>A line of no special kind (it may have conditions).</summary>
+    public bool HasNoKind => !Path.GetFileNameWithoutExtension(Name).Contains('_');
+}
+
+/// <summary>
 /// BioRand's characters that can become NPC looks: from the datapacks (zips) or loose
 /// <c>data/re2</c> folders of the player's BioRand folder. Nothing of BioRand ships with the
 /// program; the characters are read and converted when a seed is made.
@@ -104,6 +120,79 @@ public sealed class CharacterLibrary
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// A character's voice clips (<c>data/voice/&lt;id&gt;/*.ogg</c>, the id without a <c>$</c> variant), by
+    /// name, with their length: from the loose folder first, then the datapacks.
+    /// </summary>
+    public IReadOnlyList<VoiceClip> VoiceClips(string id)
+    {
+        var folder = id.Split('$')[0].ToLowerInvariant();
+        var found = new Dictionary<string, VoiceClip>(StringComparer.OrdinalIgnoreCase);
+        void Add(string name, string source, string? entry, Func<Stream> open)
+        {
+            if (!name.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase) || found.ContainsKey(name))
+                return;
+            try
+            {
+                using var stream = open();
+                using var reader = new NVorbis.VorbisReader(stream, closeOnDispose: false);
+                found[name] = new VoiceClip(folder, name, source, entry, reader.TotalTime.TotalSeconds);
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IOException or ArgumentException)
+            {
+                // a clip that does not read is left out
+            }
+        }
+
+        var loose = Path.Combine(Directory, "data", "voice", folder);
+        if (System.IO.Directory.Exists(loose))
+        {
+            foreach (var file in System.IO.Directory.EnumerateFiles(loose, "*.ogg"))
+                Add(Path.GetFileName(file), file, null, () => File.OpenRead(file));
+        }
+        var packs = Path.Combine(Directory, "datapacks");
+        if (System.IO.Directory.Exists(packs))
+        {
+            var prefix = $"data/voice/{folder}/";
+            foreach (var zip in System.IO.Directory.EnumerateFiles(packs, "*.zip").Order(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    using var archive = ZipFile.OpenRead(zip);
+                    foreach (var e in archive.Entries.Where(e => e.FullName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && e.FullName.Length > prefix.Length))
+                    {
+                        // a zip entry's stream does not seek: read it whole
+                        Add(e.Name, zip, e.FullName, () =>
+                        {
+                            using var s = e.Open();
+                            var ms = new MemoryStream();
+                            s.CopyTo(ms);
+                            ms.Position = 0;
+                            return ms;
+                        });
+                    }
+                }
+                catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+                {
+                    // a broken or locked pack: the others still count
+                }
+            }
+        }
+        return found.Values.OrderBy(c => c.Name, StringComparer.Ordinal).ToList();
+    }
+
+    public static byte[] ReadOgg(VoiceClip clip)
+    {
+        if (clip.Entry == null)
+            return File.ReadAllBytes(clip.Source);
+        using var archive = ZipFile.OpenRead(clip.Source);
+        var entry = archive.GetEntry(clip.Entry) ?? throw new FileNotFoundException($"{clip.Entry} is not in {clip.Source}.");
+        using var stream = entry.Open();
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        return ms.ToArray();
     }
 
     public static byte[] ReadPld(LibraryCharacter character)

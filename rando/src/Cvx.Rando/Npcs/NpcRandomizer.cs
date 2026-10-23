@@ -7,8 +7,11 @@ using Cvx.Rando.Items;
 
 namespace Cvx.Rando.Npcs;
 
-/// <summary>A voice line given to another speaker: VOICE{Disc}.AFS entry Entry gets the ADX of VOICE{FromDisc}.AFS entry FromEntry.</summary>
-public sealed record VoiceSwap(int Disc, int Entry, string Speaker, int FromDisc, int FromEntry);
+/// <summary>
+/// A voice line given to another speaker: VOICE{Disc}.AFS entry Entry gets the ADX of
+/// VOICE{FromDisc}.AFS entry FromEntry, or BioRand's <see cref="Clip"/> (then FromDisc and FromEntry are 0).
+/// </summary>
+public sealed record VoiceSwap(int Disc, int Entry, string Speaker, int FromDisc, int FromEntry, VoiceClip? Clip = null);
 
 /// <summary>What the NPC shuffle did.</summary>
 /// <param name="Looks">Character -> the character whose look and voice they take: another NPC, or one of BioRand's (its id, e.g. leon.re2).</param>
@@ -34,7 +37,7 @@ public sealed record NpcResult(IReadOnlyDictionary<string, string> Looks, IReadO
 /// the other character of about the same length, from the game's own voice archives.
 /// With BioRand's characters picked (<paramref name="characters"/>), they are looks too: one is
 /// converted onto the skeleton of the NPC who takes it (<see cref="CharacterConverter"/>), and
-/// that NPC keeps their own voice.
+/// that NPC's lines become that character's clips from BioRand's voice folder, as BioRand does.
 /// </summary>
 public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, CharacterLibrary? library = null, IReadOnlyList<string>? characters = null)
 {
@@ -190,12 +193,37 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, 
         var voiceOf = byName.Values.ToDictionary(c => c.Name, c => c.Voice);
         var used = new Dictionary<(int, int), int>();
         var swaps = new List<VoiceSwap>();
+
+        // BioRand's characters: their clips of no special kind (radio, doom...), plain ones
+        // (no conditions) when there are enough; a character with few clips repeats them
+        var clips = looks.Values.Where(NpcResult.IsBioRand).Distinct().ToDictionary(l => l, l =>
+        {
+            var all = library?.VoiceClips(l).Where(c => c.HasNoKind && c.Seconds > 0).ToList() ?? [];
+            var plain = all.Where(c => c.IsPlain).ToList();
+            return plain.Count >= 10 ? plain : all;
+        });
+        var clipUse = new Dictionary<VoiceClip, int>();
+
         foreach (var line in lines)
         {
             var who = byName.Values.FirstOrDefault(c => c.Voice == line.Speaker);
-            // BioRand's characters: the NPC keeps their voice (for now)
-            if (who == null || looks[who.Name] == who.Name || NpcResult.IsBioRand(looks[who.Name]))
+            if (who == null || looks[who.Name] == who.Name)
                 continue;
+            if (NpcResult.IsBioRand(looks[who.Name]))
+            {
+                // one of the few clips closest in length, the least used first (as below)
+                var clip = clips[looks[who.Name]]
+                    .OrderBy(c => Math.Abs(c.Seconds - line.Seconds))
+                    .Take(4)
+                    .OrderBy(c => clipUse.GetValueOrDefault(c))
+                    .ThenBy(_ => rng.Next(1000))
+                    .FirstOrDefault();
+                if (clip == null)
+                    continue;   // no clips: the NPC keeps this line
+                clipUse[clip] = clipUse.GetValueOrDefault(clip) + 1;
+                swaps.Add(new VoiceSwap(line.Disc, line.Entry, line.Speaker, 0, 0, clip));
+                continue;
+            }
             var newVoice = voiceOf[looks[who.Name]];
             var pick = lines.Where(l => l.Speaker == newVoice)
                 .OrderBy(l => Math.Abs(l.Seconds - line.Seconds))
@@ -209,6 +237,27 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, 
             swaps.Add(new VoiceSwap(line.Disc, line.Entry, line.Speaker, pick.Disc, pick.Entry));
         }
         return swaps;
+    }
+
+    /// <summary>
+    /// A BioRand clip as one of the game's voice lines: one-shot mono ADX (the game's are mono,
+    /// 48 kHz; the clip keeps its rate, which the ADX header gives), as loud as the line it replaces.
+    /// </summary>
+    public static byte[] ClipAsAdx(VoiceClip clip, byte[] original)
+    {
+        var (pcm, rate) = Music.MusicLibrary.DecodeOgg(CharacterLibrary.ReadOgg(clip));
+        var mono = new short[pcm[0].Length];
+        for (var i = 0; i < mono.Length; i++)
+            mono[i] = (short)((pcm[0][i] + pcm[1][i]) / 2);
+        var (rms, peak) = Music.MusicLibrary.Level([mono]);
+        var target = Music.MusicLibrary.Level(Adx.Decode(original).Channels).Rms;
+        var gain = Music.MusicLibrary.MatchGain(rms, peak, target);
+        if (Math.Abs(gain - 1) > 0.01)
+        {
+            for (var i = 0; i < mono.Length; i++)
+                mono[i] = (short)Math.Clamp(Math.Round(mono[i] * gain), short.MinValue, short.MaxValue);
+        }
+        return Adx.Encode([mono], rate, loop: false);
     }
 
     /// <summary>VOICE1.AFS and VOICE2.AFS with the swapped lines, in the mod folder (or removed when there are none).</summary>
@@ -229,7 +278,9 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, 
                         File.Delete(path);
                     continue;
                 }
-                var replacements = mine.ToDictionary(s => s.Entry, s => Source(s.FromDisc).ReadEntry(s.FromEntry));
+                var replacements = mine.ToDictionary(s => s.Entry, s => s.Clip is { } clip
+                    ? ClipAsAdx(clip, Source(disc).ReadEntry(s.Entry))
+                    : Source(s.FromDisc).ReadEntry(s.FromEntry));
                 AfsWriter.Write(Source(disc), replacements, path);
             }
         }

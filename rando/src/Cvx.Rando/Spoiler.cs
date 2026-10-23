@@ -143,7 +143,7 @@ public static class Spoiler
             foreach (var (who, look) in npcs.Looks)
             {
                 sb.AppendLine(NpcResult.IsBioRand(look)
-                    ? $"  {who,-8} looks like {NpcResult.LookName(look)} from BioRand, voice unchanged"
+                    ? $"  {who,-8} looks and sounds like {NpcResult.LookName(look)} (BioRand's model and voice clips)"
                     : $"  {who,-8} looks and sounds like {look}");
             }
             if (npcs.MissingCharacters.Count != 0)

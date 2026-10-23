@@ -60,8 +60,9 @@ CV:X's options sit in BioRand's boxes, with its own additions:
   other games BioRand has music of (converted to ADX and matched to the game's loudness; the
   seed's folder then has its own `BGM1.AFS`/`BGM2.AFS`, about 250 and 200 MB);
 - **Randomize NPCs**: Steve, Rodrigo, Alfred, Alexia and Wesker take each other's looks and
-  voices, or the looks of the BioRand characters ticked in the list (right-click: RE2 cast,
-  All, None); Claire and Chris stay themselves. The seed's folder then has its own
+  voices, or the looks and voices of the BioRand characters ticked in the list (right-click:
+  RE2 cast, All, None; each line becomes one of that character's clips of about the same
+  length, as in BioRand, the subtitles keeping the game's words); Claire and Chris stay themselves. The seed's folder then has its own
   `VOICE1.AFS`/`VOICE2.AFS` (about 70 MB);
 - in the settings, **Randomize title voice** plays one of BioRand's title calls at the title
   screen, and **Door Skip (RE CVX)** turns on recvx-pc's door skip.
