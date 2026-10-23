@@ -427,7 +427,20 @@ namespace IntelOrca.Biohazard.BioRand
                 _cvxBusy = false;
                 ShowCvxPanel();
                 UpdateUi();
+                ReleaseSeedMemory();
             }
+        }
+
+        /// <summary>
+        /// A seed builds its archives in memory (the rooms, music and voices: about 6 GB at the
+        /// peak), all garbage once written. An idle window allocates too little for the GC to run,
+        /// and an ordinary collection keeps the memory for reuse; an aggressive one gives it back
+        /// to Windows (seed 796072: 6 GB to 62 MB).
+        /// </summary>
+        private static void ReleaseSeedMemory()
+        {
+            System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
         }
 
         private void StartCvx()
