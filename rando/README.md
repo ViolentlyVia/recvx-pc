@@ -80,7 +80,7 @@ run's saves once the new one is written. The app remembers your choices in
 | `src/Cvx.Rando` | The CV:X randomizer: room data, item logic and placement, room patching, the mod folder |
 | `src/Cvx.Rando.Cli` | Command-line tool, `cvx-rando-cli.exe`, for inspecting rooms and scripted runs |
 | `data/` | Built-in data: `items.json` and the room data in `recv/` (from BioRand, corrected; see `recv/CHANGES.md`) |
-| `tests/Cvx.Tests` | Tests; the ones that need game data use `CVX_DATA` or `..\recvx-pc\build_pc\data` and are skipped when it is missing |
+| `tests/Cvx.Tests` | Tests; the ones that need game data use `CVX_DATA` or the port's `build_pc\data` (at the repository root) and are skipped when it is missing |
 
 ## Building
 
@@ -106,7 +106,7 @@ powershell -File tools/publish.ps1
 
 builds `cvx-rando.exe` as one self-contained file (about 63 MB; players install nothing) in
 `artifacts\publish`, with `cvx-rando-notices.txt` (the licences, which travel with the exe), and
-copies both next to `recvx.exe` in `..\recvx-pc\build_pc`. recvx-pc's `pc/tools/make_share.py`
+copies both next to `recvx.exe` in the port's `build_pc`. `pc/tools/make_share.py`
 then puts them in the share zip. `-Target <folder>` copies elsewhere, `-NoCopy` only builds.
 
 Testing aids: `BIORANDPP_SETTINGS=<folder>` keeps the settings elsewhere;
@@ -144,7 +144,7 @@ dotnet run --project src/Cvx.Rando.Cli -- <command>
 | `verify-data [--all]` | Checks the built-in room data against the game's rooms (see `data/recv/CHANGES.md`) |
 | `make-mod --out <dir> [--item <RM_xxxx>:<index>=<item id>]... [--ini <key=value>]...` | Builds a test mod folder for recvx-pc (`mod=` in `recvx.ini`) with hand-made item changes and `rando.ini` keys |
 
-`--data` defaults to the `CVX_DATA` environment variable, then `..\recvx-pc\build_pc\data`.
+`--data` defaults to the `CVX_DATA` environment variable, then the port's `build_pc\data` at the repository root.
 
 ## Credits
 

@@ -8,8 +8,8 @@ app sets the game up from their own disc image (no Python). Deliberately left ou
 extracted disc files (data/), converted movies, HD texture packs, recvx.ini (holds your local
 paths), saves, logs and input recordings.
 
-The randomizer (cvx-rando.exe, from the separate CVXRandomizer project; build it with its
-tools/publish.ps1) is included when it is given with --rando or found in build_pc/, with its
+The randomizer (cvx-rando.exe, from rando/ in this repository; build it with
+rando/tools/publish.ps1) is included when it is given with --rando or found in build_pc/, with its
 licence notices (cvx-rando-notices.txt) from the same folder.
 """
 import argparse

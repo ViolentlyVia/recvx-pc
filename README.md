@@ -28,7 +28,7 @@ graveyard), saving and loading. Report problems with a `last_run_input.txt` reco
 | Saving and loading (to a `saves` folder, no memory card screens) | done |
 | Keyboard and game controllers (SDL2), with vibration | done |
 | Fast-forward (hold Numpad 0) | done |
-| Randomizer support (mod folder, `rando.ini`) for the separate `cvx-rando.exe` | done |
+| Randomizer support (mod folder, `rando.ini`) for `cvx-rando.exe` ([rando/](rando/README.md)) | done |
 
 ## Building
 
@@ -129,7 +129,7 @@ match, so `scale=3` at 16:9 renders at 2560x1440.
 
 ### Randomizer
 
-The randomizer, `cvx-rando.exe`, is a separate program (the CVXRandomizer project).
+The randomizer, `cvx-rando.exe`, is a separate program, built from [rando/](rando/README.md).
 "Randomizer..." in `recvx-config.exe` starts it when it is next to the exe. It writes the files
 it changes (the room archive `RDX_LNK.AFS`, and the room sound packs `MULTSPQ1.AFS` and
 `MULTSPQ2.AFS` when enemies change) to a folder such as `rando\<seed>` and points `mod=`
@@ -172,7 +172,7 @@ python pc/tools/make_share.py [--rando <path to cvx-rando.exe>]
 
 builds `build_pc/share/recvx-cvx-pc.zip` with just `recvx.exe`, `recvx-config.exe`, `SDL2.dll`
 and a README (plus `cvx-rando.exe` and its `cvx-rando-notices.txt` when given or found in
-`build_pc`; CVXRandomizer's `tools/publish.ps1` builds and copies them there). It refuses to
+`build_pc`; `rando/tools/publish.ps1` builds and copies them there). It refuses to
 include game files; each recipient unzips it, runs `recvx-config.exe` and sets the game up from
 their own disc image (no Python needed).
 

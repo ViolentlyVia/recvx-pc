@@ -19,7 +19,7 @@ public sealed class BioRandFactAttribute : FactAttribute
         if (BioRandData.ClassicPack == null)
             Skip = "BioRand's datapacks/classic.zip not found (a \"biorand\" folder next to or above the tests).";
         else if (TestData.Directory == null)
-            Skip = "Game data not found (set CVX_DATA or set up ..\\recvx-pc\\build_pc\\data).";
+            Skip = "Game data not found (set CVX_DATA or build the port's build_pc\\data).";
     }
 }
 

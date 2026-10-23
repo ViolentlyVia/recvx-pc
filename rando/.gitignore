@@ -25,3 +25,9 @@ artifacts/
 
 # Game and BioRand samples for format work: never commit
 samples/
+
+# The port's root .gitignore ignores these names in any folder; not in the randomizer
+!build/
+!context/
+!elf/
+!iso/

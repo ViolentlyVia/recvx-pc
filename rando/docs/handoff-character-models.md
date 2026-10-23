@@ -203,7 +203,7 @@ them on other files and paste you the output.
 
 ## 9. How the owner tests in the game
 
-The owner runs recvx-pc from `..\recvx-pc\build_pc`. Testing aids (environment variables):
+The owner runs recvx-pc from `build_pc` at the repository root (the randomizer is in `rando\`). Testing aids (environment variables):
 
 - `RECVX_MOD=<folder>`: use a mod folder (else `mod=` in recvx.ini).
 - `RECVX_WARP=<stage>,<room>[,<entrance>[,<case>]]`: a new game starts in that room.

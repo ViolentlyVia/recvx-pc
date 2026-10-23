@@ -134,7 +134,7 @@ internal static partial class Cli
                                                  hand-made changes, for testing; rando.ini always
                                                  gets version=1
 
-            All commands take --data <dir> (default: CVX_DATA, then ..\recvx-pc\build_pc\data).
+            All commands take --data <dir> (default: CVX_DATA, then the port's build_pc\data).
             """);
     }
 

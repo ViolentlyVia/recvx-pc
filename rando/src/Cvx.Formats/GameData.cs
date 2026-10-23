@@ -19,8 +19,8 @@ public sealed class GameData
     }
 
     /// <summary>
-    /// The default data folder: <c>CVX_DATA</c>, else recvx-pc's <c>build_pc\data</c> next to
-    /// this repository (for development), else null.
+    /// The default data folder: <c>CVX_DATA</c>, else the port's <c>build_pc\data</c> at the root of
+    /// the repository (the randomizer is in its rando\ folder; for development), else null.
     /// </summary>
     public static string? FindDefaultDirectory()
     {
@@ -30,7 +30,7 @@ public sealed class GameData
 
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
         {
-            var candidate = Path.Combine(dir.FullName, "recvx-pc", "build_pc", "data");
+            var candidate = Path.Combine(dir.FullName, "build_pc", "data");
             if (File.Exists(Path.Combine(candidate, RoomArchiveName)))
                 return candidate;
         }

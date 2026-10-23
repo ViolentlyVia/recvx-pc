@@ -1,15 +1,15 @@
 <#
 Builds cvx-rando.exe (Biorand++) as one self-contained file (players install nothing) and copies it, with
-the licence notices, next to recvx.exe in recvx-pc's build folder, where make_share.py picks it
+the licence notices, next to recvx.exe in the port's build folder (build_pc), where make_share.py picks it
 up for the share zip.
 
     powershell -File tools/publish.ps1 [-Target <folder>] [-NoCopy]
 
--Target   where to copy cvx-rando.exe (default: ..\recvx-pc\build_pc)
+-Target   where to copy cvx-rando.exe (default: the port's build_pc at the repository root)
 -NoCopy   only build (the result is in artifacts\publish)
 #>
 param(
-    [string]$Target = (Join-Path $PSScriptRoot "..\..\recvx-pc\build_pc"),
+    [string]$Target = (Join-Path $PSScriptRoot "..\..\build_pc"),
     [switch]$NoCopy
 )
 $ErrorActionPreference = "Stop"

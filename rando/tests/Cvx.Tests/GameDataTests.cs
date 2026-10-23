@@ -108,6 +108,6 @@ public sealed class GameDataTheoryAttribute : TheoryAttribute
     public GameDataTheoryAttribute()
     {
         if (TestData.Directory == null)
-            Skip = "Game data not found (set CVX_DATA or set up ..\\recvx-pc\\build_pc\\data).";
+            Skip = "Game data not found (set CVX_DATA or build the port's build_pc\\data).";
     }
 }
