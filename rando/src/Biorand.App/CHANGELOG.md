@@ -1,5 +1,13 @@
 # Biorand++
 
+## 0.9.92
+- Biorand++ now ships with recvx-pc and has its version (0.9.92); it lives in recvx-pc's
+  rando folder.
+- CV:X random doors: the rooms the run reaches always lead back with the keys you have (seed
+  985463 could walk into RM_9320 by the open side of its jewel door and not get out).
+- CV:X: doors of the run's rooms that would lead out of the run are locked; bats count for the
+  enemy sliders; a key is not placed in a room that only arms its lock when you enter.
+
 ## 0.2.0
 - BioRand's window (3.3.2), with Resident Evil 1, 2 and 3 on BioRand's own randomizer, and
   Resident Evil Code: Veronica X on the CVX Randomizer for recvx-pc.

@@ -1013,7 +1013,7 @@ namespace IntelOrca.Biohazard.BioRand
 
         private void UpdateLink_Click(object sender, RoutedEventArgs e)
         {
-            OpenShell("https://github.com/ViolentlyVia/CVXRandomizer/releases");
+            OpenShell("https://github.com/ViolentlyVia/recvx-pc/releases");
         }
 
         /// <summary>Biorand++: on .NET a URL or document opens through the shell only when asked.</summary>
