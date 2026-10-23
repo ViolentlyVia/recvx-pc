@@ -1,19 +1,37 @@
 # recvx-pc
 
 A native Windows port of **Resident Evil Code: Veronica X**, recompiled from the
-[recvx-decomp](https://github.com/AshfordFamily/recvx-decomp) decompilation. The game's own C
-code is built with MSVC as a regular 32-bit Windows program; the PS2 hardware and SDK it was
-written for (Graphics Synthesizer, VU0, IOP sound driver, memory cards, disc drive, ...) are
-replaced by a PC platform layer. No emulator is involved.
+[recvx-decomp](https://github.com/AshfordFamily/recvx-decomp) decompilation, together with
+**Biorand++**, a randomizer for it built on [BioRand](https://github.com/biorand/classic).
+
+- **The port** (`recvx.exe`): the game's own C code is built with MSVC as a regular 32-bit
+  Windows program; the PS2 hardware and SDK it was written for (Graphics Synthesizer, VU0, IOP
+  sound driver, memory cards, disc drive, ...) are replaced by a PC platform layer. No emulator
+  is involved.
+- **Biorand++** (`cvx-rando.exe`, in [rando/](rando/README.md)): BioRand's window and its
+  engine for Resident Evil 1, 2 and 3, with a fourth game, CV:X. It shuffles items, doors,
+  enemies, music and NPCs and writes the changed files to a mod folder that `recvx.exe` loads
+  instead of the originals, so your game data is never changed.
 
 This repository contains **no game data**. You need your own copy of the US PlayStation 2 disc
 (**SLUS-20184**) as an `.iso` image.
 
+## Repository layout
+
+| Folder | What it is |
+|---|---|
+| `src/`, `include/`, `config/` | The upstream decompilation (kept as it is; PC changes are inside `#ifdef TARGET_PC`) |
+| `pc/` | The PC platform layer, the settings app and the build tools |
+| `rando/` | Biorand++ and the CV:X randomizer (.NET); see [rando/README.md](rando/README.md) |
+| `rando/external/biorand` | BioRand's source (git submodule) |
+| `build_pc/` | Build output: `recvx.exe`, `recvx-config.exe`, and the game data you set up (not in git) |
+
 ## Status
 
 The game boots and plays; testing so far covers the opening section (prison, explosion,
-graveyard), saving and loading. Report problems with a `last_run_input.txt` recording (see
-[pc/README.md](pc/README.md)).
+graveyard), saving and loading, and randomized runs. Report problems with a
+`last_run_input.txt` recording (see [pc/README.md](pc/README.md)); for a randomized run,
+include the seed's share code or its `spoiler.txt`.
 
 | Feature | State |
 |---|---|
@@ -28,7 +46,7 @@ graveyard), saving and loading. Report problems with a `last_run_input.txt` reco
 | Saving and loading (to a `saves` folder, no memory card screens) | done |
 | Keyboard and game controllers (SDL2), with vibration | done |
 | Fast-forward (hold Numpad 0) | done |
-| Randomizer support (mod folder, `rando.ini`) for `cvx-rando.exe` ([rando/](rando/README.md)) | done |
+| Randomizer: items, doors, enemies, music, NPC looks and voices (Biorand++) | in progress |
 
 ## Building
 
@@ -38,18 +56,30 @@ Requirements:
   which includes the x86 compiler). The build expects it at
   `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`; if Visual Studio is
   installed elsewhere (e.g. Community edition), change `VCVARS` in `pc/tools/msvc.py`.
-- **Python 3**.
+- **Python 3**, for the port.
+- The **.NET 10 SDK**, for the randomizer.
 
 ```bash
 git clone --recursive https://github.com/ViolentlyVia/recvx-pc.git
-cd recvx-pc
+```
+```bash
 python pc/tools/build.py
 ```
 
 `build.py` downloads SDL2 into `build_pc/deps` on first run and writes `build_pc/recvx.exe` and
 `build_pc/recvx-config.exe` (add `--debug` for an unoptimised build, `--clean` to rebuild
-everything). If you cloned without `--recursive`, run `git submodule update --init` first.
-Python is only needed to build; players need nothing but the programs.
+everything). If you cloned without `--recursive`, run `git submodule update --init --recursive`
+first (it also fetches BioRand's source for the randomizer).
+
+```bash
+powershell -File rando/tools/publish.ps1
+```
+
+builds the randomizer, `cvx-rando.exe`, as one self-contained file (players install nothing),
+with its licence notices `cvx-rando-notices.txt`, and copies both into `build_pc` next to
+`recvx.exe`. For development, `dotnet build` and `dotnet test` in `rando/` build and test it;
+the tests that need game data use `build_pc/data`. Python and .NET are only needed to build;
+players need nothing but the programs.
 
 ## Setting up the game data
 
@@ -93,7 +123,8 @@ Saves are written to `build_pc/saves` (copy the folder to back them up).
 ### Settings
 
 Run `recvx-config.exe` (next to `recvx.exe`) to change the display settings, folders and
-key / controller bindings; it writes `recvx.ini`. "Save and play" starts the game.
+key / controller bindings; it writes `recvx.ini`. "Save and play" starts the game, and
+"Randomizer..." starts Biorand++.
 
 ### recvx.ini
 
@@ -127,15 +158,36 @@ With a widescreen `aspect=`, the 3D view is widened rather than stretched, and m
 movies stay at 4:3 in the middle of the screen. The internal resolution rises horizontally to
 match, so `scale=3` at 16:9 renders at 2560x1440.
 
-### Randomizer
+## Randomizer
 
-The randomizer, `cvx-rando.exe`, is a separate program, built from [rando/](rando/README.md).
-"Randomizer..." in `recvx-config.exe` starts it when it is next to the exe. It writes the files
-it changes (the room archive `RDX_LNK.AFS`, and the room sound packs `MULTSPQ1.AFS` and
-`MULTSPQ2.AFS` when enemies change) to a folder such as `rando\<seed>` and points `mod=`
-at it. A file in the `mod=` folder is read instead of the data folder's file with the same path,
-so the game data itself is never changed. The randomizer also sets `saves=` to a save folder for
-that seed. "Play normal game" (in either program) removes `mod=` and puts your own `saves=` back.
+Start `cvx-rando.exe` next to `recvx.exe` (or "Randomizer..." in `recvx-config.exe`). Its window
+is BioRand's: the first time it takes your RE 1-3 folders from BioRand, and in its settings (the
+cog) you choose `recvx.exe`'s folder and BioRand's folder (CV:X uses BioRand's music and
+characters; a `biorand` folder next to or above the program is found by itself). RE 1-3 are
+randomized by BioRand's own engine, as in BioRand.
+
+For CV:X, pick the options and **Generate**, then **Start CV:X**:
+
+- **Randomize Doors**: Claire or Chris plays the whole run, in 1-4 segments, through more or
+  fewer of the rooms;
+- **Randomize Items**: the game's own items shuffled, or a custom item pool; random inventory;
+- **Randomize Enemies**: each kind's frequency on BioRand's sliders, optionally in random places;
+- **Randomize Music** and **Randomize NPCs** (looks and voices, from CV:X and BioRand's characters);
+- a share code (`CVX1-...`) holds the seed and every option, to play someone else's seed.
+
+Generate writes the seed to `rando\<seed>` in the game folder and makes it active: `recvx.ini`
+gets `mod=rando\<seed>` and `saves=saves_rando` (a separate save folder for random runs; your
+own `saves=` is kept as `saves_normal=`). **Play normal game** (in either program) removes `mod=`
+and puts your own saves back. Each seed's folder has a `spoiler.txt`. All the options, the
+projects and the command-line tool are in [rando/README.md](rando/README.md); the work log is
+[rando/PLAN.md](rando/PLAN.md).
+
+### What the game reads from a mod folder
+
+The randomizer writes the files it changes (the room archive `RDX_LNK.AFS`, the room sound packs
+`MULTSPQ1.AFS` and `MULTSPQ2.AFS` when enemies change, `BGM1/2.AFS` for music, `VOICE1/2.AFS`
+for NPC voices, `ADV.AFS` for the title call) to the `mod=` folder. A file there is read instead of the data folder's file
+with the same path, so the game data itself is never changed.
 
 Changes that need code rather than files are read from `rando.ini` in the mod folder (format
 in `pc/src/pc_rando.c`):
@@ -149,32 +201,20 @@ in `pc/src/pc_rando.c`):
 | `no_nosferatu_poison=1` | Nosferatu's attack never poisons |
 | `start_special_claire=<id>`, `start_items_claire=<id>:<n>,...` | Claire's starting items (the same keys with `chris` for Chris) |
 | `bgm_map=<from>:<to>,...` | music tracks swapped when room scripts ask for music |
-| `start=<stage>,<room>,<entrance>,<case>` | where a new game starts (random doors start in `RM_0010`) |
+| `start=<stage>,<room>,<entrance>,<case>[,<player>]` | where a new game starts, and as whom (random doors start in `RM_0010`) |
 
 With random doors, `rando_doors.txt` in the mod folder lists the doors that lead somewhere new,
 one per line: `<stage> <room> <case> <area> <old stage> <old room>  <new stage> <new room>
 <new case> <entrance> [1]`; a trailing `1` marks a door that leads nowhere, which the game then
-shows as locked ("It's locked.") instead of opening. The game looks a door up where it decides where the door goes (door
-areas and script doors), so the room files keep their own door data. `<case>` is the case of the
-room file that is loaded, even when the room's script has already set the next room's case
-(`room_case_no`) before its door call. When a room's variant
-file does not exist, the game loads variant 0 instead of waiting forever.
+shows as locked ("It's locked.") instead of opening. The game looks a door up where it decides
+where the door goes (door areas and script doors), so the room files keep their own door data.
+`<case>` is the case of the room file that is loaded, even when the room's script has already
+set the next room's case (`room_case_no`) before its door call. When a room's variant file does
+not exist, the game loads variant 0 instead of waiting forever.
 
-`recvx.log` lists each room's memory use when it loads (`room rm_SRRC.rdx: ... pool ...`): the
-room is expanded in place inside a fixed pool, and the randomizer checks every room it changes
-against that pool.
-
-## Sharing with friends
-
-```bash
-python pc/tools/make_share.py [--rando <path to cvx-rando.exe>]
-```
-
-builds `build_pc/share/recvx-cvx-pc.zip` with just `recvx.exe`, `recvx-config.exe`, `SDL2.dll`
-and a README (plus `cvx-rando.exe` and its `cvx-rando-notices.txt` when given or found in
-`build_pc`; `rando/tools/publish.ps1` builds and copies them there). It refuses to
-include game files; each recipient unzips it, runs `recvx-config.exe` and sets the game up from
-their own disc image (no Python needed).
+`recvx.log` lists each room's memory use when it loads (`room rm_SRRC.rdx: ... pool ...`) and
+the randomizer's `rando:` lines (doors taken, music swapped): the room is expanded in place
+inside a fixed pool, and the randomizer checks every room it changes against that pool.
 
 ## How it works
 
@@ -188,7 +228,7 @@ The upstream decompiled sources are kept as they are; every PC change is wrapped
 | VU0 microcode translated to C | `pc/src/vu/` |
 | EE kernel (threads as fibers, semaphores, VBLANK) | `pc_kernel.c` |
 | Disc access (extracted folder or ISO, mod folder) | `pc_cdvd.c` |
-| Randomizer options (`rando.ini`), `RECVX_WARP` | `pc_rando.c` |
+| Randomizer options (`rando.ini`, `rando_doors.txt`), `RECVX_WARP` | `pc_rando.c` |
 | IOP / SIF RPC, Tamsoft sound driver (SPU ADPCM synth, MIDI sequencer) | `pc_iop.c`, `pc_iop_tsnddrv.c` |
 | CRI ADX output, SDL audio mixer | `pc_adx_rna.c`, `pc_audio.c` |
 | Movies (pl_mpeg) | `pc_movie.c`, `pc_mpeg.c` |
@@ -199,10 +239,17 @@ More detail (porting approach, tools, debug environment variables) is in
 [pc/README.md](pc/README.md). `recvx.log` next to the exe records warnings and prints a stack
 trace on crashes.
 
+The randomizer (`rando/`) reads the game's room files itself (AFS archives, PRS compression,
+room scripts), places items and doors with BioRand's room data (corrected against the game,
+see `rando/data/recv/CHANGES.md`) and checks every seed can be finished before writing it.
+
 ## Credits and license
 
 - The decompilation this port is built on: [recvx-decomp](https://github.com/AshfordFamily/recvx-decomp)
   by AshfordFamily and contributors, including the CRI and Katana header submodules.
+- [BioRand](https://github.com/biorand/classic) by Ted John (IntelOrca) and its contributors:
+  Biorand++'s window and its RE 1-3 randomizer, and parts of the CV:X randomizer; Code: Veronica
+  information by kapdap. See [rando/THIRD_PARTY_NOTICES.md](rando/THIRD_PARTY_NOTICES.md).
 - [SDL2](https://www.libsdl.org/) (zlib), [pl_mpeg](https://github.com/phoboslab/pl_mpeg) (MIT),
   [xxHash](https://github.com/Cyan4973/xxHash) (BSD-2).
 
