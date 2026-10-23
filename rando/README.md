@@ -48,7 +48,8 @@ CV:X's options sit in BioRand's boxes, with its own additions:
   places). As in BioRand, each kind's slider sets how often it comes (None = never) and
   Difficulty how many of one kind a room may hold; all sliders at the middle keep the
   difficulty's own mix. Moth, Spotter, Albinoid, Anatomist and Tyrant are not yet tested in
-  the game and start at None. **No Nosferatu poison**.
+  the game and start at None. Bats count too (what takes their place starts on the floor below
+  them); only bats an event moves stay. **No Nosferatu poison**.
   **Random enemy placements**, as in BioRand: of the rooms that can take them (not boss
   rooms, rooms with enemy events, or save rooms unless **Allow enemies in save rooms**),
   **Rooms with enemies** sets the share that have enemies, from 1 to twice the **average
