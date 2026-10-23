@@ -355,7 +355,10 @@ public class DoorTests
         // RM_7230, a room of no run, and its scene stuck)
         var door = Data.Map.Rooms["80C0"].Doors!.Single(d => d.Target == "8170");
         Assert.Equal(4, door.Id);
-        var layout = Generator.MakeDoors(Doors(117323, Character.Claire, 1, 1) with { ItemMode = ItemMode.Custom, HiddenKeyItems = true }, Data);
+        // (the first layout from that seed on with RM_7120 and without RM_7230: seeds change)
+        var layout = Enumerable.Range(117323, 500)
+            .Select(seed => Generator.MakeDoors(Doors(seed, Character.Claire, 1, 1) with { ItemMode = ItemMode.Custom, HiddenKeyItems = true }, Data))
+            .First(l => l.Plan.Rooms.Contains("80C0") && !l.Plan.Rooms.Contains("8170"));
         var table = DoorTable.Write(layout.Plan, Data);
         Assert.Contains(table.Split('\n'), l => l.StartsWith("7 12 0 4 7 23 "));
     }
@@ -455,6 +458,56 @@ public class DoorTests
                         $"seed {seed}: {id} area {area} leads to stage {a.Stage} room {a.Room}, out of the run");
                 }
             }
+        }
+    }
+
+    [GameDataFact]
+    public void RoomsReachedLeadBackWithTheSameKeys()
+    {
+        // The owner's seed 985463 (1 segment, size 1): RM_3150's door led into RM_9320 by the open
+        // side of its jewel door; back through it needs the three jewels, and Alfred's Ring lay
+        // behind RM_9300's Dragonfly door, so items left behind were out of reach. With the keys
+        // of each step of the key order, every room the player reaches leads back to the start.
+        using var rooms = RoomArchive.Open(TestData.Open());
+        var settings = Doors(985463, Character.Claire, 1, 1) with
+        {
+            ItemMode = ItemMode.Custom, IncludeChris = false, HiddenKeyItems = true, RandomInventory = true, StartSidePack = true,
+        };
+        Check(Generator.MakeDoors(settings, Data, null, StoryFlags.Rule(rooms, Data, settings)), "seed 985463");
+        foreach (var seed in Enumerable.Range(1, 20))
+            Check(Make(seed, Character.Claire, 1, 1 + seed % 8), $"seed {seed}");
+
+        static void Check(Generator.DoorLayout layout, string what)
+        {
+            var start = layout.Graph.Start;
+            var order = layout.Items.KeyOrder.Select(k => k.Type).ToList();
+            for (var step = 0; step <= order.Count; step++)
+            {
+                var have = order.Take(step).ToHashSet();
+                var reached = Reach(start, have, null);
+                foreach (var room in reached)
+                    Assert.True(Reach(room, have, reached).Contains(start),
+                        $"{what}: {room} is reached with {step} keys but does not lead back with them");
+            }
+        }
+
+        // The closed side of a one-side door opens once the player came through from its open side.
+        static HashSet<RoomNode> Reach(RoomNode from, HashSet<int> have, HashSet<RoomNode>? visited)
+        {
+            var seen = new HashSet<RoomNode>();
+            var stack = new Stack<RoomNode>([from]);
+            bool Opened(DoorEdge e) => visited != null && visited.Contains(e.To) &&
+                e.To.Edges.Any(b => b.To == e.From && b.Unblock && b.Requires.All(have.Contains));
+            while (stack.Count != 0)
+            {
+                var r = stack.Pop();
+                if (!seen.Add(r))
+                    continue;
+                foreach (var e in r.Edges.Where(e => (!e.Locked || Opened(e)) && !e.NoReturn && e.Requires.All(have.Contains) &&
+                                                     e.RequiresRoom.All(x => (visited ?? seen).Contains(x))))
+                    stack.Push(e.To);
+            }
+            return seen;
         }
     }
 

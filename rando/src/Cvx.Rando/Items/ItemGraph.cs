@@ -182,16 +182,20 @@ public sealed class ItemGraph
     /// often lists a key on one side only, the side the normal game reaches it from: RM_0080's
     /// Eagle Plate door also locks the fenced corner RM_0160 leads into, which random doors can
     /// reach first. Requiring the keys from the other side too can only make the logic stricter.
+    /// The rooms a door needs go both ways too: RM_9160's door to RM_9170 needs the Octa Valve
+    /// Handle and RM_9140, RM_9170's needed only the handle, so the logic could go in and not out.
     /// </summary>
     private static void SameKeysBothWays(IEnumerable<RoomNode> rooms)
     {
         var all = rooms.SelectMany(r => r.Edges).Where(e => !e.Redirected).ToList();
-        foreach (var edge in all.Where(e => e.Requires.Length != 0))
+        foreach (var edge in all.Where(e => e.Requires.Length != 0 || e.RequiresRoom.Length != 0))
         {
             foreach (var back in all.Where(b => b.From == edge.To && b.To == edge.From))
             {
                 if (!edge.Requires.All(back.Requires.Contains))
                     back.Requires = back.Requires.Union(edge.Requires).Order().ToArray();
+                if (!edge.RequiresRoom.All(back.RequiresRoom.Contains))
+                    back.RequiresRoom = back.RequiresRoom.Union(edge.RequiresRoom).ToArray();
             }
         }
     }

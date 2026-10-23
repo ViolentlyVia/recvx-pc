@@ -484,16 +484,20 @@ public sealed class DoorRandomizer
             var keyless = open.Where(s => s.Requires.Length == 0).ToList();
             var from = keyless.Count != 0 && rng.NextProbability(70) ? rng.NextOf(keyless) : rng.NextOf(open);
 
-            // Keep a door open for the next block and for the exit.
+            // Keep a door open for the next block and for the exit. The player comes into a new
+            // block through a door without keys: its way back is the one the item logic counts on
+            // (seed 985463 came into RM_9320 by the open side of its jewel door, and the jewels
+            // were behind it). A block with only keyed doors left is stranded.
             var blocksLeft = unconnected.Order().ToList();
             var openAfter = open.Count - 1;
-            var candidates = openAfter == 0
-                ? blocksLeft.Where(b => segFree.Count(s => block[s.Room] == b) >= 2).ToList()
-                : blocksLeft;
+            bool Keyless(DoorStub s) => !links.ContainsKey(s) && s.Requires.Length == 0;
+            var candidates = (openAfter == 0
+                ? blocksLeft.Where(b => segFree.Count(s => block[s.Room] == b) >= 2)
+                : blocksLeft).Where(b => segFree.Any(s => block[s.Room] == b && Keyless(s))).ToList();
             if (candidates.Count == 0)
                 break;   // only dead ends left: the last door is the exit's
             var target = rng.NextOf(candidates);
-            var to = rng.NextOf(segFree.Where(s => block[s.Room] == target && !links.ContainsKey(s)).ToList());
+            var to = rng.NextOf(segFree.Where(s => block[s.Room] == target && Keyless(s)).ToList());
             Connect(from, to);
         }
 
