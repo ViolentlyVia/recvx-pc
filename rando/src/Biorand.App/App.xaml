@@ -1,0 +1,14 @@
+﻿<!-- Ported from BioRand (biorand/classic, biorand/App.xaml), MIT, Copyright (c) 2022-2026 Ted John. -->
+<Application x:Class="IntelOrca.Biohazard.BioRand.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:IntelOrca.Biohazard.BioRand"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Templates\CheckGroupBox.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

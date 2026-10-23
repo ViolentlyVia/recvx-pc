@@ -1,0 +1,3 @@
+[submodule "external/biorand"]
+	path = external/biorand
+	url = https://github.com/biorand/classic

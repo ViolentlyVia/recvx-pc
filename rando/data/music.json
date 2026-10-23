@@ -1,0 +1,41 @@
+// Music shuffle: tracks are swapped with others of the same category (rando.ini bgm_map, read
+// by recvx-pc where room scripts ask for music). A track number is an entry of BGM1.AFS (rooms
+// of stages 0-5, disc 1) or BGM2.AFS (stages 6-9, disc 2); a track is only swapped with one the
+// discs it plays on have. `cvx-rando-cli dump-music` lists every track: discs, length, whether it
+// loops, and the rooms that ask for it.
+//
+// Categories come from the scripts: looping tracks are music; one-shot tracks (stingers and
+// event music) are never swapped. Listen and move tracks between lists to refine them.
+//
+// Music from other games (BioRand's datapacks, data/bgm/<game>/<tag>/*.ogg) joins a category
+// through "bioRand": the tags whose tracks it may become. They are converted to ADX and matched
+// to targetRms, the average loudness (RMS, 16-bit) of the tracks below (dump-music --levels).
+{
+  "targetRms": 5038,
+  "categories": [
+    {
+      // long loops asked for in many ordinary rooms
+      "name": "Area",
+      "bioRand": [ "calm", "creepy", "basement" ],
+      "tracks": [ 0, 1, 2, 4, 5, 6, 8, 10, 11, 12, 17, 29, 30, 31, 45, 58, 114, 120 ]
+    },
+    {
+      // asked for only in rooms with a typewriter
+      "name": "Save room",
+      "bioRand": [ "safe" ],
+      "tracks": [ 3 ]
+    },
+    {
+      // short loops in rooms with enemies (Hunters: 35)
+      "name": "Tension",
+      "bioRand": [ "danger" ],
+      "tracks": [ 33, 34, 35, 47, 49, 56, 60, 64, 65, 90, 96, 117 ]
+    },
+    {
+      // loops of boss rooms: Tyrant, Nosferatu, Alexia, Albinoid, Giant Black Widow, Steve...
+      "name": "Boss",
+      "bioRand": [ "boss" ],
+      "tracks": [ 23, 24, 25, 26, 27, 28, 36, 53, 88, 95, 108, 111, 112 ]
+    }
+  ]
+}

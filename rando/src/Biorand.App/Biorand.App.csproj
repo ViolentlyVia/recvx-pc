@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Biorand++: BioRand's window (biorand/classic, biorand/, MIT) on .NET 10, with RE1-3 on
+    BioRand's engine (external/biorand) and Code: Veronica X on this repository's randomizer.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>cvx-rando</AssemblyName>
+    <RootNamespace>IntelOrca.Biohazard.BioRand</RootNamespace>
+    <Product>Biorand++</Product>
+    <Version>0.2.0</Version>
+    <ApplicationIcon>..\..\external\biorand\biorand\biorand.ico</ApplicationIcon>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- the forked code keeps BioRand's style (no nullable annotations, no implicit usings) -->
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+    <!--
+      Only BioRand's CV:X path uses AFSLib (and through it Reloaded.Memory, GPLv3); Biorand++
+      runs CV:X on its own randomizer, so neither is built in.
+    -->
+    <PackageReference Include="AFSLib" Version="1.1.1" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Reloaded.Memory" Version="9.3.2" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\external\biorand\IntelOrca.Biohazard.BioRand\IntelOrca.Biohazard.BioRand.csproj" />
+    <ProjectReference Include="..\Cvx.Rando\Cvx.Rando.csproj" />
+    <ProjectReference Include="..\Cvx.Formats\Cvx.Formats.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="CHANGELOG.md" LogicalName="Biorand.CHANGELOG.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- BioRand's pictures, from the submodule (not copied into this repository) -->
+    <Resource Include="..\..\external\biorand\biorand\resources\*.png" Link="resources\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

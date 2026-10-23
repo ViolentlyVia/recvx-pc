@@ -1,0 +1,57 @@
+// Enemy randomizer: the enemy types it places and where it copies each one from.
+//
+// - "type" is the enemy id (bhJumpEnemy index, enNN.c), "version" its model version.
+// - "donors" are "<room>#<enemy index>": the model, motions and textures are copied from that
+//   enemy (`cvx-rando-cli enemy-donors` lists candidates). Zombies have one donor per skin.
+// - "difficulty" 0-3 sets how often the type is picked at each enemy difficulty ("weight"
+//   scales that), and "max" the most of it in one room at difficulty 0, 1, 2, 3.
+// - "effect" is the enemy's `type` field: its behaviour (0 = normal; other values are states such
+//   as eating or sleeping, used by scripted enemies).
+// - "aliases": names it had before (settings saved with them still count for it).
+// - "radius" is its collision radius (`ar` in its enNN.c, about 10 cm a unit): random placements
+//   only start it where it has that much room.
+// - "colour" is its colour in the window's enemy bar; "untested": not yet seen working in the
+//   game, so never placed unless the player raises its slider (it starts at None).
+{
+  "types": [
+    {
+      "name": "Zombie", "type": 1, "difficulty": 1, "max": [ 4, 6, 8, 10 ], "radius": 3.8, "colour": "#9a9a9a",
+      "donors": [
+        "RM_0070#2", "RM_0070#3", "RM_0030#3", "RM_1070#1", "RM_9060#2", "RM_3200#0", "RM_1120#0",
+        "RM_1021#1", "RM_1100#2", "RM_0020#0", "RM_0021#0", "RM_9060#0", "RM_0020#3", "RM_7060#1",
+        "RM_9310#0", "RM_6020#1", "RM_6050#0", "RM_9190#1", "RM_6050#1", "RM_3050#1"
+      ]
+    },
+    { "name": "Bat", "type": 7, "difficulty": 0, "weight": 0.3, "max": [ 4, 6, 8, 10 ], "radius": 1.5, "colour": "#5a3c78", "donors": [ "RM_0130#0" ] },
+    { "name": "Zombie Dog", "aliases": [ "Cerberus" ], "type": 4, "difficulty": 1, "max": [ 2, 4, 6, 8 ], "radius": 3, "colour": "#8b4513", "donors": [ "RM_3011#0" ] },
+    { "name": "Black Widow", "type": 3, "difficulty": 2, "max": [ 1, 2, 3, 4 ], "radius": 6, "colour": "#1e1e1e", "donors": [ "RM_6090#0" ] },
+    { "name": "Bandersnatch", "type": 9, "difficulty": 2, "max": [ 1, 2, 4, 6 ], "radius": 5, "colour": "#6b8e23", "donors": [ "RM_1060#0" ] },
+    { "name": "Hunter", "type": 5, "version": 0, "difficulty": 3, "max": [ 1, 2, 4, 6 ], "radius": 5, "colour": "#2e8b57", "donors": [ "RM_7110#1" ] },
+    { "name": "Sweeper", "type": 5, "version": 1, "difficulty": 3, "max": [ 1, 2, 4, 6 ], "radius": 5, "colour": "#b22222", "donors": [ "RM_7050#0" ] },
+    { "name": "Moth", "type": 6, "difficulty": 1, "max": [ 1, 2, 3, 4 ], "radius": 5, "colour": "#c8b432", "untested": true, "donors": [ "RM_6030#3" ] },
+    { "name": "Spotter", "type": 11, "difficulty": 1, "max": [ 2, 3, 4, 6 ], "radius": 3.5, "colour": "#4682b4", "untested": true, "donors": [ "RM_7081#0", "RM_7110#0" ] },
+    { "name": "Albinoid", "type": 21, "difficulty": 1, "max": [ 2, 3, 4, 6 ], "radius": 4, "colour": "#e6e6fa", "untested": true, "donors": [ "RM_3120#0" ] },
+    { "name": "Anatomist", "type": 26, "difficulty": 2, "max": [ 1, 2, 3, 4 ], "radius": 3.8, "colour": "#a0522d", "untested": true, "donors": [ "RM_0110#4" ] },
+    { "name": "Tyrant", "type": 19, "version": 0, "difficulty": 3, "max": [ 1, 1, 1, 2 ], "radius": 5, "colour": "#4b0082", "untested": true, "donors": [ "RM_1122#1", "RM_3230#1" ] }
+  ],
+
+  // Enemy types that may be replaced. Others are bosses, NPCs, traps or event enemies. Bats (7)
+  // too: what takes a bat's place starts on the floor below it (bats hang from the ceiling).
+  "replaceable": [ 1, 3, 4, 5, 7, 9 ],
+
+  // Script opcodes that act on particular enemies (links to items and objects, rising zombies,
+  // synced motions...): rooms that use them keep their enemies.
+  "scriptedOpcodes": [
+    "set_enemy_item_link", "set_enemy_enemy_link", "set_object_enemy_link", "zombie_up_death_check",
+    "set_enemy_life_m", "motion_pos_set_enemy_ply", "enemy_render_set", "enemy_look_flag_set",
+    "etc_atari_enemy_pos_set", "enemy_hp_up", "ck_death_event"
+  ],
+
+  // Script opcodes that take control of one enemy's work (byte 1 = 1: an enemy, byte 2: its
+  // index) to move or animate it in an event: rooms that do this to a replaceable enemy keep
+  // their enemies (the event's motions belong to the original type).
+  "workOpcodes": [ "load_work", "load_work_ex", "load_work2" ],
+
+  // More rooms that keep their enemies (BioRand ids).
+  "keepRooms": []
+}

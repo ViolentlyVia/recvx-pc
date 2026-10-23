@@ -1,0 +1,12 @@
+<Project>
+  <!--
+    BioRand's engine reads its data (data\re1..recv and the datapacks, biorand.dll among them)
+    from the player's BioRand folder at run time (BIORAND_DATA, set by Biorand++). So nothing of
+    it is built or copied here: no C++ mod build for biorand.dll, and its data folder does not
+    travel with the projects that reference the engine.
+  -->
+  <Target Name="CopyDllModuleToData" />
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'IntelOrca.Biohazard.BioRand'">
+    <None Update="data\**\*" CopyToOutputDirectory="Never" />
+  </ItemGroup>
+</Project>
