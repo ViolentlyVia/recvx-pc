@@ -88,10 +88,16 @@ if (Test-Path (Join-Path $PSScriptRoot "pc\tools\build.py")) {
     $Root = $Dir
     Write-Host "  using the existing checkout: $Root"
 } else {
+    # git keeps BioRand's own submodules about 60 characters deeper, and must stay under 260
+    $full = [IO.Path]::GetFullPath($Dir)
+    if ($full.Length -gt 120) {
+        Fail "The folder path is too long for git ($($full.Length) characters): $full`nMove this script to a shorter folder (such as C:\recvx) or pass -Dir C:\recvx\recvx-pc."
+    }
     Write-Host "  cloning $Repo ($Version) into $Dir"
-    & git clone --recursive --branch $Version $Repo $Dir
+    & git -c core.longpaths=true clone --recursive --branch $Version $Repo $Dir
     if ($LASTEXITCODE -ne 0) { Fail "git clone failed." }
     $Root = $Dir
+    & git -C $Dir config core.longpaths true
 }
 $Build = Join-Path $Root "build_pc"
 $running = Get-Process recvx, recvx-config, cvx-rando -ErrorAction SilentlyContinue |
@@ -103,7 +109,7 @@ if ($running) {
 
 Push-Location $Root
 try {
-    & git submodule update --init --recursive
+    & git -c core.longpaths=true submodule update --init --recursive
     if ($LASTEXITCODE -ne 0) { Fail "Fetching the submodules failed." }
 
     Step "Building the game (recvx.exe, recvx-config.exe)"
