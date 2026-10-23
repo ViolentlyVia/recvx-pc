@@ -22,6 +22,9 @@ public sealed record NpcResult(IReadOnlyDictionary<string, string> Looks, IReadO
 {
     public IReadOnlyList<string> MissingCharacters { get; init; } = [];
 
+    /// <summary>The players' gameplay models with their new looks: SYSTEM.AFS entry -> the player file (<see cref="PlayerModel"/>).</summary>
+    public IReadOnlyDictionary<int, byte[]> PlayerFiles { get; init; } = new Dictionary<int, byte[]>();
+
     /// <summary>A look as the spoiler and the window say it: "Wesker", "Leon (RE2)".</summary>
     public static string LookName(string look) => IsBioRand(look) ? CharacterLibrary.DisplayName(look) : look;
 
@@ -154,7 +157,40 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, 
             changed.Add(id);
         }
 
-        return new NpcResult(looks, changed, kept, Voices(looks, byName)) { MissingCharacters = missing };
+        return new NpcResult(looks, changed, kept, Voices(looks, byName)) { MissingCharacters = missing, PlayerFiles = PlayerFiles(looks, plds) };
+    }
+
+    /// <summary>
+    /// The players' gameplay models: each player file of a player with a BioRand look gets
+    /// that character's body (<see cref="PlayerModel.Replace"/>).
+    /// </summary>
+    private Dictionary<int, byte[]> PlayerFiles(Dictionary<string, string> looks, Dictionary<string, Pld> plds)
+    {
+        var files = new Dictionary<int, byte[]>();
+        var players = data.Npcs.Players.Where(p => looks.TryGetValue(p.Name, out var l) && NpcResult.IsBioRand(l)).ToList();
+        if (players.Count == 0 || archive.Data is not { } game)
+            return files;
+        using var afs = AfsArchive.Open(Path.Combine(game.Directory, PlayerModel.Archive));
+        foreach (var player in players)
+        {
+            foreach (var entry in PlayerModel.EntriesOf(player.Name))
+                files[entry] = PlayerModel.Replace(afs.ReadEntry(entry), plds[looks[player.Name]], PlayerModel.GlobalIndexOf(entry));
+        }
+        return files;
+    }
+
+    /// <summary>SYSTEM.AFS with the players' new files, in the mod folder (or removed when there are none).</summary>
+    public static void WritePlayers(GameData game, IReadOnlyDictionary<int, byte[]> files, string directory)
+    {
+        var path = Path.Combine(directory, PlayerModel.Archive);
+        if (files.Count == 0)
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+            return;
+        }
+        using var afs = AfsArchive.Open(Path.Combine(game.Directory, PlayerModel.Archive));
+        AfsWriter.Write(afs, files.ToDictionary(x => x.Key, x => x.Value), path);
     }
 
     /// <summary>

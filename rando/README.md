@@ -65,9 +65,10 @@ CV:X's options sit in BioRand's boxes, with its own additions:
   length, as in BioRand, the subtitles keeping the game's words); Claire and Chris stay themselves. The seed's folder then has its own
   `VOICE1.AFS`/`VOICE2.AFS` (about 70 MB);
 - **Change Player Character** (BioRand's box): Claire and Chris become BioRand characters,
-  each picked in its drop-down or Random (never both the same): their cutscene models and the
-  lines of theirs the randomizer knows (116) take that character's look and voice
-  clips. Their gameplay model is not changed yet;
+  each picked in its drop-down or Random (never both the same): their gameplay model
+  (`SYSTEM.AFS` in the seed's folder; needs a recvx.exe newer than 0.9.93), their
+  cutscene models and the lines of theirs the randomizer knows (116) take that character's look
+  and voice clips;
 - in the settings, **Randomize title voice** plays one of BioRand's title calls at the title
   screen, and **Door Skip (RE CVX)** turns on recvx-pc's door skip.
 

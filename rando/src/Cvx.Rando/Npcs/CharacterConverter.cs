@@ -7,6 +7,71 @@ namespace Cvx.Rando.Npcs;
 public sealed record ConvertedCharacter(ModelPage Page, TextureEntry Textures);
 
 /// <summary>
+/// A CV skeleton the converter can dress: how many objects it has, which object each RE2 part
+/// rides on (the object at its joint, and for limbs the part and object its bone points to),
+/// and the objects at the joints <c>Fit</c> moves to the character's proportions.
+/// </summary>
+public sealed record CharacterRig(
+    int Objects,
+    (int Part, int Object, int Joint, (int Part, int Object)? Bone)[] Map,
+    int Pelvis, int Neck,
+    int RightShoulder, int RightElbow, int RightWrist, int LeftShoulder, int LeftElbow, int LeftWrist,
+    int RightHip, int RightKnee, int RightAnkle, int LeftHip, int LeftKnee, int LeftAnkle)
+{
+    /// <summary>
+    /// The human NPCs' skeleton (types 91-98, 27 objects, see PLAN.md "The NPC skeleton"). The
+    /// hands ride the forearms, placed at the wrists: the game's NPCs move their hands with the
+    /// forearm (their wrist objects, 14 and 18, have no SKIN entry and no vertices), so the
+    /// motions do not pose the wrists, and a hand on one turns at random.
+    /// </summary>
+    public static readonly CharacterRig Npc = new(27,
+    [
+        (0, 3, 1, null),        // torso: rides the chest, joint placed from the pelvis (see Convert)
+        (1, 1, 1, null),        // pelvis
+        (2, 19, 19, (3, 20)),   // right thigh, shin, foot
+        (3, 20, 20, (4, 21)),
+        (4, 21, 21, null),
+        (5, 23, 23, (6, 24)),   // left thigh, shin, foot
+        (6, 24, 24, (7, 25)),
+        (7, 25, 25, null),
+        (8, 5, 4, null),        // head: rides the head, joint at the neck
+        (9, 12, 12, (10, 13)),  // right upper arm, forearm, hand
+        (10, 13, 13, (11, 14)),
+        (11, 13, 14, null),
+        (12, 16, 16, (13, 17)), // left upper arm, forearm, hand
+        (13, 17, 17, (14, 18)),
+        (14, 17, 18, null),
+    ], Pelvis: 1, Neck: 4, RightShoulder: 12, RightElbow: 13, RightWrist: 14, LeftShoulder: 16, LeftElbow: 17, LeftWrist: 18,
+       RightHip: 19, RightKnee: 20, RightAnkle: 21, LeftHip: 23, LeftKnee: 24, LeftAnkle: 25);
+
+    /// <summary>
+    /// The players' skeleton (SYSTEM.AFS player files, 22 objects): 1 pelvis, 2 waist, 3 chest,
+    /// 4 neck, 5 head; 6-9 right collar, upper arm, forearm, wrist; 10-13 the left arm; 14-17
+    /// right hip, knee, ankle, toes; 18-21 the left leg. The wrists (9, 13) and toes have no
+    /// vertices in the game's skin, so the hands ride the forearms as on the NPCs.
+    /// </summary>
+    public static readonly CharacterRig Player = new(22,
+    [
+        (0, 3, 1, null),        // torso: rides the chest, joint placed from the pelvis
+        (1, 1, 1, null),        // pelvis
+        (2, 14, 14, (3, 15)),   // right thigh, shin, foot
+        (3, 15, 15, (4, 16)),
+        (4, 16, 16, null),
+        (5, 18, 18, (6, 19)),   // left thigh, shin, foot
+        (6, 19, 19, (7, 20)),
+        (7, 20, 20, null),
+        (8, 5, 4, null),        // head: rides the head, joint at the neck
+        (9, 7, 7, (10, 8)),     // right upper arm, forearm, hand
+        (10, 8, 8, (11, 9)),
+        (11, 8, 9, null),
+        (12, 11, 11, (13, 12)), // left upper arm, forearm, hand
+        (13, 12, 12, (14, 13)),
+        (14, 12, 13, null),
+    ], Pelvis: 1, Neck: 4, RightShoulder: 7, RightElbow: 8, RightWrist: 9, LeftShoulder: 11, LeftElbow: 12, LeftWrist: 13,
+       RightHip: 14, RightKnee: 15, RightAnkle: 16, LeftHip: 18, LeftKnee: 19, LeftAnkle: 20);
+}
+
+/// <summary>
 /// Turns an RE2 player model (BioRand's characters) into a model page for Code: Veronica's
 /// human NPCs. The NPCs share one skeleton of 27 objects (see PLAN.md, "The NPC skeleton"),
 /// and their motions come from outside the room, so the new page keeps the target's object
@@ -26,32 +91,7 @@ public sealed record ConvertedCharacter(ModelPage Page, TextureEntry Textures);
 /// </remarks>
 public static class CharacterConverter
 {
-    /// <summary>
-    /// RE2 part -> the CV object it rides on, the CV object at its joint, and for limbs the RE2
-    /// part and CV object its bone points to (null: keep the part's orientation; the hands use
-    /// their forearm's). The hands ride the forearms, placed at the wrists: the game's NPCs move
-    /// their hands with the forearm (their wrist objects, 14 and 18, have no SKIN entry and no
-    /// vertices), so the motions do not pose the wrists, and a hand on one turns at random.
-    /// </summary>
-    private static readonly (int Part, int Object, int Joint, (int Part, int Object)? Bone)[] Map =
-    [
-        (0, 3, 1, null),        // torso: rides the chest, joint placed from the pelvis (see Convert)
-        (1, 1, 1, null),        // pelvis
-        (2, 19, 19, (3, 20)),   // right thigh, shin, foot
-        (3, 20, 20, (4, 21)),
-        (4, 21, 21, null),
-        (5, 23, 23, (6, 24)),   // left thigh, shin, foot
-        (6, 24, 24, (7, 25)),
-        (7, 25, 25, null),
-        (8, 5, 4, null),        // head: rides the head, joint at the neck
-        (9, 12, 12, (10, 13)),  // right upper arm, forearm, hand
-        (10, 13, 13, (11, 14)),
-        (11, 13, 14, null),
-        (12, 16, 16, (13, 17)), // left upper arm, forearm, hand
-        (13, 17, 17, (14, 18)),
-        (14, 17, 18, null),
-    ];
-
+    // RE2 part -> the RE2 forearm whose turn the hand takes
     private static readonly Dictionary<int, int> HandOf = new() { [11] = 10, [14] = 13 };
 
     /// <summary>The objects of the human NPC skeleton (types 91-98).</summary>
@@ -63,24 +103,27 @@ public static class CharacterConverter
     /// </summary>
     public const uint FirstGlobalIndex = 0x3A00000;
 
-    /// <param name="skeleton">The target NPC's model (its objects are kept).</param>
+    /// <param name="skeleton">The target's model (its objects are kept).</param>
     /// <param name="template">A 256x256 8-bit texture of the game (its TIM2 head is reused).</param>
     /// <param name="globalIndex">The global index of the first texture; the others follow.</param>
-    public static ConvertedCharacter Convert(Pld pld, NjModel skeleton, Tim2Picture template, uint globalIndex = FirstGlobalIndex)
+    /// <param name="rig">The target's skeleton: <see cref="CharacterRig.Npc"/> (the default) or <see cref="CharacterRig.Player"/>.</param>
+    public static ConvertedCharacter Convert(Pld pld, NjModel skeleton, Tim2Picture template, uint globalIndex = FirstGlobalIndex, CharacterRig? rig = null)
     {
-        if (skeleton.Objects.Count != SkeletonObjects)
-            throw new ArgumentException($"The target has {skeleton.Objects.Count} objects, not the human NPC skeleton's {SkeletonObjects}.", nameof(skeleton));
+        rig ??= CharacterRig.Npc;
+        if (skeleton.Objects.Count != rig.Objects)
+            throw new ArgumentException($"The target has {skeleton.Objects.Count} objects, not the skeleton's {rig.Objects}.", nameof(skeleton));
         if (pld.Armature.Count < 15 || pld.Mesh.Parts.Count < 15)
             throw new InvalidDataException($"The PLD has {pld.Armature.Count} joints and {pld.Mesh.Parts.Count} parts, not RE2's 15.");
 
         var rest = pld.Armature.RestPositions();
         var target = skeleton.BindPositions();
-        var scale = Stature(target, 4, 21, 25) / Stature(rest.Select(ToCv).ToArray(), 8, 4, 7);
-        var bind = Fit(skeleton, target, rest, scale);
+        var scale = Stature(target, rig.Neck, rig.RightAnkle, rig.LeftAnkle) / Stature(rest.Select(ToCv).ToArray(), 8, 4, 7);
+        var bind = Fit(skeleton, target, rest, scale, rig);
         var parents = skeleton.Parents();
+        var map = rig.Map;
 
         var rotations = new Dictionary<int, Quaternion>();
-        foreach (var (part, obj, _, bone) in Map)
+        foreach (var (part, obj, _, bone) in map)
         {
             rotations[part] = bone is var (childPart, childObj)
                 ? Turn(Vector3.Normalize(ToCv(rest[childPart] - rest[part])), Vector3.Normalize(bind[childObj] - bind[obj]))
@@ -123,7 +166,7 @@ public static class CharacterConverter
         }
 
         // one model per object: a forearm's holds the forearm and the hand
-        foreach (var group in Map.GroupBy(m => m.Object))
+        foreach (var group in map.GroupBy(m => m.Object))
         {
             var obj = group.Key;
             var vertices = new List<(Vector3 Position, Vector3 Normal)>();
@@ -134,7 +177,7 @@ public static class CharacterConverter
                 var turn = rotations[part];
                 // the torso's joint is RE2's root, placed where it is on the pelvis (most characters
                 // have the two together; some, like RE3's Nemesis, have the root well below)
-                var at = part == 0 ? bind[1] + ToCv(rest[0] - rest[1]) * scale : bind[joint];
+                var at = part == 0 ? bind[rig.Pelvis] + ToCv(rest[0] - rest[1]) * scale : bind[joint];
                 var offset = at - bind[obj];
                 var index = new Dictionary<(int, int), int>();
                 int VertexOf(int v, int n)
@@ -207,7 +250,7 @@ public static class CharacterConverter
     /// ground). Collarbones, toes and the face's objects keep their places relative to their
     /// parents.
     /// </summary>
-    private static Vector3[] Fit(NjModel skeleton, Vector3[] target, Vector3[] rest, float scale)
+    private static Vector3[] Fit(NjModel skeleton, Vector3[] target, Vector3[] rest, float scale, CharacterRig r)
     {
         var p = (Vector3[])target.Clone();
         var parents = skeleton.Parents();
@@ -223,21 +266,22 @@ public static class CharacterConverter
         void Bone(int obj, int parentObj, int part, int parentPart) =>
             Move(obj, p[parentObj] + Vector3.Normalize(target[obj] - target[parentObj]) * Vector3.Distance(rest[part], rest[parentPart]) * scale);
 
-        Move(4, p[1] + Re2(8, 1));      // neck: the head's joint (from the pelvis)
-        Move(12, p[1] + Re2(9, 1));     // shoulders
-        Move(16, p[1] + Re2(12, 1));
-        Bone(13, 12, 10, 9);            // elbows, wrists
-        Bone(14, 13, 11, 10);
-        Bone(17, 16, 13, 12);
-        Bone(18, 17, 14, 13);
-        Move(19, p[1] + Re2(2, 1));     // hips (from the pelvis)
-        Move(23, p[1] + Re2(5, 1));
-        Bone(20, 19, 3, 2);             // knees, ankles
-        Bone(21, 20, 4, 3);
-        Bone(24, 23, 6, 5);
-        Bone(25, 24, 7, 6);
-        var lift = (target[21].Y + target[25].Y - p[21].Y - p[25].Y) / 2;
-        Move(1, p[1] + new Vector3(0, lift, 0));
+        var pelvis = r.Pelvis;
+        Move(r.Neck, p[pelvis] + Re2(8, 1));            // neck: the head's joint (from the pelvis)
+        Move(r.RightShoulder, p[pelvis] + Re2(9, 1));   // shoulders
+        Move(r.LeftShoulder, p[pelvis] + Re2(12, 1));
+        Bone(r.RightElbow, r.RightShoulder, 10, 9);     // elbows, wrists
+        Bone(r.RightWrist, r.RightElbow, 11, 10);
+        Bone(r.LeftElbow, r.LeftShoulder, 13, 12);
+        Bone(r.LeftWrist, r.LeftElbow, 14, 13);
+        Move(r.RightHip, p[pelvis] + Re2(2, 1));        // hips (from the pelvis)
+        Move(r.LeftHip, p[pelvis] + Re2(5, 1));
+        Bone(r.RightKnee, r.RightHip, 3, 2);            // knees, ankles
+        Bone(r.RightAnkle, r.RightKnee, 4, 3);
+        Bone(r.LeftKnee, r.LeftHip, 6, 5);
+        Bone(r.LeftAnkle, r.LeftKnee, 7, 6);
+        var lift = (target[r.RightAnkle].Y + target[r.LeftAnkle].Y - p[r.RightAnkle].Y - p[r.LeftAnkle].Y) / 2;
+        Move(pelvis, p[pelvis] + new Vector3(0, lift, 0));
         return p;
     }
 

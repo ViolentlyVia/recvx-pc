@@ -324,6 +324,9 @@ public static class Generator
             if (result.Npcs is { Voices.Count: > 0 })
                 progress?.Report("Writing the NPCs' voices...");
             NpcRandomizer.WriteVoices(data, result.Npcs?.Voices ?? [], directory);
+            if (result.Npcs is { PlayerFiles.Count: > 0 })
+                progress?.Report("Writing Claire's and Chris's models...");
+            NpcRandomizer.WritePlayers(data, result.Npcs?.PlayerFiles ?? new Dictionary<int, byte[]>(), directory);
         }
         Write(DoorTable.FileName, result.DoorTable);
         Write("spoiler.txt", result.Spoiler);

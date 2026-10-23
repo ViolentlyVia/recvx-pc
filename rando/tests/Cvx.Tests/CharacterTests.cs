@@ -304,6 +304,49 @@ public class CharacterTests
             Assert.All(theirs, v => Assert.Equal(look, v.Clip?.Character));
         }
         Assert.All(result.Voices, v => Assert.Contains(v.Speaker, new[] { claire.Voice, chris.Voice }));
+
+        // their gameplay models: Claire's two player files, Chris's one
+        Assert.Equal(new[] { 10, 11, 14 }, result.PlayerFiles.Keys.Order());
+    }
+
+    [BioRandFact]
+    public void PlayerFilesGetTheBodyAndKeepTheRest()
+    {
+        using var afs = AfsArchive.Open(Path.Combine(TestData.Directory!, PlayerModel.Archive));
+        var library = CharacterLibrary.Open(BioRandData.Directory)!;
+        var pld = Pld.Read(CharacterLibrary.ReadPld(library.Get("leon.re2")!));
+        foreach (var entry in new[] { 10, 11, 14 })
+        {
+            var file = afs.ReadEntry(entry);
+            var before = PlayerModel.Layout.Read(file);
+            // the loader reads every texture entry: none is left over
+            Assert.Equal(file.Length - 4, before.TailAt);
+
+            var after = PlayerModel.Replace(file, pld, PlayerModel.GlobalIndexOf(entry));
+            var layout = PlayerModel.Layout.Read(after);
+            Assert.Equal(after.Length - 4, layout.TailAt);
+
+            // the body: the player skeleton's objects, the parts on them, no SKIN block before it
+            var bodyBlock = layout.Page.Blocks.FindIndex(b => b.Model != null);
+            Assert.Equal(CharacterRig.Player.Objects, layout.Page.Blocks[bodyBlock].Model!.Objects.Count);
+            Assert.True(bodyBlock == 0 || layout.Page.Blocks[bodyBlock - 1].Kind != ModelPageBlockKind.Skin);
+            Assert.Equal(before.Page.Models.First().Objects.Select(o => o.Child), layout.Page.Models.First().Objects.Select(o => o.Child));
+            Assert.All(TextureEntry.Read(layout.Textures[0].Data).Pictures, p => Assert.True(p.GlobalIndex >= PlayerModel.GlobalIndexOf(entry)));
+
+            // everything else as it was: the other blocks, the motions, the other texture entries
+            var oldBody = before.Page.Blocks.FindIndex(b => b.Model != null);
+            var oldSkin = oldBody > 0 && before.Page.Blocks[oldBody - 1].Kind == ModelPageBlockKind.Skin ? oldBody - 1 : -1;
+            static string Hex(ModelPageBlock b) => Convert.ToHexString(b.Data);
+            Assert.Equal(before.Page.Blocks.Where((_, i) => i != oldBody && i != oldSkin).Select(Hex),
+                         layout.Page.Blocks.Where((_, i) => i != bodyBlock).Select(Hex));
+            Assert.True(file.AsSpan(before.MotionsAt, before.TexturesAt - before.MotionsAt).SequenceEqual(after.AsSpan(layout.MotionsAt, layout.TexturesAt - layout.MotionsAt)));
+            Assert.Equal(before.Textures.Count, layout.Textures.Count);
+            Assert.All(before.Textures.Zip(layout.Textures).Skip(1), x =>
+            {
+                Assert.True(x.First.Data.AsSpan().SequenceEqual(x.Second.Data));
+                Assert.Equal(x.First.Aligned, x.Second.Aligned);
+            });
+        }
     }
 
     [Fact]
