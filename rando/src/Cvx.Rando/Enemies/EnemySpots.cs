@@ -11,8 +11,9 @@ namespace Cvx.Rando.Enemies;
 /// <item>walls: <c>walp</c> types 0-1 (boxes), 2-3 (circles) and 4-5 (right triangles) block,
 ///   as in hitchk.c <c>bhCheckWall</c>; type 6 (stairs and slopes) is walkable but no place to
 ///   start on;</item>
-/// <item>the floor: a flood fill over a grid, at the height of each entrance and of the room's
-///   enemies (in every version of the room), through the gaps the player fits through. A fill
+/// <item>the floor: a flood fill over a grid, at the height of each entrance, of the room's
+///   enemies that walk (in every version of the room) and of its footstep areas, through the gaps
+///   the player fits through. A fill
 ///   that gets out of the walls (an open edge, or a height with no walls such as a bat's) is
 ///   not floor; there only the footstep areas count (<c>flrp</c> type 1, which set
 ///   <c>flr_snd</c> in hitchk.c and lie on the floor the player walks on). Only floor the
@@ -37,6 +38,8 @@ public static class EnemySpots
     private const float EnemyHeight = 18f;
     /// <summary>Heights closer than this are one floor.</summary>
     private const float SameFloor = 1.5f;
+    /// <summary>How far above or below its ends stairs still join a floor.</summary>
+    private const float StairStep = 3f;
 
     /// <summary>A place on the floor an enemy can start from, with <paramref name="Room"/> to the walls around it.</summary>
     public sealed record Spot(RdxVectorF Position, float Room)
@@ -60,8 +63,8 @@ public static class EnemySpots
     }
 
     /// <summary>
-    /// Positions known to be floor in a room: its enemies' in every version of the room, and
-    /// BioRand's recorded ones.
+    /// Positions known to be floor in a room: its walking enemies' in every version of the room
+    /// (a bat at the ceiling is no floor), and BioRand's recorded ones.
     /// </summary>
     public static List<RdxVectorF> Known(RoomId id, RoomArchive archive, RandoData data)
     {
@@ -151,7 +154,10 @@ public static class EnemySpots
                 return new SpotMap(Floors(floor), Walls(walls), [], [], entrances, knownList);
 
             // One fill per floor height (entrances and known places that are near each other).
-            var seeds = entrances.Concat(knownList).OrderBy(p => p.Y).ToList();
+            // (footstep areas lie on the floor too: a floor only stairs lead to starts there)
+            var seeds = entrances.Concat(knownList)
+                .Concat(floor.Select(a => new RdxVectorF((a.MinX + a.MaxX) / 2, a.Y, (a.MinZ + a.MaxZ) / 2)))
+                .OrderBy(p => p.Y).ToList();
             var levels = new List<List<RdxVectorF>>();
             foreach (var s in seeds)
             {
@@ -190,7 +196,12 @@ public static class EnemySpots
             var slopes = walls.Where(w => w.Type == 6).ToList();
             var accepted = regions.Where(r => r.Entrance && r.Points.Count != 0).Select(r => r.Points).ToList();
             var pending = regions.Where(r => !r.Entrance && r.Points.Count != 0).Select(r => r.Points).ToList();
-            bool Touches(List<RdxVectorF> region, Area slope) => region.Any(p => slope.Contains(p.X, p.Z, 2 * Cell));
+            // (at a height the stairs reach, from their foot to their top, give or take a step:
+            // RM_1030's stairs end at 6 below a landing at 8)
+            bool Touches(List<RdxVectorF> region, Area slope) =>
+                region[0].Y >= Math.Min(slope.Y, slope.Y + slope.H) - StairStep &&
+                region[0].Y <= Math.Max(slope.Y, slope.Y + slope.H) + StairStep &&
+                region.Any(p => slope.Contains(p.X, p.Z, 2 * Cell));
             for (var changed = true; changed;)
             {
                 changed = false;
@@ -204,7 +215,13 @@ public static class EnemySpots
                     }
                 }
             }
-            reachable.AddRange(accepted.SelectMany(r => r));
+            // Walls do not tell a balcony from the air above a lower floor (RM_9321's hall at 32
+            // and 44): over another floor, a cell is floor only where a footstep area says so.
+            (int, int) CellOf(RdxVectorF p) => ((int)MathF.Round(p.X / Cell), (int)MathF.Round(p.Z / Cell));
+            var below = accepted.SelectMany(r => r).GroupBy(CellOf).ToDictionary(g => g.Key, g => g.Min(p => p.Y));
+            reachable.AddRange(accepted.SelectMany(r => r).Where(p =>
+                below[CellOf(p)] >= p.Y - SameFloor ||
+                floor.Any(a => Math.Abs(a.Y - p.Y) < SameFloor && a.Contains(p.X, p.Z))));
         }
 
         var open = reachable.Where(p => !doors.Any(d => d.Contains(p.X, p.Z, DoorDistance)))

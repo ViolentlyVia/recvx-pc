@@ -35,8 +35,9 @@
     { "name": "Tyrant", "type": 19, "version": 0, "difficulty": 3, "max": [ 1, 1, 1, 2 ], "radius": 5, "colour": "#4b0082", "untested": true, "donors": [ "RM_1122#1", "RM_3230#1" ] }
   ],
 
-  // Enemy types that may be replaced. Others are bosses, NPCs, traps or event enemies.
-  "replaceable": [ 1, 3, 4, 5, 9 ],
+  // Enemy types that may be replaced. Others are bosses, NPCs, traps or event enemies. Bats (7)
+  // too: what takes a bat's place starts on the floor below it (bats hang from the ceiling).
+  "replaceable": [ 1, 3, 4, 5, 7, 9 ],
 
   // Script opcodes that act on particular enemies (links to items and objects, rising zombies,
   // synced motions...): rooms that use them keep their enemies.

@@ -13,11 +13,15 @@ namespace Cvx.Rando.Enemies;
 /// </summary>
 internal static class EnemyScan
 {
+    /// <param name="Positions">Where its enemies that walk stand (not bats, moths or spiders: they hang, fly or climb).</param>
     /// <param name="DeathFlags">Flags of <c>set_ck_enemy</c>, <c>ck_death</c> and <c>ck_death_event</c>.</param>
     /// <param name="StoryFlags">Death flags its scripts check or set directly (<c>ck</c>/<c>set</c> group 3).</param>
     public sealed record Room(IReadOnlyList<RdxVectorF> Positions, IReadOnlyList<int> DeathFlags, IReadOnlyList<int> StoryFlags);
 
     // (Lazy: callers on several threads at once must not each read every room)
+    /// <summary>Enemy types that need not stand on the floor: spiders (3), moths (6), bats (7).</summary>
+    private static readonly int[] OffTheFloor = [3, 6, 7];
+
     private static readonly ConditionalWeakTable<RoomArchive, Lazy<IReadOnlyDictionary<RoomId, Room>>> Cache = [];
 
     public static IReadOnlyDictionary<RoomId, Room> Of(RoomArchive archive) =>
@@ -42,7 +46,7 @@ internal static class EnemyScan
                 else if (o.Name is "ck" or "set" && b.Length >= 6 && b[1] == 3)
                     story.Add(flag);
             }
-            result[id] = new Room(file.Enemies.ToArray().Select(e => e.Position).ToList(), death, story);
+            result[id] = new Room(file.Enemies.ToArray().Where(e => !OffTheFloor.Contains(e.Type)).Select(e => e.Position).ToList(), death, story);
         });
         return result;
     }

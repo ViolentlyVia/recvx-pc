@@ -74,6 +74,12 @@ public sealed class ItemGraph
     public Character? OnlyCharacter { get; init; }
     public required IReadOnlyDictionary<string, RoomNode> Rooms { get; init; }
     public required IReadOnlyList<ItemLocation> Locations { get; init; }
+    /// <summary>
+    /// How many pickups of each item the whole game has (this door mode's entries), also in
+    /// rooms a run with random doors does not use: keys the game needs several of (four Wing
+    /// Objects make the Gold Dragonfly) need that many wherever the run puts them.
+    /// </summary>
+    public IReadOnlyDictionary<int, int> GameCopies { get; init; } = new Dictionary<int, int>();
 
     /// <summary>
     /// Builds the original room graph. Pickups of documents are left out (never randomized), as
@@ -151,6 +157,10 @@ public sealed class ItemGraph
         SameKeysBothWays(rooms.Values);
         OneSideOnly(rooms.Values);
 
+        var copies = map.Rooms.Values.SelectMany(r => r.Items ?? [])
+            .Where(i => Applies(i.DoorRando) && i.Type != null && i.GlobalId != null)
+            .DistinctBy(i => i.GlobalId).GroupBy(i => i.Type!.Value).ToDictionary(g => g.Key, g => g.Count());
+
         var beginEnd = map.BeginEndRooms.First(x => x.DoorRando == null || x.DoorRando == settings.RandomDoors);
         // With Chris, the logic runs to the last room of the game (BioRand's door-mode end,
         // A1E0); without, to Chris's start (BioRand's non-door end, A090).
@@ -163,6 +173,7 @@ public sealed class ItemGraph
             OnlyCharacter = doors?.Character,
             Rooms = rooms,
             Locations = locations.Values.OrderBy(x => x.GlobalId).ToList(),
+            GameCopies = copies,
         };
     }
 

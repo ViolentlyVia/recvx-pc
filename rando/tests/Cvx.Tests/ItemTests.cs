@@ -243,4 +243,32 @@ public class ItemTests
         // RM_7180's Bow Gun is RM_3130's own pickup (one location): its set stays
         Assert.DoesNotContain(result.StoryFlags, c => c.Room.Name is "RM_7180" or "RM_7181" && c.To == null);
     }
+
+    [GameDataTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void KeysAvoidRoomsThatArmTheirLockAtTheStart(bool doors)
+    {
+        // Seed 202385: the Gold Key lay in RM_1070, whose start procedure arms its Gold Key
+        // door only if Claire already carries the key (ck_player_item), so it did not open until
+        // she left and came back. Keys go elsewhere when they can.
+        using var rooms = RoomArchive.Open(TestData.Open());
+        var gold = Data.Items.Items.Single(i => i.Name == "Gold Key").Id;
+        var rule = StoryFlags.Rule(rooms, Data, new RandoSettings { RandomDoors = doors });
+        Assert.True(rule.Avoid.TryGetValue(gold, out var gold1070));
+        Assert.Contains(Data.Map.Rooms["2070"].Items!.First().GlobalId!.Value, gold1070);
+        var inside = new List<string>();
+        foreach (var seed in Enumerable.Range(1, 8))
+        {
+            var settings = new RandoSettings { Seed = seed, RandomDoors = doors, DoorSegments = 1, DoorSegmentSize = 1 + seed % 8 };
+            var result = Generator.Generate(settings, Data, rooms);
+            foreach (var k in result.Items!.KeyOrder)
+            {
+                if (rule.Avoid.TryGetValue(k.Type, out var avoid) && avoid.Contains(k.Location.GlobalId))
+                    inside.Add($"seed {seed}: {Data.Items.NameOf(k.Type)} at {k.Location}");
+            }
+        }
+        Assert.True(inside.Count == 0, string.Join("; ", inside));
+    }
 }
+

@@ -261,4 +261,43 @@ public class EnemyTests
     }
 
     private static float Distance(RdxVectorF a, float x, float z) => MathF.Sqrt((a.X - x) * (a.X - x) + (a.Z - z) * (a.Z - z));
+
+    [GameDataFact]
+    public void BatsAtNoneLeave()
+    {
+        // The owner's seed 428946: Bats at None, yet RM_0130's own bats stayed. Now only bats an
+        // event moves stay (RM_1030 one, RM_4010 five), and what takes a bat's place starts on
+        // the floor (bats hang at 26-44).
+        using var rooms = RoomArchive.Open(TestData.Open());
+        var ratios = Data.Enemies.Types.ToDictionary(k => k.Name, k => k.Name == "Bat" ? 0 : k.Untested ? 0 : 4);
+        foreach (var difficulty in new[] { 0, 3 })
+        {
+            var result = Generator.Generate(new RandoSettings { Seed = 5, RandomItems = false, RandomEnemies = true, EnemyDifficulty = difficulty, EnemyRatios = ratios }, Data, rooms);
+            var left = new List<string>();
+            foreach (var id in RoomTable.All.Where(id => Data.Map.Rooms.ContainsKey(id.BioRandId)))
+            {
+                var file = result.ChangedRooms.TryGetValue(id, out var f) ? f : rooms.ReadRoom(id);
+                var original = rooms.ReadRoom(id);
+                var controlled = CvScriptReader.ReadOpcodes(original)
+                    .Where(o => Data.Enemies.WorkOpcodes.Contains(o.Name) && o.Bytes.Span[1] == 1).Select(o => (int)o.Bytes.Span[2]).ToHashSet();
+                var enemies = file.Enemies.ToArray();
+                for (var i = 0; i < enemies.Length; i++)
+                {
+                    if (enemies[i].Type == 7 && !controlled.Contains(i))
+                        left.Add($"{id.Name}[{i}]");
+                }
+                var before = original.Enemies.ToArray();
+                if (!result.ChangedRooms.ContainsKey(id))
+                    continue;
+                var spots = EnemySpots.Find(original, EnemySpots.Known(id, rooms, Data)).Select(s => s.Position).ToList();
+                for (var i = 0; i < before.Length && i < enemies.Length; i++)
+                {
+                    if (before[i].Type == 7 && enemies[i].Type != 7)
+                        Assert.Contains(enemies[i].Position, spots);
+                }
+            }
+            Assert.True(left.Count == 0, $"difficulty {difficulty}: bats left in {string.Join(", ", left)}");
+        }
+    }
 }
+

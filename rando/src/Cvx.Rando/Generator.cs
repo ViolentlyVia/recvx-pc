@@ -189,7 +189,7 @@ public static class Generator
             MusicTargetRms = data.Music.TargetRms,
             TitleCall = titleCall,
             Npcs = npcs,
-            DoorTable = doors == null ? null : Doors.DoorTable.Write(doors, data),
+            DoorTable = doors == null ? null : Doors.DoorTable.Write(doors, data, archive),
             GraphDot = graph == null ? null : GraphExport.Dot(graph, data.Items, saveRooms),
             GraphDgml = graph == null ? null : GraphExport.Dgml(graph, data.Items, saveRooms),
             Patches = patcher.Patches,

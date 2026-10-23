@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Cvx.Formats;
 using Cvx.Formats.Script;
 using Cvx.Rando.Data;
@@ -50,7 +51,28 @@ public static class StoryFlags
     /// taken), so the checks can follow them. 64 of the map's 401 pickups set none (the game
     /// hands those over in an event).
     /// </summary>
-    public sealed record FlagRule(IReadOnlySet<int> Keys, IReadOnlySet<int> Locations);
+    /// <param name="Avoid">
+    /// Pickups each key should not go to: rooms whose start procedure checks that the player
+    /// carries it (<c>ck_player_item</c>) to arm its lock. RM_1070 lets its Gold Key door take
+    /// the key only if Claire had it when she came in, so a Gold Key picked up inside (seed
+    /// 202385) worked only after leaving and coming back.
+    /// </param>
+    public sealed record FlagRule(IReadOnlySet<int> Keys, IReadOnlySet<int> Locations, IReadOnlyDictionary<int, IReadOnlySet<int>> Avoid);
+
+    // (room numbers whose start procedure checks each item, read once per archive)
+    private static readonly ConditionalWeakTable<RoomArchive, Lazy<Dictionary<int, HashSet<(int, int)>>>> StartChecks = [];
+
+    private static Dictionary<int, HashSet<(int Stage, int Room)>> CarriedAtStart(RoomArchive archive) =>
+        StartChecks.GetValue(archive, a => new Lazy<Dictionary<int, HashSet<(int, int)>>>(() =>
+        {
+            var found = new System.Collections.Concurrent.ConcurrentBag<(int Item, int Stage, int Room)>();
+            Parallel.ForEach(RoomTable.All, id =>
+            {
+                foreach (var o in CvScriptReader.ReadOpcodes(a.ReadRoom(id)).Where(o => o.Procedure == 0 && o.Opcode == CvOpcodes.CkPlayerItem && o.Length >= 2))
+                    found.Add((o.Bytes.Span[1], id.Stage, id.Room));
+            });
+            return found.GroupBy(f => f.Item).ToDictionary(g => g.Key, g => g.Select(f => (f.Stage, f.Room)).ToHashSet());
+        })).Value;
 
     public static FlagRule Rule(RoomArchive archive, RandoData data, RandoSettings settings)
     {
@@ -64,7 +86,11 @@ public static class StoryFlags
                 origin.Listings.All(l => !SameRoom(RoomId.ParseBioRand(l.Room), use.Room)))
                 keys.Add(origin.OriginalType);
         }
-        return new FlagRule(keys, spots.Values.Where(s => s.Flag != null).Select(s => s.GlobalId).ToHashSet());
+        var carried = CarriedAtStart(archive);
+        var avoid = carried.Where(c => data.Items.Get(c.Key)?.IsKey == true).ToDictionary(c => c.Key, c => (IReadOnlySet<int>)spots.Values
+            .Where(s => s.Listings.Any(l => RoomId.ParseBioRand(l.Room) is var r && c.Value.Contains((r.Stage, r.Room))))
+            .Select(s => s.GlobalId).ToHashSet());
+        return new FlagRule(keys, spots.Values.Where(s => s.Flag != null).Select(s => s.GlobalId).ToHashSet(), avoid);
     }
 
     private static Dictionary<int, Spot> Spots(IReadOnlyList<PickupFlagUse> uses, RandoData data, RandoSettings settings)
@@ -188,7 +214,7 @@ public static class StoryFlags
     }
 
     /// <summary>The checks of every <c>if</c> around an opcode (an <c>if</c>'s block ends 2 + its length byte after it).</summary>
-    private static List<CvOpcode> IfConditions(List<CvOpcode> ops, int offset)
+    internal static List<CvOpcode> IfConditions(List<CvOpcode> ops, int offset)
     {
         var result = new List<CvOpcode>();
         var at = ops.FindIndex(o => o.Offset == offset);

@@ -190,13 +190,18 @@ public sealed class ItemPlacer
 
     /// <summary>
     /// How many of a key to place: as many as the game has of it in this half. A run with
-    /// random doors places one of a key whose pickups are all in rooms it does not use.
+    /// random doors places as many as the whole game has, wherever they lie: the game may need
+    /// them all (seed 152118 placed one Wing Object of the four that make the Gold Dragonfly
+    /// RM_9300's door needs, as the other three were in rooms the run does not use).
     /// </summary>
     private int Copies(int type)
     {
         var copies = _graph.Locations.Count(l => l.OriginalType == type && InHalf(l) && !KeepsOriginal(l));
-        if (copies == 0 && Single && !_graph.Locations.Any(l => l.OriginalType == type && KeepsOriginal(l)))
-            copies = 1;
+        if (Single)
+        {
+            var kept = _graph.Locations.Count(l => l.OriginalType == type && KeepsOriginal(l));
+            copies = Math.Max(copies, Math.Max(_graph.GameCopies.GetValueOrDefault(type), 1) - kept);
+        }
         return copies;
     }
 
@@ -206,6 +211,9 @@ public sealed class ItemPlacer
         // a key other rooms check by its pickup flag goes where a flag says it was taken (when one is free)
         if (_flagRule is { } rule && rule.Keys.Contains(key) && free.Where(l => rule.Locations.Contains(l.GlobalId)).ToList() is { Count: > 0 } flagged)
             free = flagged;
+        // nor in a room that arms its lock for it only if the player brought it in (when another is free)
+        if (_flagRule is { } r && r.Avoid.TryGetValue(key, out var avoid) && free.Where(l => !avoid.Contains(l.GlobalId)).ToList() is { Count: > 0 } away)
+            free = away;
         var normal = free.Where(l => l.Priority == ItemPriority.Normal ||
                                      (_settings.HiddenKeyItems && l.Priority == ItemPriority.Hidden)).ToList();
         var pool = normal.Count != 0 ? normal : free;

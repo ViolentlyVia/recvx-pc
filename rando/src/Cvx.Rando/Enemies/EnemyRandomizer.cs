@@ -142,25 +142,64 @@ public sealed class EnemyRandomizer
     {
         var targets = room.Targets;
         var candidates = Kinds(room.Spec).Where(k => k.MaxAt(_difficulty) >= targets.Count).ToList();
+        // A room with more enemies than any kind may hold at this difficulty keeps them, unless
+        // they are a kind set to None (RM_0130's five bats at Easy): then it changes all the same
+        // (and keeps its count).
+        bool AtNone(RdxEnemyAssets t) =>
+            _data.Enemies.Types.Where(k => k.Type == t.Type && (k.Version == null || k.Version == t.ModelVersion)).ToList() is { Count: > 0 } own &&
+            own.All(k => Weight(k) == 0);
+        var fallback = targets.Any(AtNone) ? Kinds(room.Spec).Where(k => k.MaxAt(_difficulty) < targets.Count).ToList() : [];
 
         // Try kinds by weight until one fits the room.
-        while (candidates.Count != 0)
+        while (candidates.Count != 0 || fallback.Count != 0)
         {
+            if (candidates.Count == 0)
+                (candidates, fallback) = (fallback, []);
             var kind = _rng.NextWeighted(candidates.Select(k => (k, Weight(k))).ToList());
             candidates.Remove(kind);
             var plan = Plan(kind, targets.Count);
             if (plan == null)
                 continue;
             var replacements = targets.Select((t, i) => (t.Index, plan[i])).ToDictionary(x => x.Index, x => x.Item2);
-            if (Rebuild(rooms, room.Id, file => RdxEnemyRewriter.Replace(file, replacements), 0) is not { } rebuilt)
+            Func<RdxFile, RdxFile> build = file => RdxEnemyRewriter.Replace(file, replacements);
+            // Bats hang from the ceiling: what takes their place starts on the floor below them.
+            if (kind.Type != Bat && targets.Any(t => t.Type == Bat))
+            {
+                if (FloorPlaces(room, targets.Where(t => t.Type == Bat).ToList(), kind) is not { } floor)
+                    continue;
+                var slots = room.Layout.Enemies.Select(e => new RdxEnemySlot(e.Index, replacements.GetValueOrDefault(e.Index),
+                    floor.TryGetValue(e.Index, out var p) ? p : null)).ToList();
+                build = file => RdxEnemyRewriter.Rebuild(file, slots);
+            }
+            if (Rebuild(rooms, room.Id, build, 0) is not { } rebuilt)
                 continue;
 
             foreach (var nop in room.Spec?.Nop ?? [])
                 rooms.Nop(room.Id, nop);
-            rooms.SetRebuild(room.Id, file => RdxEnemyRewriter.Replace(file, replacements));
+            rooms.SetRebuild(room.Id, build);
             return Change(room, rebuilt, kind, targets.Count, plan);
         }
         return null;
+    }
+
+    /// <summary>
+    /// For each bat, the place on the floor nearest below it where <paramref name="kind"/> fits
+    /// (spread out), or null when the room has too few.
+    /// </summary>
+    private Dictionary<int, RdxVectorF>? FloorPlaces(Room room, List<RdxEnemyAssets> bats, EnemyKind kind)
+    {
+        var free = EnemySpots.Find(room.Original, EnemySpots.Known(room.Id, _archive, _data)).Where(s => s.Fits(kind.Radius)).ToList();
+        var result = new Dictionary<int, RdxVectorF>();
+        foreach (var bat in bats)
+        {
+            var at = bat.Entry.Position;
+            var spot = free.Where(s => s.Position.Y <= at.Y && result.Values.All(r => Distance(r, s.Position) >= Spacing / 2))
+                .OrderBy(s => Distance(s.Position, at)).ThenBy(s => at.Y - s.Position.Y).FirstOrDefault();
+            if (spot == null)
+                return null;
+            result[bat.Index] = spot.Position;
+        }
+        return result;
     }
 
     /// <summary>
@@ -382,12 +421,16 @@ public sealed class EnemyRandomizer
     /// <summary>The kinds the settings allow in a room.</summary>
     private List<EnemyKind> Kinds(MapRoomEnemies? spec)
     {
-        var maxKind = Math.Min(spec?.MaxDifficulty ?? 3, 3);
-        return _data.Enemies.Types
-            .Where(k => Weight(k) > 0 && k.Difficulty <= maxKind)
+        var allowed = _data.Enemies.Types
+            .Where(k => Weight(k) > 0)
             .Where(k => spec?.IncludeTypes is not { Length: > 0 } inc || inc.Contains(k.Type))
             .Where(k => spec?.ExcludeTypes is not { } exc || !exc.Contains(k.Type))
             .ToList();
+        // a room for easy kinds only (RM_0130: bats) takes the easiest of those left when its own are at None
+        var maxKind = Math.Min(spec?.MaxDifficulty ?? 3, 3);
+        if (allowed.Count != 0 && allowed.All(k => k.Difficulty > maxKind))
+            maxKind = allowed.Min(k => k.Difficulty);
+        return allowed.Where(k => k.Difficulty <= maxKind).ToList();
     }
 
     /// <summary>

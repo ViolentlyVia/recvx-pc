@@ -418,4 +418,65 @@ public class DoorTests
         }
         return seen;
     }
+
+    [GameDataFact]
+    public void NoDoorLeadsOutOfTheRun()
+    {
+        // The owner's seed 428946 (1 segment, size 1): RM_2060's script door to RM_2050, which
+        // the door mode's data does not list, kept its target and led into the rest of the game.
+        // Every door a player opens in the run's rooms that leads out of the run has an entry.
+        using var rooms = RoomArchive.Open(TestData.Open());
+        var settings = Doors(428946, Character.Claire, 1, 1) with
+        {
+            ItemMode = ItemMode.Custom, IncludeChris = false, HiddenKeyItems = true, RandomInventory = true, StartSidePack = true,
+        };
+        var owner = Generator.MakeDoors(settings, Data, null, StoryFlags.Rule(rooms, Data, settings));
+        Assert.Contains("3060", owner.Plan.Rooms);
+        Assert.DoesNotContain("3050", owner.Plan.Rooms);
+        var entries = DoorTable.Entries(owner.Plan, Data, rooms);
+        Assert.Contains(entries, e => e is { Stage: 2, Room: 6, Area: 9, OldStage: 2, OldRoom: 5, Locked: true });
+
+        foreach (var seed in Enumerable.Range(1, 10))
+        {
+            var layout = Make(seed, Character.Claire, 1 + seed % 4, 1 + seed % 8);
+            var run = layout.Plan.Rooms.Select(RoomId.ParseBioRand).ToHashSet();
+            var table = DoorTable.Entries(layout.Plan, Data, rooms);
+            foreach (var id in RoomTable.All.Where(id => run.Any(r => r.Stage == id.Stage && r.Room == id.Room)))
+            {
+                var aots = rooms.ReadRoom(id).Aots.ToArray();
+                for (var area = 0; area < aots.Length; area++)
+                {
+                    var a = aots[area];
+                    if (a.Kind != Cvx.Formats.Rdx.RdxAot.KindDoor || (a.Stage == id.Stage && a.Room == id.Room) ||
+                        run.Any(r => r.Stage == a.Stage && r.Room == a.Room) || !RoomTable.All.Any(r => r.Stage == a.Stage && r.Room == a.Room))
+                        continue;
+                    Assert.True(table.Any(e => e.Stage == id.Stage && e.Room == id.Room && e.Case == id.Variant &&
+                            e.OldStage == a.Stage && e.OldRoom == a.Room && (e.Area == area || e.Area == 255)),
+                        $"seed {seed}: {id} area {area} leads to stage {a.Stage} room {a.Room}, out of the run");
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void RunsGetEveryCopyOfAKey()
+    {
+        // The owner's seed 152118 (1 segment, size 1): RM_9300's door needs the Gold Dragonfly,
+        // made from the wingless one and four Wing Objects, but the run placed one Wing Object:
+        // the four pickups were in rooms it did not use. A run places as many as the game has.
+        var wing = Data.Items.Items.Single(i => i.Name == "Wing Object").Id;
+        foreach (var seed in Enumerable.Range(1, 12))
+        {
+            var layout = Make(seed, Character.Claire, 1 + seed % 4, 1 + seed % 8);
+            foreach (var type in layout.Items.KeyOrder.Select(k => k.Type).Distinct())
+            {
+                var held = layout.Items.ByGlobalId.Values.Count(a => a.Type == type);
+                Assert.True(held >= Math.Max(1, layout.Graph.GameCopies.GetValueOrDefault(type)),
+                    $"seed {seed}: {Data.Items.NameOf(type)} in {held} pickups, the game has {layout.Graph.GameCopies.GetValueOrDefault(type)}");
+            }
+            if (layout.Items.KeyOrder.Any(k => k.Type == wing))
+                Assert.Equal(4, layout.Items.ByGlobalId.Values.Count(a => a.Type == wing));
+        }
+    }
 }
+
