@@ -125,15 +125,13 @@ public static class RoomTweaks
 
     /// <summary>
     /// The side pack from the start: the status screen gives the bigger inventory while event
-    /// flag 6 (Claire) or 7 (Chris) is set (player.c <c>bhCheckSubPack</c>). Set in the rooms a
-    /// new game starts in (RM_0000, and RM_0010 with random doors).
+    /// flag 6 (Claire) or 7 (Chris) is set (player.c <c>bhCheckSubPack</c>). Set in the room a
+    /// new game starts in (RM_0000, with random doors too).
     /// </summary>
     public static readonly IReadOnlyList<RoomTweak> SidePack =
     [
         new("1000", TweakMode.Always, "start with the side pack") { Flag = (1, 6, 0) },
         new("1000", TweakMode.Always, "start with the side pack") { Flag = (1, 7, 0) },
-        new("1010", TweakMode.Always, "start with the side pack") { Flag = (1, 6, 0) },
-        new("1010", TweakMode.Always, "start with the side pack") { Flag = (1, 7, 0) },
     ];
 
     /// <summary>The Sp Alloy Emblem, which opens the courtyard's gate (RM_0031, to RM_0100).</summary>

@@ -216,25 +216,32 @@ public static class Generator
     {
         settings = settings with { RandomItems = true };
         var randomizer = new DoorRandomizer(data, SaveRoomKeys(data), settings);
+        string? why = null;
         for (var attempt = 0; attempt < MaxDoorAttempts; attempt++)
         {
             var plan = randomizer.Make(Rng.For(settings.Seed, $"doors{attempt}"));
             if (plan == null)
+            {
+                why = randomizer.LastFailure;
                 continue;
+            }
             var graph = ItemGraph.Build(data, settings, plan);
             ItemPlacementResult placement;
             try
             {
                 placement = PlaceItems(data, settings, graph, startWeapons ?? [], flagRule);
             }
-            catch (ItemPlacementException)
+            catch (ItemPlacementException e)
             {
+                why = e.Message;
                 continue;
             }
-            if (Playthrough.Check(graph, placement).Completed)
+            var check = Playthrough.Check(graph, placement);
+            why = check.Completed ? Playthrough.FindTrap(graph, placement) : check.Message;
+            if (why == null)
                 return new DoorLayout(plan, graph, placement, attempt + 1);
         }
-        throw new ItemPlacementException($"No door layout for seed {settings.Seed} could be finished (try another seed).");
+        throw new ItemPlacementException($"No door layout for seed {settings.Seed} could be finished (try another seed; last: {why}).");
     }
 
     /// <summary>
@@ -312,11 +319,11 @@ public static class Generator
             sb.AppendLine("fix_rifle_stacking=1");
         if (result.Settings.NoNosferatuPoison)
             sb.AppendLine("no_nosferatu_poison=1");
-        if (result.Doors is { } doors)
+        // Claire's run starts as a new game does (the opening, the cell); Chris's where he arrives.
+        if (result.Doors is { Character: Character.Chris } doors)
         {
             var start = RoomId.ParseBioRand(doors.StartRoom);
-            var player = doors.Character == Character.Chris ? 1 : 0;
-            sb.AppendLine($"start={start.Stage},{start.Room},{doors.StartEntrance},{start.Variant},{player}");
+            sb.AppendLine($"start={start.Stage},{start.Room},{doors.StartEntrance},{start.Variant},1");
         }
         foreach (var inventory in result.StartInventories)
         {

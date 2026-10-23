@@ -60,15 +60,11 @@ public class DoorTests
         var plan = Make(seed).Plan;
         Assert.Equal(DoorRandomizer.StartRoom, plan.StartRoom);
         var saveRooms = Generator.SaveRoomKeys(Data);
-        var exits = plan.Links.Values.Where(l => l.Door.Room == DoorRandomizer.StartRoom).ToList();
-        Assert.Equal(2, exits.Count);
-        foreach (var link in exits)
-        {
-            if (link.Door.OriginalTarget == DoorRandomizer.CellRoom)
-                Assert.Equal(DoorRandomizer.StartRoom, link.TargetRoom);   // the cell is skipped
-            else
-                Assert.Contains(link.TargetRoom, saveRooms);
-        }
+        // the cell (a new game's room) has one door, the game's first: it leads to a save room
+        var exit = Assert.Single(plan.Links.Values, l => l.Door.Room == DoorRandomizer.StartRoom);
+        Assert.Equal(DoorRandomizer.CellRoom, DoorRandomizer.StartRoom);
+        Assert.Contains(exit.TargetRoom, saveRooms);
+        Assert.NotEqual(DoorRandomizer.StartRoom, exit.TargetRoom);
     }
 
     [Theory]
@@ -172,7 +168,7 @@ public class DoorTests
                 Spoiler = "",
             });
         }
-        Assert.Contains("start=0,1,0,0,0", Ini(Character.Claire));
+        Assert.DoesNotContain("start=", Ini(Character.Claire));      // a new game, as the game starts it
         Assert.Contains("start=7,24,0,0,1", Ini(Character.Chris));   // RM_7240, where Chris arrives
     }
 
@@ -404,7 +400,7 @@ public class DoorTests
             Assert.NotEmpty(CvScriptReader.ReadOpcodes(file));
         }
         Assert.NotNull(result.DoorTable);
-        Assert.Contains("start=0,1,0,0,0", Generator.RandoIni(result));
+        Assert.DoesNotContain("start=", Generator.RandoIni(result));
     }
 
     private static HashSet<string> Reachable(ItemGraph graph, string start)
@@ -429,13 +425,16 @@ public class DoorTests
         // the door mode's data does not list, kept its target and led into the rest of the game.
         // Every door a player opens in the run's rooms that leads out of the run has an entry.
         using var rooms = RoomArchive.Open(TestData.Open());
-        var settings = Doors(428946, Character.Claire, 1, 1) with
-        {
-            ItemMode = ItemMode.Custom, IncludeChris = false, HiddenKeyItems = true, RandomInventory = true, StartSidePack = true,
-        };
-        var owner = Generator.MakeDoors(settings, Data, null, StoryFlags.Rule(rooms, Data, settings));
-        Assert.Contains("3060", owner.Plan.Rooms);
-        Assert.DoesNotContain("3050", owner.Plan.Rooms);
+        // (the first layout from that seed on with RM_2060 and without RM_2050: seeds change)
+        var owner = Enumerable.Range(428946, 500).Select(seed =>
+            {
+                var settings = Doors(seed, Character.Claire, 1, 1) with
+                {
+                    ItemMode = ItemMode.Custom, IncludeChris = false, HiddenKeyItems = true, RandomInventory = true, StartSidePack = true,
+                };
+                return Generator.MakeDoors(settings, Data, null, StoryFlags.Rule(rooms, Data, settings));
+            })
+            .First(l => l.Plan.Rooms.Contains("3060") && !l.Plan.Rooms.Contains("3050"));
         var entries = DoorTable.Entries(owner.Plan, Data, rooms);
         Assert.Contains(entries, e => e is { Stage: 2, Room: 6, Area: 9, OldStage: 2, OldRoom: 5, Locked: true });
 
@@ -467,48 +466,51 @@ public class DoorTests
         // The owner's seed 985463 (1 segment, size 1): RM_3150's door led into RM_9320 by the open
         // side of its jewel door; back through it needs the three jewels, and Alfred's Ring lay
         // behind RM_9300's Dragonfly door, so items left behind were out of reach. With the keys
-        // of each step of the key order, every room the player reaches leads back to the start.
+        // of each step of the key order, every room the player reaches leads back to its start
+        // (Playthrough.FindTrap; the generator does not use a layout with a trap).
         using var rooms = RoomArchive.Open(TestData.Open());
         var settings = Doors(985463, Character.Claire, 1, 1) with
         {
             ItemMode = ItemMode.Custom, IncludeChris = false, HiddenKeyItems = true, RandomInventory = true, StartSidePack = true,
         };
         Check(Generator.MakeDoors(settings, Data, null, StoryFlags.Rule(rooms, Data, settings)), "seed 985463");
-        foreach (var seed in Enumerable.Range(1, 20))
+        foreach (var seed in Enumerable.Range(1, 60))
             Check(Make(seed, Character.Claire, 1, 1 + seed % 8), $"seed {seed}");
 
         static void Check(Generator.DoorLayout layout, string what)
         {
-            var start = layout.Graph.Start;
-            var order = layout.Items.KeyOrder.Select(k => k.Type).ToList();
-            for (var step = 0; step <= order.Count; step++)
-            {
-                var have = order.Take(step).ToHashSet();
-                var reached = Reach(start, have, null);
-                foreach (var room in reached)
-                    Assert.True(Reach(room, have, reached).Contains(start),
-                        $"{what}: {room} is reached with {step} keys but does not lead back with them");
-            }
+            var trap = Playthrough.FindTrap(layout.Graph, layout.Items);
+            Assert.True(trap == null, $"{what}: {trap}");
         }
+    }
 
-        // The closed side of a one-side door opens once the player came through from its open side.
-        static HashSet<RoomNode> Reach(RoomNode from, HashSet<int> have, HashSet<RoomNode>? visited)
+    [Fact]
+    public void FindTrapSeesADoorKeyedOnOneSide()
+    {
+        // the owner's seed 985463 in small: the start (RM_3150) leads into RM_9320 by a door
+        // without keys; its door back needs the jewels (item 43), found further on
+        var start = new RoomNode { Id = RoomId.ParseBioRand("40F0"), Key = "40F0" };
+        var jewels = new RoomNode { Id = RoomId.ParseBioRand("A200"), Key = "A200" };
+        var end = new RoomNode { Id = RoomId.ParseBioRand("A1E0"), Key = "A1E0" };
+        start.Edges.Add(new DoorEdge { From = start, To = jewels, Redirected = true });
+        jewels.Edges.Add(new DoorEdge { From = jewels, To = start, Requires = [43], Redirected = true });
+        jewels.Edges.Add(new DoorEdge { From = jewels, To = end, Redirected = true });
+        end.Edges.Add(new DoorEdge { From = end, To = jewels, Redirected = true });
+        var graph = new ItemGraph
         {
-            var seen = new HashSet<RoomNode>();
-            var stack = new Stack<RoomNode>([from]);
-            bool Opened(DoorEdge e) => visited != null && visited.Contains(e.To) &&
-                e.To.Edges.Any(b => b.To == e.From && b.Unblock && b.Requires.All(have.Contains));
-            while (stack.Count != 0)
-            {
-                var r = stack.Pop();
-                if (!seen.Add(r))
-                    continue;
-                foreach (var e in r.Edges.Where(e => (!e.Locked || Opened(e)) && !e.NoReturn && e.Requires.All(have.Contains) &&
-                                                     e.RequiresRoom.All(x => (visited ?? seen).Contains(x))))
-                    stack.Push(e.To);
-            }
-            return seen;
-        }
+            Start = start, End = end, OnlyCharacter = Character.Claire, Locations = [],
+            Rooms = new Dictionary<string, RoomNode> { ["40F0"] = start, ["A200"] = jewels, ["A1E0"] = end },
+        };
+        var spot = new ItemLocation { GlobalId = 1, OriginalType = 43, Priority = ItemPriority.Normal };
+        ItemPlacementResult Placement(int[] keys) => new()
+        {
+            ByGlobalId = new Dictionary<int, ItemAssignment>(), GivenKeys = [], Log = [],
+            KeyOrder = keys.Select(k => new ItemAssignment(spot, k, true)).ToList(),
+        };
+        Assert.Contains("A200", Playthrough.FindTrap(graph, Placement([43])));
+        // with a way back without keys, there is no trap
+        jewels.Edges[0].Requires = [];
+        Assert.Null(Playthrough.FindTrap(graph, Placement([43])));
     }
 
     [Fact]

@@ -82,6 +82,60 @@ public static class Playthrough
         return new Result(false, "too many areas", collected.Count);
     }
 
+    /// <summary>
+    /// A room the player can walk into and not back out of with the keys they have, or null.
+    /// With the keys of each step of the key order, every room reached from a start (the run's,
+    /// or the far side of a one-way door) must lead back to it: the item logic counts on going
+    /// back. A random link keyed on one side is one-way from the other (seed 985463 came into
+    /// RM_9320 by the open side of its jewel door; seed 7 into RM_1070 from RM_3160, reached
+    /// another way). The closed side of a one-side door opens once its open side was reached.
+    /// Doors the game itself makes one-way (story doors, doors locked for good on the far side)
+    /// are not walked through; their far sides are starts of their own.
+    /// </summary>
+    public static string? FindTrap(ItemGraph graph, ItemPlacementResult placement)
+    {
+        var starts = new List<RoomNode> { graph.Start };
+        starts.AddRange(graph.Rooms.Values.SelectMany(r => r.Edges).Where(OneWay).Select(e => e.To).Distinct().Where(r => r != graph.Start));
+        var start = graph.OnlyCharacter is { } only ? StartKeys(only == Character.Chris, placement) : StartKeys(graph.Start.IsChris, placement);
+        var order = placement.KeyOrder.Select(k => k.Type).ToList();
+        for (var step = 0; step <= order.Count; step++)
+        {
+            var have = new HashSet<int>(start.Concat(order.Take(step)));
+            foreach (var from in starts)
+            {
+                var reached = Reach(from, have, null);
+                foreach (var room in reached)
+                {
+                    if (!Reach(room, have, reached).Contains(from))
+                        return $"{room} is reached from {from} with {step} keys of the key order but does not lead back";
+                }
+            }
+        }
+        return null;
+    }
+
+    /// <summary>A door with no way back through it (keys aside): a story door, or one whose far side is locked for good.</summary>
+    private static bool OneWay(DoorEdge e) =>
+        e.NoReturn || (!e.Unblock && !e.To.Edges.Any(b => b.To == e.From && !b.Locked && !b.NoReturn));
+
+    private static HashSet<RoomNode> Reach(RoomNode from, HashSet<int> have, HashSet<RoomNode>? visited)
+    {
+        var seen = new HashSet<RoomNode>();
+        var stack = new Stack<RoomNode>([from]);
+        bool Opened(DoorEdge e) => visited != null && visited.Contains(e.To) &&
+            e.To.Edges.Any(b => b.To == e.From && b.Unblock && b.Requires.All(have.Contains));
+        while (stack.Count != 0)
+        {
+            var r = stack.Pop();
+            if (!seen.Add(r))
+                continue;
+            foreach (var e in r.Edges.Where(e => (!e.Locked || Opened(e)) && !OneWay(e) && e.Requires.All(have.Contains) &&
+                                                 e.RequiresRoom.All(x => (visited ?? seen).Contains(x))))
+                stack.Push(e.To);
+        }
+        return seen;
+    }
+
     private static HashSet<int> StartKeys(bool chris, ItemPlacementResult placement)
     {
         var have = new HashSet<int>(chris ? ItemPlacer.ChrisStartKeys : ItemPlacer.ClaireStartKeys);

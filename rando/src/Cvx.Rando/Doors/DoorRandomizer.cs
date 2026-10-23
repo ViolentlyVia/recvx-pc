@@ -87,11 +87,14 @@ public sealed class DoorPlan
 /// Kept as in the game, inside a segment: one-way and bridge doors, doors with locks, room
 /// conditions or flag conditions, and doors into rooms the data excludes. Kept doors that
 /// would leave the segment lead back into their own room instead, as do doors into rooms the
-/// run does not use (the cell, ...).
+/// run does not use.
+///
+/// Claire's run starts as a new game does, in RM_0000 (the cell, where Rodrigo lets her out);
+/// its one door, the first of the game, is the first random door.
 /// </summary>
 public sealed class DoorRandomizer
 {
-    public const string StartRoom = "1010";
+    public const string StartRoom = "1000";
     public const string ChrisStartRoom = "8180";
     public const int StartEntrance = 0;
     public const string CellRoom = "1000";
@@ -115,8 +118,8 @@ public sealed class DoorRandomizer
         _segments = Math.Clamp(settings.DoorSegments, 1, MaxSegments);
         _size = Math.Clamp(settings.DoorSegmentSize, 1, MaxSize);
         _character = settings.DoorCharacter;
-        // Chris starts after the switch to him, so the run never goes through it.
-        _skipped = _character == Character.Chris ? [CellRoom, SwitchRoom] : [CellRoom];
+        // Chris starts after the switch to him, so the run never goes through it (or Claire's cell).
+        _skipped = _character == Character.Chris ? [CellRoom, SwitchRoom] : [];
         EndRoom = data.Map.BeginEndRooms.First(x => x.DoorRando == true).End!;
     }
 
@@ -142,7 +145,7 @@ public sealed class DoorRandomizer
     private bool HasCategory(string room, string category) =>
         (_data.Map.Rooms[room].DoorRando ?? []).Any(d => string.Equals(d.Category, category, StringComparison.OrdinalIgnoreCase));
 
-    private bool Excluded(string room) => room == CellRoom || HasCategory(room, "exclude");
+    private bool Excluded(string room) => (room == CellRoom && _character == Character.Chris) || HasCategory(room, "exclude");
 
     /// <summary>Doors that join rooms for good: the data does not let them change, or a room needs another room.</summary>
     private static bool Sticky(DoorStub s) => s.Raw.Randomize == false || s.Raw.RequiresRoom is { Length: > 0 };

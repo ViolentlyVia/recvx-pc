@@ -107,7 +107,7 @@ public class InventoryTests
         foreach (var (items, doors) in new[] { (false, false), (true, false), (true, true) })
         {
             var result = Generator.Generate(new RandoSettings { Seed = 4, RandomItems = items, RandomDoors = doors, StartSidePack = true }, Data, rooms);
-            foreach (var room in new[] { "1000", "1010" })
+            foreach (var room in new[] { "1000" })   // a new game starts there, with random doors too
             {
                 var start = result.ChangedRooms[RoomId.ParseBioRand(room)].Script[0].ToArray();
                 Assert.True(Contains(start, claire) && Contains(start, chris), $"{room} items {items} doors {doors}");
