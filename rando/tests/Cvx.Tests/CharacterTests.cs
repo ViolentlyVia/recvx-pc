@@ -333,15 +333,28 @@ public class CharacterTests
             Assert.Equal(before.Page.Models.First().Objects.Select(o => o.Child), layout.Page.Models.First().Objects.Select(o => o.Child));
             Assert.All(TextureEntry.Read(layout.Textures[0].Data).Pictures, p => Assert.True(p.GlobalIndex >= PlayerModel.GlobalIndexOf(entry)));
 
+            // the blinks (models 1 and 2's textures) are the body's: no flash of the game's character
+            Assert.All(layout.Textures.Skip(1).Take(PlayerModel.BlinkModels), t => Assert.True(t.Data.AsSpan().SequenceEqual(layout.Textures[0].Data)));
+
+            // Claire's ponytail (model 4) is hidden; Chris has none
+            var models = layout.Page.Blocks.Where(b => b.Kind == ModelPageBlockKind.Model).ToList();
+            if (entry == 11)
+                Assert.Equal(PlayerModel.PonytailModel, models.Count);
+            else
+                Assert.All(models[PlayerModel.PonytailModel].Model!.Objects, o => Assert.True((o.EvalFlags & NjObject.EvalHide) != 0));
+
             // everything else as it was: the other blocks, the motions, the other texture entries
             var oldBody = before.Page.Blocks.FindIndex(b => b.Model != null);
             var oldSkin = oldBody > 0 && before.Page.Blocks[oldBody - 1].Kind == ModelPageBlockKind.Skin ? oldBody - 1 : -1;
+            var oldModels = before.Page.Blocks.Where(b => b.Kind == ModelPageBlockKind.Model).ToList();
+            var oldHair = oldModels.Count > PlayerModel.PonytailModel ? before.Page.Blocks.IndexOf(oldModels[PlayerModel.PonytailModel]) : -1;
+            var newHair = models.Count > PlayerModel.PonytailModel ? layout.Page.Blocks.IndexOf(models[PlayerModel.PonytailModel]) : -1;
             static string Hex(ModelPageBlock b) => Convert.ToHexString(b.Data);
-            Assert.Equal(before.Page.Blocks.Where((_, i) => i != oldBody && i != oldSkin).Select(Hex),
-                         layout.Page.Blocks.Where((_, i) => i != bodyBlock).Select(Hex));
+            Assert.Equal(before.Page.Blocks.Where((_, i) => i != oldBody && i != oldSkin && i != oldHair).Select(Hex),
+                         layout.Page.Blocks.Where((_, i) => i != bodyBlock && i != newHair).Select(Hex));
             Assert.True(file.AsSpan(before.MotionsAt, before.TexturesAt - before.MotionsAt).SequenceEqual(after.AsSpan(layout.MotionsAt, layout.TexturesAt - layout.MotionsAt)));
             Assert.Equal(before.Textures.Count, layout.Textures.Count);
-            Assert.All(before.Textures.Zip(layout.Textures).Skip(1), x =>
+            Assert.All(before.Textures.Zip(layout.Textures).Skip(1 + PlayerModel.BlinkModels), x =>
             {
                 Assert.True(x.First.Data.AsSpan().SequenceEqual(x.Second.Data));
                 Assert.Equal(x.First.Aligned, x.Second.Aligned);

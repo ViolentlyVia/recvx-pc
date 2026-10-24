@@ -27,6 +27,21 @@ public static class PlayerModel
     public static uint GlobalIndexOf(int entry) => CharacterConverter.FirstGlobalIndex + 0x200 + (uint)entry * 16;
 
     /// <summary>
+    /// The models after the body that hold its blinking textures: the player blinks by giving
+    /// the body model 1's and model 2's texture lists (player.c, <c>PlyEyeTab</c>: <c>txp[1]</c>,
+    /// <c>txp[2]</c>), the same textures with the eyes half and fully closed. Their texture
+    /// entries are the 2nd and 3rd.
+    /// </summary>
+    public const int BlinkModels = 2;
+
+    /// <summary>
+    /// Claire's ponytail: model 4, the 4-object chain (with its own SKIN block) the game hangs
+    /// on her head as a linked object with its own motion (player.c, <c>lkmtab</c>, <c>mdlver</c>
+    /// 4; objitm.c, <c>bhCalcHair</c>). Chris's files have no model 4.
+    /// </summary>
+    public const int PonytailModel = 4;
+
+    /// <summary>
     /// The file with its body made from <paramref name="pld"/> (its SKIN block dropped: the converted
     /// body's parts ride their objects) and the body's textures replaced; everything else as it was.
     /// </summary>
@@ -44,12 +59,16 @@ public static class PlayerModel
         using var ms = new MemoryStream();
         using var bw = new BinaryWriter(ms);
 
-        // the page: the body's SKIN block left out, the body converted, the rest as they were
+        // the page: the body's SKIN block left out, the body converted, the ponytail hidden, the
+        // rest as they were
         using (var page = new MemoryStream())
         using (var pw = new BinaryWriter(page))
         {
+            var model = -1;
             foreach (var (block, i) in layout.Page.Blocks.Select((b, i) => (b, i)))
             {
+                if (block.Kind == ModelPageBlockKind.Model)
+                    model++;
                 if (i == bodyBlock - 1 && block.Kind == ModelPageBlockKind.Skin)
                     continue;
                 if (block.Kind == ModelPageBlockKind.Empty)
@@ -57,7 +76,21 @@ public static class PlayerModel
                     pw.Write(0);
                     continue;
                 }
-                var data = i == bodyBlock ? converted.Page.Blocks.Single().Model!.ToBytes((int)page.Position + 4) : block.Data;
+                byte[] data;
+                if (i == bodyBlock)
+                {
+                    data = converted.Page.Blocks.Single().Model!.ToBytes((int)page.Position + 4);
+                }
+                else if (block.Kind == ModelPageBlockKind.Model && model == PonytailModel && block.Model is { } hair)
+                {
+                    foreach (var o in hair.Objects)
+                        o.EvalFlags |= NjObject.EvalHide;
+                    data = hair.ToBytes((int)page.Position + 4);
+                }
+                else
+                {
+                    data = block.Data;
+                }
                 pw.Write(data.Length);
                 pw.Write(data);
             }
@@ -71,10 +104,12 @@ public static class PlayerModel
         // the motions and the third block as they were
         bw.Write(file, layout.MotionsAt, layout.TexturesAt - layout.MotionsAt);
 
-        // the textures: the body's converted, each entry where the loader looks for it
+        // the textures: the body's converted, and the blinks' (the same pictures: a blink then
+        // changes nothing), each entry where the loader looks for it
+        var textures = converted.Textures.ToBytes();
         foreach (var (texture, i) in layout.Textures.Select((t, i) => (t, i)))
         {
-            var data = i == 0 ? converted.Textures.ToBytes() : texture.Data;
+            var data = i <= BlinkModels ? textures : texture.Data;
             bw.Write(data.Length | (texture.Aligned ? unchecked((int)0x80000000) : 0));
             if (texture.Aligned)
             {
