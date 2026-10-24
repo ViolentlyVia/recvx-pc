@@ -18,7 +18,7 @@ EXE = os.path.join(common.BUILD, "recvx.exe")
 def header_mtime_cache():
     """Newest header mtime in the include dirs: any header change rebuilds everything (simple and safe)."""
     newest = 0
-    for inc in ["include", "pc/include", "pc/src", "src"]:
+    for inc in ["include", "pc/include", "pc/src", "pc/res", "src"]:
         for dirpath, _, files in os.walk(os.path.join(common.ROOT, inc)):
             for f in files:
                 if f.endswith(".h"):
