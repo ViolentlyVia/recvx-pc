@@ -66,7 +66,7 @@ CV:X's options sit in BioRand's boxes, with its own additions:
   `VOICE1.AFS`/`VOICE2.AFS` (about 70 MB);
 - **Change Player Character** (BioRand's box): Claire and Chris become BioRand characters,
   each picked in its drop-down or Random (never both the same): their gameplay model
-  (`SYSTEM.AFS` in the seed's folder; needs a recvx.exe newer than 0.9.93), their
+  (`SYSTEM.AFS` in the seed's folder; needs recvx.exe 0.9.94 or newer), their
   cutscene models, the lines of theirs the randomizer knows (151) and their pain and death
   sounds (BioRand's `data/hurt`) take that character's look and voice;
 - in the settings, **Randomize title voice** plays one of BioRand's title calls at the title

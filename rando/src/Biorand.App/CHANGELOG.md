@@ -1,5 +1,12 @@
 # Biorand++
 
+## 0.9.94
+- CV:X: BioRand's "Change Player Character": Claire and Chris become BioRand characters (Random,
+  or one you pick for each): their cutscene and gameplay models, their lines and their pain
+  and death sounds. Converted players no longer blink into Claire or keep her ponytail.
+- CV:X: NPCs that take a BioRand character's look speak with that character's voice (BioRand's
+  clips; the subtitles keep the game's words).
+
 ## 0.9.93
 - CV:X random doors with Claire start as a new game does: the opening, Claire waking in the
   cell and Rodrigo letting her out. The cell's door, the first of the game, is the first random
