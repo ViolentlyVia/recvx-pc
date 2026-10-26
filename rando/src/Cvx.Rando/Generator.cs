@@ -9,6 +9,7 @@ using Cvx.Rando.Enemies;
 using Cvx.Rando.Items;
 using Cvx.Rando.Music;
 using Cvx.Rando.Npcs;
+using Cvx.Rando.Title;
 
 namespace Cvx.Rando;
 
@@ -34,6 +35,11 @@ public sealed record GenerationResult
     public NpcResult? Npcs { get; init; }
     /// <summary>BioRand's title call that replaces the game's (ADV.AFS), when it is randomized.</summary>
     public LibraryTrack? TitleCall { get; init; }
+    /// <summary>
+    /// BioRand's CV:X title art (data/recv/bg.png in its folder), which the seed's title screen
+    /// is made from (<see cref="TitleScreen"/>); null without a BioRand folder.
+    /// </summary>
+    public byte[]? TitleBackground { get; init; }
     /// <summary>Door layouts made until one could be finished.</summary>
     public int DoorAttempts { get; init; }
     /// <summary>rando_doors.txt, with random doors.</summary>
@@ -189,6 +195,7 @@ public static class Generator
             MissingMusicGames = missingMusic,
             MusicTargetRms = data.Music.TargetRms,
             TitleCall = titleCall,
+            TitleBackground = TitleScreen.FindBackground(musicLibrary?.Directory),
             Npcs = npcs,
             DoorTable = doors == null ? null : Doors.DoorTable.Write(doors, data, archive),
             GraphDot = graph == null ? null : GraphExport.Dot(graph, data.Items, saveRooms),
@@ -223,6 +230,15 @@ public static class Generator
             result[name] = pool[rng.Next(pool.Count)];
         }
         return result;
+    }
+
+    /// <summary>The seed's title screen (ADV.AFS entry 2), or null without BioRand's art.</summary>
+    public static byte[]? TitlePicture(GameData data, GenerationResult result)
+    {
+        if (result.TitleBackground is not { } background)
+            return null;
+        using var adv = AfsArchive.Open(Path.Combine(data.Directory, TitleScreen.Archive));
+        return TitleScreen.Make(adv.ReadEntry(TitleScreen.Entry), background, TitleScreen.Caption);
     }
 
     private static ItemPlacementResult PlaceItems(RandoData data, RandoSettings settings, ItemGraph graph, IReadOnlyCollection<int> startWeapons,
@@ -320,7 +336,7 @@ public static class Generator
                 progress?.Report("Writing enemy sounds...");
             EnemySounds.Write(data, result.Enemies, directory, result.Npcs?.PlayerSounds);
             MusicWriter.Write(data, result.MusicTargetRms, result.Music, directory, progress);
-            MusicWriter.WriteTitleCall(data, result.TitleCall, directory, progress);
+            MusicWriter.WriteTitleCall(data, result.TitleCall, directory, progress, TitlePicture(data, result));
             if (result.Npcs is { Voices.Count: > 0 })
                 progress?.Report("Writing the NPCs' voices...");
             NpcRandomizer.WriteVoices(data, result.Npcs?.Voices ?? [], directory);

@@ -3,6 +3,7 @@ using Cvx.Formats;
 using Cvx.Rando.Data;
 using Cvx.Rando.Music;
 using Cvx.Rando.Npcs;
+using Cvx.Rando.Title;
 
 namespace Cvx.Rando;
 
@@ -29,6 +30,7 @@ public static class Spoiler
         sb.AppendLine($"NPCs: {(s.RandomNpcs && result.Npcs != null ? Looks(data.Npcs.Characters.Select(c => c.Name)) : "off")}");
         if (s.RandomPlayers)
             sb.AppendLine($"Claire and Chris: {(result.Npcs != null && Looks(data.Npcs.Players.Select(c => c.Name)) is { Length: > 0 } p ? p : "unchanged (no BioRand folder with characters)")}");
+        sb.AppendLine($"Title screen: {(result.TitleBackground != null ? $"BioRand's, with {TitleScreen.Caption}" : "the game's (no BioRand folder)")}");
         if (s.RandomTitleCall)
             sb.AppendLine($"Title call: {(result.TitleCall is { } t ? $"BioRand's {t.Name}" : "the game's (no BioRand folder with title calls)")}");
         sb.AppendLine();

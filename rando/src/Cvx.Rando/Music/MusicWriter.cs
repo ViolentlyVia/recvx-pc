@@ -53,22 +53,30 @@ public static class MusicWriter
     public const string TitleArchive = "ADV.AFS";
 
     /// <summary>
-    /// The title call: ADV.AFS with <paramref name="title"/> in place of the game's (as loud as
-    /// the game's), or no ADV.AFS in the mod folder when there is none.
+    /// ADV.AFS with <paramref name="title"/> in place of the game's title call (as loud as the
+    /// game's) and <paramref name="titleScreen"/> as its title screen (entry 2), or no ADV.AFS in
+    /// the mod folder when there is neither.
     /// </summary>
-    public static void WriteTitleCall(GameData data, LibraryTrack? title, string directory, IProgress<string>? progress = null)
+    public static void WriteTitleCall(GameData data, LibraryTrack? title, string directory, IProgress<string>? progress = null, byte[]? titleScreen = null)
     {
         var path = Path.Combine(directory, TitleArchive);
-        if (title == null)
+        if (title == null && titleScreen == null)
         {
             if (File.Exists(path))
                 File.Delete(path);
             return;
         }
-        progress?.Report("Writing the title call...");
+        progress?.Report("Writing the title screen...");
         using var afs = AfsArchive.Open(Path.Combine(data.Directory, TitleArchive));
-        var (own, _) = Adx.Decode(afs.ReadEntry(TitleCallEntry));
-        AfsWriter.Write(afs, new Dictionary<int, byte[]> { [TitleCallEntry] = Convert(title, MusicLibrary.Level(own).Rms, loop: false) }, path);
+        var replacements = new Dictionary<int, byte[]>();
+        if (title != null)
+        {
+            var (own, _) = Adx.Decode(afs.ReadEntry(TitleCallEntry));
+            replacements[TitleCallEntry] = Convert(title, MusicLibrary.Level(own).Rms, loop: false);
+        }
+        if (titleScreen != null)
+            replacements[Title.TitleScreen.Entry] = titleScreen;
+        AfsWriter.Write(afs, replacements, path);
     }
 
     /// <summary>A BioRand track as ADX: decoded, brought to the game's loudness, looping over the whole track (or once).</summary>
