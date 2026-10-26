@@ -69,6 +69,9 @@ CV:X's options sit in BioRand's boxes, with its own additions:
   (`SYSTEM.AFS` in the seed's folder; needs recvx.exe 0.9.94 or newer), their
   cutscene models, the lines of theirs the randomizer knows (151) and their pain and death
   sounds (BioRand's `data/hurt`) take that character's look and voice;
+- every seed's **title screen** is BioRand's CV:X art (`data/recv/bg.png` in its folder: the
+  game's title with BIORAND under the logo), with the Biorand++ version at the top left, as
+  BioRand's titles do (`ADV.AFS`); without a BioRand folder the title stays the game's;
 - in the settings, **Randomize title voice** plays one of BioRand's title calls at the title
   screen, and **Door Skip (RE CVX)** turns on recvx-pc's door skip.
 
