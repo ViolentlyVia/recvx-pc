@@ -307,6 +307,54 @@ public class CharacterTests
 
         // their gameplay models: Claire's two player files, Chris's one
         Assert.Equal(new[] { 10, 11, 14 }, result.PlayerFiles.Keys.Order());
+        // their pain and death sounds: both characters have BioRand's four
+        Assert.Equal(new ushort[] { 0xFFF0, 0xFFF1 }, result.PlayerSounds.Keys.Order());
+        Assert.All(result.PlayerSounds.Values, clips => Assert.Equal(new[] { 0, 1, 2, 3 }, clips.Keys.Order()));
+    }
+
+    [BioRandFact]
+    public void PlayerPainSoundsBecomeTheCharactersHurtClips()
+    {
+        var library = CharacterLibrary.Open(BioRandData.Directory)!;
+        using var packs = SoundPacks.Open(TestData.Open(), 1);
+        foreach (var (player, look) in new[] { ("Claire", "leon.re2"), ("Chris", "ada.re2") })
+        {
+            var index = packs.Keys.ToList().IndexOf(PlayerSounds.KeyOf(player));
+            var pack = packs.Afs.ReadEntry(index);
+            var clips = library.HurtClips(look).ToDictionary(x => x.Key, x => (CharacterLibrary.ReadOgg(x.Value), x.Value.Name));
+            Assert.Equal(4, clips.Count);
+            var after = PlayerSounds.Replace(pack, clips);
+
+            static (byte[] Hd, byte[] Bd) Split(byte[] p)
+            {
+                var bank = SoundPacks.Parse(p).Single(b => b.Type == PlayerSounds.BankType && b.BankNo == PlayerSounds.BankNo).Data.ToArray();
+                int U(int at) => BitConverter.ToInt32(bank, at);
+                return (bank.AsSpan(U(0), U(4)).ToArray(), bank.AsSpan(U(8), U(12)).ToArray());
+            }
+            var (oldHd, oldBd) = Split(pack);
+            var (hd, bd) = Split(after);
+            Assert.Equal(oldHd.Length, hd.Length);
+            var programs = PlayerSounds.Programs(hd);
+            Assert.Equal(new[] { 0, 1, 2, 3 }, programs.Select(p => p.Program));
+
+            // each program plays its clip (program 1, the death, BioRand's 3), mono at the new rate, as long as the clip (or the cap)
+            int[] clipOf = [0, 3, 1, 2];
+            foreach (var (program, vag) in programs)
+            {
+                Assert.Equal(PlayerSounds.Rate, BitConverter.ToUInt16(hd, vag + 4));
+                var samples = Vag.Decode(bd, BitConverter.ToInt32(hd, vag));
+                var (pcm, rate) = PlayerSounds.Decode(clips[clipOf[program]].Item1, clips[clipOf[program]].Name);
+                var seconds = Math.Min(pcm.Length / (double)rate, clipOf[program] == 3 ? 3.0 : 1.2);
+                Assert.InRange(samples.Length / (double)PlayerSounds.Rate, seconds, seconds + 2 * Vag.SamplesPerBlock / (double)PlayerSounds.Rate);
+            }
+
+            // the rest of the pack as it was
+            var before = SoundPacks.Parse(pack);
+            var banks = SoundPacks.Parse(after);
+            Assert.Equal(before.Select(b => (b.Type, b.BankNo)), banks.Select(b => (b.Type, b.BankNo)));
+            Assert.All(before.Zip(banks).Where(x => x.First.Type != PlayerSounds.BankType || x.First.BankNo != PlayerSounds.BankNo),
+                x => Assert.True(x.First.Data.Span.SequenceEqual(x.Second.Data.Span)));
+        }
     }
 
     [BioRandFact]

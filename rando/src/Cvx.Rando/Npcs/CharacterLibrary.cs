@@ -183,6 +183,49 @@ public sealed class CharacterLibrary
         return found.Values.OrderBy(c => c.Name, StringComparer.Ordinal).ToList();
     }
 
+    /// <summary>
+    /// A character's pain and death sounds (<c>data/hurt/&lt;id&gt;/0-3.ogg|wav</c>, as BioRand's
+    /// <c>VoiceRandomiser</c> reads them: 0-2 hurt, 3 death), by number; the loose folder first.
+    /// Their length is not read (0).
+    /// </summary>
+    public IReadOnlyDictionary<int, VoiceClip> HurtClips(string id)
+    {
+        var folder = id.Split('$')[0].ToLowerInvariant();
+        var found = new Dictionary<int, VoiceClip>();
+        void Add(string name, string source, string? entry)
+        {
+            var stem = Path.GetFileNameWithoutExtension(name);
+            var ext = Path.GetExtension(name).ToLowerInvariant();
+            if ((ext == ".ogg" || ext == ".wav") && int.TryParse(stem, out var n) && n is >= 0 and <= 3)
+                found.TryAdd(n, new VoiceClip(folder, name, source, entry, 0));
+        }
+        var loose = Path.Combine(Directory, "data", "hurt", folder);
+        if (System.IO.Directory.Exists(loose))
+        {
+            foreach (var file in System.IO.Directory.EnumerateFiles(loose))
+                Add(Path.GetFileName(file), file, null);
+        }
+        var packs = Path.Combine(Directory, "datapacks");
+        if (System.IO.Directory.Exists(packs))
+        {
+            var prefix = $"data/hurt/{folder}/";
+            foreach (var zip in System.IO.Directory.EnumerateFiles(packs, "*.zip").Order(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    using var archive = ZipFile.OpenRead(zip);
+                    foreach (var e in archive.Entries.Where(e => e.FullName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && e.FullName.Length > prefix.Length))
+                        Add(e.Name, zip, e.FullName);
+                }
+                catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+                {
+                    // a broken or locked pack: the others still count
+                }
+            }
+        }
+        return found;
+    }
+
     public static byte[] ReadOgg(VoiceClip clip)
     {
         if (clip.Entry == null)

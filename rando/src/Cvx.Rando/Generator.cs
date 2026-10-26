@@ -318,7 +318,7 @@ public static class Generator
         {
             if (result.Enemies.Count != 0)
                 progress?.Report("Writing enemy sounds...");
-            EnemySounds.Write(data, result.Enemies, directory);
+            EnemySounds.Write(data, result.Enemies, directory, result.Npcs?.PlayerSounds);
             MusicWriter.Write(data, result.MusicTargetRms, result.Music, directory, progress);
             MusicWriter.WriteTitleCall(data, result.TitleCall, directory, progress);
             if (result.Npcs is { Voices.Count: > 0 })

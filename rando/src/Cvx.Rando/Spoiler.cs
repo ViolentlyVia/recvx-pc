@@ -153,6 +153,8 @@ public static class Spoiler
             if (npcs.MissingCharacters.Count != 0)
                 sb.AppendLine($"  Not in the BioRand folder, left out: {string.Join(", ", npcs.MissingCharacters.Select(NpcResult.LookName))}");
             sb.AppendLine($"  {npcs.ChangedRooms.Count} rooms changed, {npcs.Voices.Count} voice lines given to the new voices.");
+            foreach (var player in data.Npcs.Players.Where(p => npcs.PlayerSounds.ContainsKey(Npcs.PlayerSounds.KeyOf(p.Name))))
+                sb.AppendLine($"  {player.Name}'s pain and death sounds are {NpcResult.LookName(npcs.Looks[player.Name])}'s.");
             sb.AppendLine($"  Rooms: {string.Join(" ", npcs.ChangedRooms.Select(r => r.Name))}");
             if (npcs.KeptRooms.Count != 0)
                 sb.AppendLine($"  Unchanged (room data not understood or too big): {string.Join(" ", npcs.KeptRooms.Select(r => r.Name))}");

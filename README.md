@@ -190,7 +190,7 @@ projects and the command-line tool are in [rando/README.md](rando/README.md); th
 ### What the game reads from a mod folder
 
 The randomizer writes the files it changes (the room archive `RDX_LNK.AFS`, the room sound packs
-`MULTSPQ1.AFS` and `MULTSPQ2.AFS` when enemies change, `BGM1/2.AFS` for music, `VOICE1/2.AFS`
+`MULTSPQ1.AFS` and `MULTSPQ2.AFS` when enemies or Claire's and Chris's pain sounds change, `BGM1/2.AFS` for music, `VOICE1/2.AFS`
 for NPC voices, `ADV.AFS` for the title call, `SYSTEM.AFS` for Claire's and Chris's gameplay
 models) to the `mod=` folder. A file there is read instead of the data folder's file
 with the same path, so the game data itself is never changed.

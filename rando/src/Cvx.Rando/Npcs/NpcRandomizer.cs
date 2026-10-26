@@ -25,6 +25,13 @@ public sealed record NpcResult(IReadOnlyDictionary<string, string> Looks, IReadO
     /// <summary>The players' gameplay models with their new looks: SYSTEM.AFS entry -> the player file (<see cref="PlayerModel"/>).</summary>
     public IReadOnlyDictionary<int, byte[]> PlayerFiles { get; init; } = new Dictionary<int, byte[]>();
 
+    /// <summary>
+    /// The players' pain and death sounds: their sound pack's key (<see cref="Npcs.PlayerSounds.KeyOf"/>)
+    /// -> BioRand's hurt clips of their new character (0-2 hurt, 3 death: the file and its name).
+    /// </summary>
+    public IReadOnlyDictionary<ushort, IReadOnlyDictionary<int, (byte[] Data, string Name)>> PlayerSounds { get; init; } =
+        new Dictionary<ushort, IReadOnlyDictionary<int, (byte[] Data, string Name)>>();
+
     /// <summary>A look as the spoiler and the window say it: "Wesker", "Leon (RE2)".</summary>
     public static string LookName(string look) => IsBioRand(look) ? CharacterLibrary.DisplayName(look) : look;
 
@@ -157,7 +164,7 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, 
             changed.Add(id);
         }
 
-        return new NpcResult(looks, changed, kept, Voices(looks, byName)) { MissingCharacters = missing, PlayerFiles = PlayerFiles(looks, plds) };
+        return new NpcResult(looks, changed, kept, Voices(looks, byName)) { MissingCharacters = missing, PlayerFiles = PlayerFiles(looks, plds), PlayerSounds = HurtSounds(looks) };
     }
 
     /// <summary>
@@ -177,6 +184,21 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, 
                 files[entry] = PlayerModel.Replace(afs.ReadEntry(entry), plds[looks[player.Name]], PlayerModel.GlobalIndexOf(entry));
         }
         return files;
+    }
+
+    /// <summary>The hurt clips of each player's new character, by their sound pack (none for a character without any).</summary>
+    private Dictionary<ushort, IReadOnlyDictionary<int, (byte[] Data, string Name)>> HurtSounds(Dictionary<string, string> looks)
+    {
+        var result = new Dictionary<ushort, IReadOnlyDictionary<int, (byte[] Data, string Name)>>();
+        foreach (var player in data.Npcs.Players)
+        {
+            if (library == null || !looks.TryGetValue(player.Name, out var look) || !NpcResult.IsBioRand(look))
+                continue;
+            var clips = library.HurtClips(look).ToDictionary(x => x.Key, x => (CharacterLibrary.ReadOgg(x.Value), x.Value.Name));
+            if (clips.Count != 0)
+                result[Npcs.PlayerSounds.KeyOf(player.Name)] = clips;
+        }
+        return result;
     }
 
     /// <summary>SYSTEM.AFS with the players' new files, in the mod folder (or removed when there are none).</summary>

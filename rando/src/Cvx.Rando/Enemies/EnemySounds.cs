@@ -14,9 +14,12 @@ public static class EnemySounds
 
     /// <summary>
     /// Writes MULTSPQ1.AFS / MULTSPQ2.AFS to <paramref name="directory"/> with the changed rooms'
-    /// packs (and removes ones from an earlier seed that are not needed). Returns the rooms changed.
+    /// packs and the players' packs with new pain and death sounds (<paramref name="players"/>: a
+    /// pack's key -> BioRand's hurt clips, <see cref="Npcs.PlayerSounds.Replace"/>), and removes
+    /// ones from an earlier seed that are not needed. Returns the rooms changed.
     /// </summary>
-    public static List<RoomId> Write(GameData data, IReadOnlyCollection<EnemyRoomChange> changes, string directory)
+    public static List<RoomId> Write(GameData data, IReadOnlyCollection<EnemyRoomChange> changes, string directory,
+        IReadOnlyDictionary<ushort, IReadOnlyDictionary<int, (byte[] Data, string Name)>>? players = null)
     {
         var done = new List<RoomId>();
         var discs = new[] { 1, 2 }.Select(d => SoundPacks.Open(data, d)).ToArray();
@@ -51,6 +54,12 @@ public static class EnemySounds
                     replacements[index] = SoundPacks.Build(banks);
                     if (!done.Contains(change.Room))
                         done.Add(change.Room);
+                }
+                foreach (var (key, clips) in players ?? new Dictionary<ushort, IReadOnlyDictionary<int, (byte[] Data, string Name)>>())
+                {
+                    var index = Array.IndexOf(packs.Keys.ToArray(), key);
+                    if (index >= 0)
+                        replacements[index] = Npcs.PlayerSounds.Replace(packs.Afs.ReadEntry(index), clips);
                 }
 
                 var path = Path.Combine(directory, packs.Name + ".AFS");
