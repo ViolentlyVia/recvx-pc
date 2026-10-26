@@ -249,6 +249,33 @@ public class DoorTests
     }
 
     [Fact]
+    public void RandomDoorsKeepRm3150sGateOpen()
+    {
+        // Found in play (seed 86426): RM_3150's first-visit event closed its gate, which cut
+        // door 1 (back to RM_1080 and the start) off from doors 0 and 2 for good.
+        var tweak = Assert.Single(RoomTweaks.For(new RandoSettings { RandomDoors = true }, Data), t => t.Room == "40F0" && t.Flag != null);
+        Assert.Equal(new byte[] { 0x05, 0x01, 0xE5, 0x00, 0x00, 0x00 }, tweak.FlagOpcode());
+        Assert.DoesNotContain(RoomTweaks.For(new RandoSettings(), Data), t => t.Room == "40F0" && t.Flag != null);
+    }
+
+    [GameDataFact]
+    public void Rm3150sGateEventNeedsFlagE5Clear()
+    {
+        // The event that closes the gate (set_wall_atari 27 on) runs only while flag 0xE5 is
+        // clear, and no other room reads or sets the flag.
+        using var rooms = RoomArchive.Open(TestData.Open());
+        var ops = CvScriptReader.ReadOpcodes(rooms.ReadRoom(RoomId.ParseName("RM_3150")));
+        var raise = ops.Single(o => o.Procedure == 1 && o.Bytes.Span.SequenceEqual(new byte[] { 0x0A, 0x1B, 0x00, 0x00 }));
+        var block = ops.Last(o => o.Procedure == 1 && o.Name == "if" && o.Offset < raise.Offset && o.Offset + o.Bytes.Span[1] > raise.Offset);
+        Assert.Contains(ops, o => o.Offset > block.Offset && o.Offset < raise.Offset && o.Bytes.Span.SequenceEqual(new byte[] { 0x04, 0x01, 0xE5, 0x00, 0x00, 0x01 }));
+        foreach (var id in RoomTable.All.Where(r => r.Name != "RM_3150"))
+        {
+            Assert.DoesNotContain(CvScriptReader.ReadOpcodes(rooms.ReadRoom(id)),
+                o => o.Opcode is 0x04 or 0x05 && o.Length >= 6 && o.Bytes.Span[1] == 1 && o.Bytes.Span[2] == 0xE5 && o.Bytes.Span[3] == 0);
+        }
+    }
+
+    [Fact]
     public void TheLiftKeepsItsDoors()
     {
         // Found in play (seed 306305): RM_1140 and RM_4050 are one lift; area 3 rides it and

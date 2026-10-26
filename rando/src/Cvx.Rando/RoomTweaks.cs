@@ -80,6 +80,12 @@ public static class RoomTweaks
         Patch("4150", 0x145DF8 + 5, 0x00, TweakMode.DoorsOnly, "set_ck_item switches the taken pickup off"),
         Patch("4150", 0x145E6E + 5, 0x00, TweakMode.DoorsOnly, "ck_item switches the pickup off when taken"),
         Patch("40F0", 0x7241C + 2, 0xC5, TweakMode.ItemsOnly, "RM_4011 right after the Alfred cutscene"),
+        // RM_3150's gate (wall 27) parts the room: door 1 (to RM_3011) on one side, doors 0 and 2
+        // on the other. Its first-visit event (area 2, while flags 0xE5 and 0x20 are clear) closes
+        // the gate until RM_3100's power and the panel open it. The door mode nop that removes the
+        // event also holds area 1's door call, so it is skipped; with 0xE5 set the event never
+        // runs, the gate stays open and areas 0 and 2 are doors (owner's seed 86426).
+        Flag("40F0", 0xE5, 0, "the gate stays open"),
         Flag("4080", 211, 0, "story flag for random doors"),
 
         Nop("5000", 0x187778, 0x18777A, TweakMode.Always, "Steve is at the airport"),
