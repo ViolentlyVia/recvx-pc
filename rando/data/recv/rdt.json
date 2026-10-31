@@ -1019,12 +1019,6 @@
           "type": 12,
           "amount": 15,
           "offsets": [ 1356926 ]
-        },
-        {
-          "id": 7,
-          "globalId": 169,
-          "type": 21,
-          "amount": 1
         }
       ]
     },
@@ -6182,22 +6176,18 @@
       ],
       "items": [
         {
-          "id": 9,
-          "globalId": 431,
-          "type": 128,
-          "amount": 1
-        },
-        {
           "id": 10,
           "globalId": 432,
           "type": 18,
-          "amount": 30
+          "amount": 30,
+          "requires": [ 121 ]
         },
         {
           "id": 11,
           "globalId": 433,
           "type": 18,
-          "amount": 30
+          "amount": 30,
+          "requires": [ 121 ]
         },
         {
           "id": 12,

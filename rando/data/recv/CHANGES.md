@@ -110,3 +110,13 @@ cutscene its nop removes would set: `RoomTweaks` sets it when the room starts wi
 | 80C0 (RM_7120) | door to 8170 (RM_7230): `id` 3 -> 4 | Its script calls it when trigger area 4 is used (`ck 0A 17 00 04`); recvx-pc looks script doors up by the area in use, so it was never redirected. Seed 117323 (doors, 1 segment) went on into RM_7230, a room of no run, and its scene stuck. `verify-data` now checks every script door's id against the area its script tests. |
 
 Open: 9010 (RM_8010)'s script doors (`set_door_call` for areas 0, 1, 2 to RM_8000/RM_8001) are listed under the wrong ids and targets; the room is excluded from random doors, so nothing redirects them.
+
+## Fixes (2026-10-30, owner's seed 992583)
+
+| Room | Change | Why |
+|---|---|---|
+| A1D0 (RM_9290) | item 9 (global 431, Duralumin Case Bow Gun Powder) removed | The start procedure sets its pickup flag (item flag 431, `set` at 0x1D2298) before `set_ck_item`, outside any `if`, so the pickup never shows. The owner's seed put the Control Lever there. |
+| 2070 (RM_1070) | item 7 (global 169, Green Herb) removed | The same: item flag 169 is set at 0x14B260, before `set_ck_item`, outside any `if`. |
+| A1D0 (RM_9290) | items 10 and 11 (globals 432, 433): `requires: [121]` (Crystal), as item 13 | They lie behind a gate (walls 18 and 19, x 41-50 at z 110-112, upstairs) that the room's pickup handler opens when item 13's pickup is taken (`cmpb` 0x1D27E6, item 13's offset: `set_wall_atari` 18 and 19 off, `bhWalAtariSet` clears the enable bit), and item 13 needs the Crystal. The owner's seed put the Security Card and the Gold Dragonfly No Wings there with no need listed. |
+
+`verify-data` now reports a pickup whose room marks it taken when it starts (`DataValidator.TakenAtStart`).

@@ -297,6 +297,8 @@ public sealed class DataValidator
             }
 
             CheckNop(item.Nop, label, opcodes, file, Error);
+            if (TakenAtStart(opcodes, item.Id) is { } taken)
+                Error($"{label}: the room marks this pickup taken when it starts ({taken.Name} at 0x{taken.Offset:X}), so it never shows");
         }
 
         foreach (var dr in room.DoorRando ?? [])
@@ -308,6 +310,25 @@ public sealed class DataValidator
             CheckNop(en.Nop, "enemies", opcodes, file, Error);
 
         return (doors, itemCount, offsets);
+    }
+
+    /// <summary>
+    /// The <c>set</c> of item flag group 7 by which a room's start procedure marks the pickup of
+    /// trigger area <paramref name="area"/> taken whatever happened (outside any <c>if</c>), or
+    /// null: such a pickup never shows (RM_1070 area 7, RM_9290 area 9).
+    /// </summary>
+    internal static CvOpcode? TakenAtStart(IReadOnlyList<CvOpcode> opcodes, int area)
+    {
+        const byte SetCkItem = 0x23;    // set_ck_item work, flag (2 bytes), area, keep
+        var start = opcodes.Where(o => o.Procedure == 0).ToList();
+        var pickup = start.FirstOrDefault(o => o.Opcode == SetCkItem && o.Length >= 6 && o.Bytes.Span[4] == area);
+        if (pickup.Bytes.IsEmpty)
+            return null;
+        var flag = pickup.Bytes.Span[2] | pickup.Bytes.Span[3] << 8;
+        var set = start.FirstOrDefault(o => o.Name == "set" && o.Length >= 6 && o.Bytes.Span[1] == 7 &&
+                                            (o.Bytes.Span[2] | o.Bytes.Span[3] << 8) == flag && o.Bytes.Span[5] == 0 &&
+                                            !start.Any(b => b.Name is "if" or "else" && b.Offset < o.Offset && b.Offset + b.Bytes.Span[1] > o.Offset));
+        return set.Bytes.IsEmpty ? null : set;
     }
 
     private static void CheckNop(OffsetSpec[]? specs, string label, IReadOnlyList<CvOpcode> opcodes, RdxFile file, Action<string> error)

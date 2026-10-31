@@ -90,6 +90,31 @@ public class ScriptAndValidationTests
         var unexpected = report.Errors.Where(e => !known.Contains(e.Room)).Select(e => e.ToString()).ToList();
         Assert.Empty(unexpected);
         Assert.Equal(8, report.Errors.Count());
-        Assert.Equal(400 - 1 + 2, report.ItemsChecked);   // one bogus BioRand item removed, two Shotguns added
+        Assert.Equal(400 - 1 + 2 - 2, report.ItemsChecked);   // one bogus BioRand item removed, two Shotguns added, two dead pickups removed
+    }
+
+    [GameDataFact]
+    public void PickupsTheirRoomTakesAtTheStartAreNotInTheMap()
+    {
+        // Seed 992583: the Control Lever lay in RM_9290's area 9, whose pickup flag the room sets
+        // as it starts, so it never showed. RM_1070's area 7 is the same.
+        using var rooms = RoomArchive.Open(TestData.Open());
+        var data = RandoData.Load();
+        Assert.NotNull(DataValidator.TakenAtStart(CvScriptReader.ReadOpcodes(rooms.ReadRoom(RoomId.ParseName("RM_9290"))), 9));
+        Assert.NotNull(DataValidator.TakenAtStart(CvScriptReader.ReadOpcodes(rooms.ReadRoom(RoomId.ParseName("RM_1070"))), 7));
+        // RM_6100's area 4 has two pickups; the room takes only the one the map does not list
+        Assert.Null(DataValidator.TakenAtStart(CvScriptReader.ReadOpcodes(rooms.ReadRoom(RoomId.ParseName("RM_6100"))), 4));
+        foreach (var (key, room) in data.Map.Rooms)
+        {
+            var ops = CvScriptReader.ReadOpcodes(rooms.ReadRoom(RoomId.ParseBioRand(key)));
+            Assert.All((room.Items ?? []).Where(i => i.ItemId == null && i.Offsets is not { Length: > 0 }),
+                i => Assert.Null(DataValidator.TakenAtStart(ops, i.Id)));
+        }
+
+        // RM_9290's two pickups behind the gate that taking item 13 opens need what item 13 needs
+        var items = data.Map.Rooms["A1D0"].Items!;
+        var thirteen = items.Single(i => i.Id == 13).Requires;
+        Assert.Equal(new[] { 121 }, thirteen);
+        Assert.All(items.Where(i => i.Id is 10 or 11), i => Assert.Equal(thirteen, i.Requires));
     }
 }
