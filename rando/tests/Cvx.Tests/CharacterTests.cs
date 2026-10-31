@@ -304,6 +304,14 @@ public class CharacterTests
             Assert.All(theirs, v => Assert.Equal(look, v.Clip?.Character));
         }
         Assert.All(result.Voices, v => Assert.Contains(v.Speaker, new[] { claire.Voice, chris.Voice }));
+        // found in play (seed 992583): Claire's answers to Rodrigo in the cell (RM_0000, played
+        // on her cutscene model) kept her voice; their audio matches BioRand's clairecv1, 2, 75, 76
+        foreach (var entry in new[] { 16, 19, 22, 230, 232 })
+            Assert.Contains(result.Voices, v => v.Disc == 1 && v.Entry == entry && v.Speaker == claire.Voice);
+        // the owner's corrections by ear (2026-10-30)
+        foreach (var (disc, entry, who) in new[] { (1, 127, claire), (2, 417, claire), (2, 445, chris), (2, 503, chris) })
+            Assert.Contains(result.Voices, v => v.Disc == disc && v.Entry == entry && v.Speaker == who.Voice);
+        Assert.Equal("steve", data.Npcs.Voices["1"][39]);
 
         // their gameplay models: Claire's two player files, Chris's one
         Assert.Equal(new[] { 10, 11, 14 }, result.PlayerFiles.Keys.Order());
