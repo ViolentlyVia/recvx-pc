@@ -67,7 +67,7 @@ CV:X's options sit in BioRand's boxes, with its own additions:
 - **Change Player Character** (BioRand's box): Claire and Chris become BioRand characters,
   each picked in its drop-down or Random (never both the same): their gameplay model
   (`SYSTEM.AFS` in the seed's folder; needs recvx.exe 0.9.94 or newer), their
-  cutscene models, the lines of theirs the randomizer knows (151) and their pain and death
+  cutscene models, the lines of theirs the randomizer knows (176) and their pain and death
   sounds (BioRand's `data/hurt`) take that character's look and voice;
 - every seed's **title screen** is BioRand's CV:X art (`data/recv/bg.png` in its folder: the
   game's title with BIORAND under the logo), with the Biorand++ version at the top left, as
