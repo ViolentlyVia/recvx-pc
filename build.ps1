@@ -15,7 +15,7 @@ recvx-pc folder next to the script).
 -Yes      install missing tools without asking
 #>
 param(
-    [string]$Version = "v0.9.94",
+    [string]$Version = "v0.9.95",
     [string]$Dir = (Join-Path $PSScriptRoot "recvx-pc"),
     [switch]$NoRando,
     [switch]$Yes

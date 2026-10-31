@@ -1,5 +1,17 @@
 # Biorand++
 
+## 0.9.95
+- CV:X: every seed's title screen is BioRand's CV:X art, with the Biorand++ version at the top
+  left (without a BioRand folder the title stays the game's).
+- CV:X: with Change Player Character, the status screen shows the character's face (BioRand's
+  portrait) and name.
+- CV:X: more of Claire's and Chris's lines take their new character's voice (her answers to
+  Rodrigo in the cell among them); a few lines' speakers corrected.
+- CV:X random doors: RM_3150's gate stays open, so the way back through it is never cut off.
+- CV:X random items: no key item in RM_9290's spot that never shows, or in Claire's cell, which
+  stays shut once she leaves the first room; RM_9290's two spots behind the gate need the
+  Crystal, as the gate does.
+
 ## 0.9.94
 - CV:X: BioRand's "Change Player Character": Claire and Chris become BioRand characters (Random,
   or one you pick for each): their cutscene and gameplay models, their lines and their pain
