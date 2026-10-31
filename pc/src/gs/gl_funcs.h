@@ -56,9 +56,14 @@
 #define PC_GL_COMPRESSED_RGBA_S3TC_DXT5 0x83F3
 #define PC_GL_COMPRESSED_RGBA_BPTC_UNORM 0x8E8C
 
+/* (the GL headers of other systems have these) */
+#ifndef GL_VERSION_2_0
 typedef char GLchar;
+#endif
+#ifndef GL_VERSION_1_5
 typedef ptrdiff_t GLsizeiptr;
 typedef ptrdiff_t GLintptr;
+#endif
 
 #define PC_GL_FUNCS(X) \
     X(void, glGenTextures, (GLsizei n, GLuint* t)) \

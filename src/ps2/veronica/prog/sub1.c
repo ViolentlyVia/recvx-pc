@@ -2607,6 +2607,12 @@ void KazuSet(S_WORK* st, unsigned char flg)
     unsigned char max;
 
     itemid = 0;
+#ifdef TARGET_PC
+    /* the box column (flg 1) outside the item box screen sets neither: no loop (on the PS2 and
+     * with MSVC the leftover values happen to be harmless, with GCC they run off the tables) */
+    num1 = 0;
+    num2 = 0;
+#endif
     
     if ((sys->gm_flg & 0x8000000))
     { 

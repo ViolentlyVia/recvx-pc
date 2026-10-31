@@ -1776,7 +1776,11 @@ void bhDrawTrsEffect2D(unsigned int* owp, int ct)
 } 
 
 // 100% matching!
+#ifdef TARGET_PC
+void bhDrawThunder()   /* effect.h declares it extern (GCC refuses the mix) */
+#else
 static void bhDrawThunder()
+#endif
 {
     NJS_POLYGON_VTX* p; 
     int i;              

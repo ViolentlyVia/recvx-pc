@@ -4,7 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
 #include <io.h>
+#endif
 
 #include <SDL.h>
 #include <SDL_syswm.h>
@@ -249,7 +251,11 @@ void pcPlatformNotSetUp(void)
     box.buttons = buttons;
 
     pcPlatformExeDir(dir, sizeof(dir));
+#ifdef _WIN32
     snprintf(exe, sizeof(exe), "%s\\recvx-config.exe", dir);
+#else
+    snprintf(exe, sizeof(exe), "%s/recvx-config", dir);
+#endif
 
     if ((SDL_ShowMessageBox(&box, &choice) == 0) && (choice == 1) && !pcOsLaunch(exe))
     {
@@ -648,6 +654,7 @@ void pcVideoInit(void)
         pcPlatformFatal("Could not create the window: %s", SDL_GetError());
     }
 
+#ifdef _WIN32
     {
         SDL_SysWMinfo info;
 
@@ -658,6 +665,7 @@ void pcVideoInit(void)
             pcOsSetWindowIcon(info.info.win.window);
         }
     }
+#endif
 
     /* the windowed size and spot, also when starting fullscreen or maximized */
     win_state.x = (x == SDL_WINDOWPOS_CENTERED) ? 0 : x;

@@ -1,15 +1,16 @@
 /* PC port: text drawn with Windows' own font into bitmaps that the renderer shows
  * (gsRendererPresent): a notice instead of the game picture (the "return to the title screen?"
  * question), and the build number at the bottom of the title screen. */
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#pragma comment(lib, "gdi32.lib")
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "../res/version.h"
-
-#pragma comment(lib, "gdi32.lib")
 
 typedef struct {
     unsigned char* rgba;              /* top row first */
@@ -37,6 +38,7 @@ void pcOverlayTitleShown(void)
 
 /* draws text centred, with lines line_h pixels apart, into out: white on black, or grey text
  * premultiplied by its coverage (transparent, for blending over the picture) */
+#ifdef _WIN32
 static int render(OverlayImage* out, const char* text, int line_h, int transparent)
 {
     HDC dc = CreateCompatibleDC(NULL);
@@ -129,6 +131,18 @@ static int render(OverlayImage* out, const char* text, int line_h, int transpare
     out->h = height;
     return out->rgba != NULL;
 }
+#else
+
+/* no system font yet outside Windows: no text */
+static int render(OverlayImage* out, const char* text, int line_h, int transparent)
+{
+    (void)out;
+    (void)text;
+    (void)line_h;
+    (void)transparent;
+    return 0;
+}
+#endif
 
 /* img drawn from text at height, redrawn when either changed */
 static const unsigned char* cached(OverlayImage* img, const char* text, int height, int transparent, int* w, int* h)

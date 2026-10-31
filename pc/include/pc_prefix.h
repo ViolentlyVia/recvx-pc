@@ -21,9 +21,13 @@
 #include <assert.h>
 #include <errno.h>
 #include <setjmp.h>
+#include "pc_compat.h"
 
-/* GCC/MWCC attributes (alignment, VU sections) are not needed on PC. */
+/* GCC/MWCC attributes (alignment, VU sections) are not needed on PC. Platform files built with
+ * GCC keep them: the system headers they include need them. */
+#if !defined(__GNUC__) || !defined(PC_NATIVE_LONG)
 #define __attribute__(x)
+#endif
 
 /* MWCC treats "inline" in C; MSVC spells it __inline in C mode before C11 headers. */
 #ifndef inline

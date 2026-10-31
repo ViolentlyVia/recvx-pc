@@ -9,7 +9,9 @@
  *
  * The pack folder comes from RECVX_HDTEX or an "hd_textures=" line in recvx.ini.
  */
+#ifdef _WIN32
 #include <io.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

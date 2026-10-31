@@ -1,5 +1,5 @@
 """Shared configuration for the PC port build scripts."""
-import glob, os, shutil
+import glob, os, re, shutil
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 BUILD = os.path.join(ROOT, "build_pc")
@@ -45,6 +45,22 @@ def sync_katana():
         dst = os.path.join(KATANA_DST, f)
         if not os.path.exists(dst) or os.path.getmtime(dst) < os.path.getmtime(src):
             shutil.copyfile(src, dst)
+    if os.name != "nt":
+        katana_case_names()
+
+
+def katana_case_names():
+    """The Katana headers include each other with names in another case (SG_MWPLY.H for
+    sg_mwply.h): on a case-sensitive file system those names get a copy of their own."""
+    files = {f.lower(): f for f in os.listdir(KATANA_DST)}
+    for f in list(files.values()):
+        with open(os.path.join(KATANA_DST, f), encoding="latin-1") as h:
+            names = re.findall(r'^\s*#\s*include\s*[<"]([^>"/]+)[>"]', h.read(), re.M)
+        for name in names:
+            real = files.get(name.lower())
+            dst = os.path.join(KATANA_DST, name)
+            if real is not None and real != name and not os.path.exists(dst):
+                shutil.copyfile(os.path.join(KATANA_DST, real), dst)
 
 
 def include_flags():
@@ -62,13 +78,16 @@ def game_sources():
 
 
 def pc_sources():
-    return sorted(glob.glob(os.path.join(ROOT, "pc/src/*.c")) + glob.glob(os.path.join(ROOT, "pc/src/gs/*.c")) + glob.glob(os.path.join(ROOT, "pc/src/vu/*.c")))
+    files = sorted(glob.glob(os.path.join(ROOT, "pc/src/*.c")) + glob.glob(os.path.join(ROOT, "pc/src/gs/*.c")) + glob.glob(os.path.join(ROOT, "pc/src/vu/*.c")))
+    # the OS layer of the other system
+    other = "pc/src/pc_os_posix.c" if os.name == "nt" else "pc/src/pc_os_win32.c"
+    return [f for f in files if rel(f) != other]
 
 
 # PC platform files that never include game headers: they talk to Windows/SDL and keep the
 # host's 32-bit "long" (game code is compiled with the EE's 64-bit one, see pc_prefix.h).
 NATIVE_LONG = {
-    "pc/src/pc_os_win32.c", "pc/src/pc_platform.c", "pc/src/pc_audio.c", "pc/src/pc_kernel.c",
+    "pc/src/pc_os_win32.c", "pc/src/pc_os_posix.c", "pc/src/pc_platform.c", "pc/src/pc_audio.c", "pc/src/pc_kernel.c",
     "pc/src/pc_cdvd.c", "pc/src/pc_iop.c", "pc/src/pc_iop_tsnddrv.c", "pc/src/pc_sce_misc.c", "pc/src/pc_mpeg.c",
     "pc/src/pc_mc.c", "pc/src/pc_overlay.c",
 }

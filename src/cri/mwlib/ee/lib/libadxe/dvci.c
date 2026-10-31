@@ -20,7 +20,11 @@ CVFS_IF dvCiGetInterface()
 }
 
 // 100% matching!
+#ifdef TARGET_PC
+void dvci_wait(void)   /* dvci.h declares it extern (GCC refuses the mix) */
+#else
 static void dvci_wait(void)
+#endif
 {
     Sint32 i;
 

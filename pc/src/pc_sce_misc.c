@@ -155,8 +155,9 @@ void sceVu0FTOI4Vector(sceVu0IVECTOR v0, sceVu0FVECTOR v1)
 }
 
 /* ------------------------------------------------------------------------------------------- */
-/* EE libc extras */
+/* EE libc extras (glibc has them) */
 
+#ifdef _WIN32
 int strcasecmp(const char* a, const char* b)
 {
     return _stricmp(a, b);
@@ -166,5 +167,6 @@ char* index(const char* s, int c)
 {
     return strchr(s, c);
 }
+#endif
 
 

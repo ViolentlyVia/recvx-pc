@@ -12,8 +12,10 @@
  * nothing is pending (-1), which the game's idle check relies on. Files are written to a
  * temporary name and renamed on close, so a crash while saving never damages an old save.
  */
+#ifdef _WIN32
 #include <direct.h>
 #include <io.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

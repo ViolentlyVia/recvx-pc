@@ -1548,6 +1548,31 @@ void Ps2AddOT(void* p, unsigned int num, float z, unsigned long prim)
     
     num = (num * 3) + 1; 
     
+#ifdef TARGET_PC
+    /* the same without casts as assignment targets (an MSVC extension GCC lacks) */
+    {
+        long* pp = (long*)((char*)Ps2_PP + 16);
+        u_long128* src;
+
+        *pp++ = DMAnext | ((*(long*)p) & 0xFFFFFFF);
+        *pp++ = 0;
+
+        *pp++ = SCE_GIF_SET_TAG(1, 0, 0, 0, 0, 1);
+        *pp++ = SCE_GIF_PACKED_AD;
+
+        *pp++ = Ps2_gs_save.ALPHA;
+        *pp++ = SCE_GS_ALPHA_1;
+
+        src = (u_long128*)((char*)p + 48);
+
+        for (i = 0; i < num; i++)
+        {
+            ((u_long128*)pp)[i] = src[i];
+        }
+
+        Ps2_PP = (u_long128*)pp + num;
+    }
+#else
     (char*)Ps2_PP += 16; 
         
     *((long*)Ps2_PP)++ = DMAnext | ((*(long*)p) & 0xFFFFFFF); 
@@ -1565,6 +1590,7 @@ void Ps2AddOT(void* p, unsigned int num, float z, unsigned long prim)
     { 
         *((u_long128*)Ps2_PP)++ = *((u_long128*)p)++; 
     } 
+#endif
     
     Ps2_ot_list_no++; 
 } 
