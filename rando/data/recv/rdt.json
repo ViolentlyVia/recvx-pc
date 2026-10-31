@@ -50,7 +50,8 @@
           "id": 8,
           "globalId": 122,
           "type": 21,
-          "amount": 1
+          "amount": 1,
+          "priority": "low"
         }
       ]
     },

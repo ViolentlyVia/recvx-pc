@@ -270,5 +270,25 @@ public class ItemTests
         }
         Assert.True(inside.Count == 0, string.Join("; ", inside));
     }
+
+    [GameDataTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void KeysStayOutOfClairesCell(bool doors)
+    {
+        // Seeds 86426 and 461621: a Wing Object lay in the cell (RM_0000's area 8), which closes
+        // for good once Claire leaves the room until RM_0050 or RM_0100 sets map flag 0x62.
+        using var rooms = RoomArchive.Open(TestData.Open());
+        var cell = Data.Map.Rooms["1000"].Items!.Single(i => i.Id == 8);
+        Assert.Equal("low", cell.Priority);
+        var inside = new List<string>();
+        foreach (var seed in Enumerable.Range(1, 12))
+        {
+            var settings = new RandoSettings { Seed = seed, RandomDoors = doors, DoorSegments = 1, DoorSegmentSize = 1 + seed % 8, HiddenKeyItems = seed % 2 == 0 };
+            var result = Generator.Generate(settings, Data, rooms);
+            inside.AddRange(result.Items!.KeyOrder.Where(k => k.Location.GlobalId == cell.GlobalId).Select(k => $"seed {seed}: {Data.Items.NameOf(k.Type)}"));
+        }
+        Assert.True(inside.Count == 0, string.Join("; ", inside));
+    }
 }
 

@@ -120,3 +120,9 @@ Open: 9010 (RM_8010)'s script doors (`set_door_call` for areas 0, 1, 2 to RM_800
 | A1D0 (RM_9290) | items 10 and 11 (globals 432, 433): `requires: [121]` (Crystal), as item 13 | They lie behind a gate (walls 18 and 19, x 41-50 at z 110-112, upstairs) that the room's pickup handler opens when item 13's pickup is taken (`cmpb` 0x1D27E6, item 13's offset: `set_wall_atari` 18 and 19 off, `bhWalAtariSet` clears the enable bit), and item 13 needs the Crystal. The owner's seed put the Security Card and the Gold Dragonfly No Wings there with no need listed. |
 
 `verify-data` now reports a pickup whose room marks it taken when it starts (`DataValidator.TakenAtStart`).
+
+## Fixes (2026-10-30, owner's seed 461621)
+
+| Room | Change | Why |
+|---|---|---|
+| 1000 (RM_0000) | item 8 (global 122, Green Herb): `priority: low` | It lies inside Claire's cell (trigger area 8, x 49-55, z 64-70, behind the bars at x 35). The cell door (wall 18) opens in the opening scene, and on any later visit only once map flag 1:0x62 is set, which RM_0050 and RM_0100 do (RM_0000's start procedure switches walls 18, 19 and 23 off under it). So the pickup can be missed for good by leaving the room. The owner missed a Wing Object there in seeds 86426 and 461621; keys now go elsewhere when they can. |
