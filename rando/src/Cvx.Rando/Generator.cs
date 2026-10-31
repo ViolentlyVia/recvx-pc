@@ -343,6 +343,9 @@ public static class Generator
             if (result.Npcs is { PlayerFiles.Count: > 0 })
                 progress?.Report("Writing Claire's and Chris's models...");
             NpcRandomizer.WritePlayers(data, result.Npcs?.PlayerFiles ?? new Dictionary<int, byte[]>(), directory);
+            if (result.Npcs is { StatusLooks.Count: > 0 })
+                progress?.Report("Writing the status screen...");
+            NpcRandomizer.WriteStatus(data, result.Npcs?.StatusLooks ?? new Dictionary<int, StatusLook>(), directory);
         }
         Write(DoorTable.FileName, result.DoorTable);
         Write("spoiler.txt", result.Spoiler);

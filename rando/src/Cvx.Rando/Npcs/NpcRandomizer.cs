@@ -25,6 +25,9 @@ public sealed record NpcResult(IReadOnlyDictionary<string, string> Looks, IReadO
     /// <summary>The players' gameplay models with their new looks: SYSTEM.AFS entry -> the player file (<see cref="PlayerModel"/>).</summary>
     public IReadOnlyDictionary<int, byte[]> PlayerFiles { get; init; } = new Dictionary<int, byte[]>();
 
+    /// <summary>The players' pictures on the status screen with their new looks: player (0 Claire, 1 Chris) -> look (<see cref="StatusScreen"/>).</summary>
+    public IReadOnlyDictionary<int, StatusLook> StatusLooks { get; init; } = new Dictionary<int, StatusLook>();
+
     /// <summary>
     /// The players' pain and death sounds: their sound pack's key (<see cref="Npcs.PlayerSounds.KeyOf"/>)
     /// -> BioRand's hurt clips of their new character (0-2 hurt, 3 death: the file and its name).
@@ -164,7 +167,8 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, 
             changed.Add(id);
         }
 
-        return new NpcResult(looks, changed, kept, Voices(looks, byName)) { MissingCharacters = missing, PlayerFiles = PlayerFiles(looks, plds), PlayerSounds = HurtSounds(looks) };
+        return new NpcResult(looks, changed, kept, Voices(looks, byName)) { MissingCharacters = missing, PlayerFiles = PlayerFiles(looks, plds), PlayerSounds = HurtSounds(looks),
+            StatusLooks = StatusLooks(looks) };
     }
 
     /// <summary>
@@ -184,6 +188,20 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, 
                 files[entry] = PlayerModel.Replace(afs.ReadEntry(entry), plds[looks[player.Name]], PlayerModel.GlobalIndexOf(entry));
         }
         return files;
+    }
+
+    /// <summary>Each player with a BioRand look whose character has a portrait: their name and portrait for the status screen.</summary>
+    private Dictionary<int, StatusLook> StatusLooks(Dictionary<string, string> looks)
+    {
+        var result = new Dictionary<int, StatusLook>();
+        foreach (var player in data.Npcs.Players)
+        {
+            if (!looks.TryGetValue(player.Name, out var look) || !NpcResult.IsBioRand(look) || library?.Get(look) is not { } character)
+                continue;
+            if (CharacterLibrary.ReadFace(character) is { } face)
+                result[player.Name == "Chris" ? 1 : 0] = new StatusLook(StatusScreen.NameOf(look), face);
+        }
+        return result;
     }
 
     /// <summary>The hurt clips of each player's new character, by their sound pack (none for a character without any).</summary>
@@ -213,6 +231,26 @@ public sealed class NpcRandomizer(RandoData data, RoomArchive archive, Rng rng, 
         }
         using var afs = AfsArchive.Open(Path.Combine(game.Directory, PlayerModel.Archive));
         AfsWriter.Write(afs, files.ToDictionary(x => x.Key, x => x.Value), path);
+    }
+
+    /// <summary>
+    /// ITEM1.AFS and ITEM2.AFS with the status screen's player pictures for the new looks, in the
+    /// mod folder (or removed when there are none).
+    /// </summary>
+    public static void WriteStatus(GameData game, IReadOnlyDictionary<int, StatusLook> looks, string directory)
+    {
+        foreach (var name in StatusScreen.Archives)
+        {
+            var path = Path.Combine(directory, name);
+            if (looks.Count == 0)
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+                continue;
+            }
+            using var afs = AfsArchive.Open(Path.Combine(game.Directory, name));
+            AfsWriter.Write(afs, new Dictionary<int, byte[]> { [StatusScreen.Entry] = StatusScreen.Make(afs.ReadEntry(StatusScreen.Entry), looks) }, path);
+        }
     }
 
     /// <summary>

@@ -318,6 +318,10 @@ public class CharacterTests
         // their pain and death sounds: both characters have BioRand's four
         Assert.Equal(new ushort[] { 0xFFF0, 0xFFF1 }, result.PlayerSounds.Keys.Order());
         Assert.All(result.PlayerSounds.Values, clips => Assert.Equal(new[] { 0, 1, 2, 3 }, clips.Keys.Order()));
+        // their status screen pictures: BioRand's portraits and their names
+        Assert.Equal(new[] { 0, 1 }, result.StatusLooks.Keys.Order());
+        Assert.Equal(("LEON", "ADA"), (result.StatusLooks[0].Name, result.StatusLooks[1].Name));
+        Assert.All(result.StatusLooks.Values, l => Assert.Equal((40, 56), (Png.Decode(l.Face).Width, Png.Decode(l.Face).Height)));
     }
 
     [BioRandFact]

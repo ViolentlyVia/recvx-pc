@@ -238,6 +238,25 @@ public sealed class CharacterLibrary
         return ms.ToArray();
     }
 
+    /// <summary>The character's portrait (<c>face.png</c> next to its PLD), or null when it has none.</summary>
+    public static byte[]? ReadFace(LibraryCharacter character)
+    {
+        const string Face = "face.png";
+        if (character.Entry == null)
+        {
+            var path = Path.Combine(Path.GetDirectoryName(character.Source)!, Face);
+            return File.Exists(path) ? File.ReadAllBytes(path) : null;
+        }
+        using var archive = ZipFile.OpenRead(character.Source);
+        var entry = archive.GetEntry(character.Entry[..(character.Entry.LastIndexOf('/') + 1)] + Face);
+        if (entry == null)
+            return null;
+        using var stream = entry.Open();
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        return ms.ToArray();
+    }
+
     public static byte[] ReadPld(LibraryCharacter character)
     {
         if (character.Entry == null)
