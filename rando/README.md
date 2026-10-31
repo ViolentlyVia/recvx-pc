@@ -68,7 +68,9 @@ CV:X's options sit in BioRand's boxes, with its own additions:
   each picked in its drop-down or Random (never both the same): their gameplay model
   (`SYSTEM.AFS` in the seed's folder; needs recvx.exe 0.9.94 or newer), their
   cutscene models, the lines of theirs the randomizer knows (176) and their pain and death
-  sounds (BioRand's `data/hurt`) take that character's look and voice;
+  sounds (BioRand's `data/hurt`) take that character's look and voice; the status screen
+  shows the character's face (BioRand's portrait, scaled up) and name (`ITEM1.AFS`/`ITEM2.AFS`
+  in the seed's folder, about 85 MB);
 - every seed's **title screen** is BioRand's CV:X art (`data/recv/bg.png` in its folder: the
   game's title with BIORAND under the logo), with the Biorand++ version at the top left, as
   BioRand's titles do (`ADV.AFS`); without a BioRand folder the title stays the game's;
