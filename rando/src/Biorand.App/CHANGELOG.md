@@ -1,5 +1,13 @@
 # Biorand++
 
+## 1.0.0
+- Dark mode: the whole window, with a dark title bar. It follows Windows until you use the
+  Dark mode toggle in the settings (Window); then your choice stays.
+- cvx-rando-cli `generate --out <dir> --check`: plays the seed through and reads the written
+  folder back (every pickup holds the item the logic put there, every door of the layout is in
+  rando_doors.txt and none leads out of the run, the starting items are the ones the logic
+  used); `generate` also prints the seed's share code.
+
 ## 0.9.95
 - CV:X: every seed's title screen is BioRand's CV:X art, with the Biorand++ version at the top
   left (without a BioRand folder the title stays the game's).

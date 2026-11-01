@@ -75,7 +75,9 @@ CV:X's options sit in BioRand's boxes, with its own additions:
   game's title with BIORAND under the logo), with the Biorand++ version at the top left, as
   BioRand's titles do (`ADV.AFS`); without a BioRand folder the title stays the game's;
 - in the settings, **Randomize title voice** plays one of BioRand's title calls at the title
-  screen, and **Door Skip (RE CVX)** turns on recvx-pc's door skip.
+  screen, and **Door Skip (RE CVX)** turns on recvx-pc's door skip; **Dark mode** (Window)
+  darkens the whole window. Until you use it, the window follows Windows' own setting (apps in
+  dark mode).
 
 There is one CV:X seed at a time: generating deletes the previous seed's folder and the random
 run's saves once the new one is written. The app remembers your choices in
@@ -138,7 +140,7 @@ dotnet run --project src/Cvx.Rando.Cli -- <command>
 | `extract-room <RM_xxxx> --out <file> [--data <dir>]` | Writes a room's expanded file |
 | `extract-afs <archive> <entry> --out <file>` | Writes one entry of an AFS archive as it is |
 | `roundtrip [--data <dir>] [--out <dir>]` | Rebuilds every room and the archive without changes and checks the result |
-| `generate [--seed <n>] [--mode shuffle\|custom] [--claire-only] [--inventory] [--side-pack] [--no-poison] [--doors] [--segments 1-4] [--segment-size 1-8] [--chris] [--enemies] [--enemy-difficulty 0-3] [--enemy-ratios Zombie=4,Hunter=7,...] [--enemy-placements] [--enemy-quantity 0-15] [--enemy-rooms 0-7] [--enemies-in-save-rooms] [--music] [--music-games re2,sh1,...] [--title-call] [--npcs] [--npc-characters leon.re2,...] [--biorand <dir>] [--share <code>] [--out <dir>] [--spoiler]` | Randomizes CV:X; `--out` writes the mod folder (`RDX_LNK.AFS` and the other changed archives, `rando.ini`, `rando_doors.txt`, `spoiler.txt`, `graph.dot`, `graph.dgml`) for recvx-pc's `mod=` |
+| `generate [--seed <n>] [--mode shuffle\|custom] [--claire-only] [--inventory] [--side-pack] [--no-poison] [--doors] [--segments 1-4] [--segment-size 1-8] [--chris] [--enemies] [--enemy-difficulty 0-3] [--enemy-ratios Zombie=4,Hunter=7,...] [--enemy-placements] [--enemy-quantity 0-15] [--enemy-rooms 0-7] [--enemies-in-save-rooms] [--music] [--music-games re2,sh1,...] [--title-call] [--npcs] [--npc-characters leon.re2,...] [--biorand <dir>] [--share <code>] [--out <dir> [--check]] [--spoiler]` | Randomizes CV:X and prints the seed's share code; `--out` writes the mod folder (`RDX_LNK.AFS` and the other changed archives, `rando.ini`, `rando_doors.txt`, `spoiler.txt`, `graph.dot`, `graph.dgml`) for recvx-pc's `mod=`; `--check` then plays the seed through and reads the folder back: every pickup holds the item the logic put there, every door of the layout is in `rando_doors.txt` and none leads out of the run, `rando.ini` has the starting items the logic used (exit code 3 when something is wrong) |
 | `save-rooms [--data <dir>]` | Lists the rooms with an item box or a typewriter |
 | `enemy-spots [<RM_xxxx>] [--png <dir>]` | Where random enemy placements may start enemies in each room; `--png` draws each floor from above (walls, the reachable floor, the places, entrances, known enemy places) |
 | `dump-enemies [<RM_xxxx>] [--scripts] [--out <dir>]` | Each room's enemies with the model, motion and texture data the game loads for them; `--out` writes them as files |
