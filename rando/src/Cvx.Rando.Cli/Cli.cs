@@ -90,7 +90,7 @@ internal static partial class Cli
                        [--npcs] [--npc-characters leon.re2,ada.re2,...]
                        [--players] [--claire-look <id>] [--chris-look <id>]
                        [--biorand <dir>]
-                       [--share <code>] [--out <dir>] [--spoiler]
+                       [--share <code>] [--out <dir> [--check]] [--spoiler]
                                                  randomize (--doors: random doors, played by Claire, or
                                                  Chris with --chris, in 1-4 segments, using 1-8 eighths
                                                  of the rooms; --enemy-placements: random places, about
@@ -98,7 +98,8 @@ internal static partial class Cli
                                                  Claire and Chris look and sound like BioRand characters,
                                                  the ids given or random); --out writes the mod folder (RDX_LNK.AFS,
                                                  rando.ini, rando_doors.txt, spoiler.txt, graph.dot,
-                                                 graph.dgml) for recvx-pc's mod=
+                                                 graph.dgml) for recvx-pc's mod=; --check then plays it
+                                                 through and reads the folder back (exit code 3 when wrong)
               dump-script <RM_xxxx> [--from <hex>] [--to <hex>]
                                                  a room's script opcodes with their file offsets
               swap-enemies <RM_xxxx> --donor <RM_xxxx>:<enemy index> [--only <types>] [--effect <n>] [--out <dir>]
@@ -582,6 +583,7 @@ internal static partial class Cli
         Console.WriteLine($"Seed {seed}: {result.Patches.Count} patches in {result.ChangedRooms.Count} rooms" +
                           $"{(result.Doors != null ? $", door layout {result.DoorAttempts}" : "")}" +
                           $"{(result.Settings.RandomEnemies ? $", enemies changed in {result.Enemies.Count} rooms" : "")} ({sw.Elapsed.TotalSeconds:0.0}s)");
+        Console.WriteLine($"Share code: {Cvx.Rando.Setup.ShareCode.Encode(result.Settings)}");
         if (options.Has("spoiler"))
             Console.WriteLine(result.Spoiler);
         if (options.Get("out") is { } outDir)
@@ -589,6 +591,15 @@ internal static partial class Cli
             sw.Restart();
             Generator.WriteMod(result, rooms, outDir, new Progress<string>(Console.WriteLine));
             Console.WriteLine($"Wrote {Path.GetFullPath(outDir)} ({sw.Elapsed.TotalSeconds:0.0}s)");
+            if (options.Has("check"))
+            {
+                var problems = SeedCheck.Check(result, RandoData.Load(), rooms, outDir);
+                foreach (var p in problems)
+                    Console.WriteLine($"  PROBLEM {p}");
+                Console.WriteLine(problems.Count == 0 ? $"Seed {seed} checked: completable, and the folder holds what the logic used" : $"Seed {seed}: {problems.Count} problems");
+                if (problems.Count != 0)
+                    return 3;
+            }
         }
         return 0;
     }

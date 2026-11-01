@@ -1,0 +1,12 @@
+<!--
+    Biorand++: the colours the window picks by name (Themes/Dark.xaml has the dark ones). The light
+    look is BioRand's: the system's window colours, and green, brown and red for messages.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <x:Static x:Key="Rando.WindowBrush" Member="SystemColors.WindowBrush" />
+    <x:Static x:Key="Rando.TextBrush" Member="SystemColors.ControlTextBrush" />
+    <x:Static x:Key="Rando.GoodBrush" Member="Brushes.Green" />
+    <x:Static x:Key="Rando.WarnBrush" Member="Brushes.Brown" />
+    <x:Static x:Key="Rando.BadBrush" Member="Brushes.Red" />
+</ResourceDictionary>

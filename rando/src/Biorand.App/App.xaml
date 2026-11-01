@@ -8,6 +8,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Templates\CheckGroupBox.xaml" />
+                <ResourceDictionary Source="Themes\Light.xaml" /> <!-- Biorand++: colours by name; Theme.cs adds Themes\Dark.xaml -->
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

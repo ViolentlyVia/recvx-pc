@@ -124,6 +124,9 @@ namespace IntelOrca.Biohazard.BioRand
                 chkRandomizeTitleVoice.IsChecked = _settings.RandomizeTitleVoice;
                 chkMaxInventorySize.IsChecked = _settings.MaxInventorySize;
                 chkDoorSkip.IsChecked = _settings.DoorSkip;
+                // Biorand++: dark mode as Windows has it, until the toggle is used
+                chkDarkMode.IsChecked = _settings.DarkMode ?? Theme.WindowsIsDark();
+                Theme.Apply(chkDarkMode.IsChecked == true);
 
                 // Biorand++
                 gameLocationBioRand.Location = _settings.BioRandPath;
@@ -391,7 +394,7 @@ namespace IntelOrca.Biohazard.BioRand
 
         private void UpdateEstimateCompletion()
         {
-            var colour = Colors.Green;
+            var colour = "Rando.GoodBrush"; // Biorand++: colours by name (dark mode)
             if (_config.RandomDoors)
             {
                 var lower = (_config.AreaCount + 1) * 60;
@@ -408,15 +411,15 @@ namespace IntelOrca.Biohazard.BioRand
                 else if (_config.AreaSize <= 1)
                 {
                     eta = "30 to 60 minutes";
-                    colour = Colors.Brown;
+                    colour = "Rando.WarnBrush";
                 }
                 else
                 {
                     eta = $"{(int)lHours} to {(int)uHours} hours";
-                    colour = Colors.Red;
+                    colour = "Rando.BadBrush";
                 }
                 lblEstimateCompletionTime.Text = $"{eta} per scenario";
-                lblEstimateCompletionTime.Foreground = new SolidColorBrush(colour);
+                lblEstimateCompletionTime.SetResourceReference(TextBlock.ForegroundProperty, colour);
             }
             else
             {
@@ -1243,6 +1246,21 @@ namespace IntelOrca.Biohazard.BioRand
             {
                 SaveSettings();
             }
+        }
+
+        // Biorand++: dark mode, at once; from then on the toggle's choice stays instead of following Windows
+        private void chkDarkMode_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suspendEvents)
+                return;
+            _settings.DarkMode = chkDarkMode.IsChecked == true;
+            Theme.Apply(_settings.DarkMode.Value);
+            SaveSettings();
+        }
+
+        private void Window_SourceInitialized(object sender, EventArgs e)
+        {
+            Theme.SetTitleBar(this); // Biorand++: dark title bar in dark mode
         }
 
         private int? SelectedGame

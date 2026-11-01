@@ -45,6 +45,8 @@ namespace IntelOrca.Biohazard.BioRand
         public bool RandomizeTitleVoice { get; set; } = true;
         public bool MaxInventorySize { get; set; }
         public bool DoorSkip { get; set; }
+        // Biorand++: null follows Windows (dark when its apps are)
+        public bool? DarkMode { get; set; }
 
         public string LastVersion { get; set; }
 

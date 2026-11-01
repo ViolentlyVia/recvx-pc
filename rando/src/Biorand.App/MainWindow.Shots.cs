@@ -41,7 +41,7 @@ namespace IntelOrca.Biohazard.BioRand
                         dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
                     var background = new DrawingVisual();
                     using (var dc = background.RenderOpen())
-                        dc.DrawRectangle(SystemColors.WindowBrush, null, new Rect(0, 0, content.ActualWidth, content.ActualHeight));
+                        dc.DrawRectangle(Background ?? SystemColors.WindowBrush, null, new Rect(0, 0, content.ActualWidth, content.ActualHeight));
                     bitmap.Render(background);
                     bitmap.Render(content);
                     var encoder = new PngBitmapEncoder();

@@ -10,6 +10,9 @@
     WindowStartupLocation="CenterScreen"
     ResizeMode="CanResize"
     SizeToContent="WidthAndHeight"
+    Background="{DynamicResource Rando.WindowBrush}"
+    Foreground="{DynamicResource Rando.TextBrush}"
+    SourceInitialized="Window_SourceInitialized"
     Loaded="Window_Loaded">
     <Window.Resources>
         <Style TargetType="local:RandoSlider">
@@ -25,7 +28,7 @@
         </Grid.RowDefinitions>
         <Border Grid.Row="0" x:Name="versionBox" Visibility="Collapsed" Background="#FFB" Padding="8,4">
             <TextBlock>
-                <Hyperlink Click="UpdateLink_Click">A new update is available!</Hyperlink>
+                <Hyperlink Click="UpdateLink_Click" Foreground="{x:Static SystemColors.HotTrackBrush}">A new update is available!</Hyperlink>
             </TextBlock>
         </Border>
         <Grid Grid.Row="1">
@@ -131,6 +134,9 @@
                             <CheckBox x:Name="chkDoorSkip" Checked="globalCheckBox_Changed"
                                 Unchecked="globalCheckBox_Changed">Door Skip (RE CVX)</CheckBox>
                         </StackPanel>
+                    </GroupBox>
+                    <GroupBox Header="Window">
+                        <CheckBox x:Name="chkDarkMode" Checked="chkDarkMode_Changed" Unchecked="chkDarkMode_Changed">Dark mode</CheckBox>
                     </GroupBox>
                 </StackPanel>
                 <Grid x:Name="panelRando" Visibility="Visible">
@@ -301,7 +307,7 @@
                                     </StackPanel>
                                     <TextBlock Text="Estimate completion time:" />
                                     <TextBlock x:Name="lblEstimateCompletionTime" Margin="16,0,0,0"
-                                        Foreground="Brown" Text="10 - 30 minutes" />
+                                        Foreground="{DynamicResource Rando.WarnBrush}" Text="10 - 30 minutes" />
                                 </StackPanel>
                             </local:CheckGroupBox>
                         </StackPanel>

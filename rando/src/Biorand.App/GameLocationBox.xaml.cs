@@ -94,14 +94,13 @@ namespace IntelOrca.Biohazard.BioRand
                 Validate?.Invoke(this, eventArgs);
 
                 txtValidationMessage.Text = eventArgs.Message;
-                txtValidationMessage.Foreground = eventArgs.IsValid ?
-                    Brushes.Green :
-                    Brushes.Red;
+                // Biorand++: colours by name (dark mode)
+                txtValidationMessage.SetResourceReference(TextBlock.ForegroundProperty, eventArgs.IsValid ? "Rando.GoodBrush" : "Rando.BadBrush");
             }
             catch (Exception ex)
             {
                 txtValidationMessage.Text = ex.Message;
-                txtValidationMessage.Foreground = Brushes.Red;
+                txtValidationMessage.SetResourceReference(TextBlock.ForegroundProperty, "Rando.BadBrush");
             }
 
             Location = path;
