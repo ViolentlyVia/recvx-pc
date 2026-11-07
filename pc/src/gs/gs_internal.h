@@ -67,7 +67,27 @@ void gsMemTransferData(const unsigned char* data, int qwc);
 void gsMemReadImage(const GsRegs* r, unsigned char* out);
 
 /* gs.c */
+#define GS_REG_PACKED_RGBA 0x101   /* recorded packed RGBAQ (Q from the last packed ST) */
+#define GS_REG_PACKED_ST   0x102   /* recorded packed ST (w: Q) */
+
+typedef struct {
+    GsRegs regs;
+    GsVertex vq[3];
+    int vq_count;
+    GsVertex fan_first;
+} GsState;
+
 void gsWriteReg(int reg, u64 value);
+void gsExecReg(int reg, u64 value, unsigned int w);
+void gsGetState(GsState* s);
+void gsSetState(const GsState* s);
+void gsFlushPrims(void);
+
+/* gs_interp.c (smooth motion) */
+extern int gsInterpRecording;
+void gsInterpRecordReg(int reg, u64 value, unsigned int w);
+void gsInterpRecordData(const unsigned char* data, int qwc);
+void gsInterpBreak(void);
 void gsGifTransfer(const void* data, int qwc);
 void gsDmaChain(const void* tag);
 

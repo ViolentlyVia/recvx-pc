@@ -218,8 +218,26 @@ static void latch_vertex(u64 xyz, int has_f, int kick)
 
 static void clut_load(u64 tex0);
 
-void gsWriteReg(int reg, u64 value)
+/* smooth motion (gs_interp.c) records the frame's register writes instead; this executes one */
+void gsExecReg(int reg, u64 value, unsigned int w)
 {
+    switch (reg)
+    {
+    case GS_REG_PACKED_RGBA: /* packed RGBAQ: Q is the one the last packed ST set */
+    {
+        float q = gsRegs.q;
+
+        gsRegs.rgbaq = value | ((u64)(*(unsigned int*)&q) << 32);
+        return;
+    }
+    case GS_REG_PACKED_ST:   /* packed ST, sets Q */
+        gsRegs.st = value;
+        gsRegs.q = *(const float*)&w;
+        return;
+    default:
+        break;
+    }
+
     switch (reg)
     {
     case 0x00: gsRegs.prim = value; vq_count = 0; break;
@@ -286,6 +304,42 @@ void gsWriteReg(int reg, u64 value)
     }
 }
 
+static void write_reg(int reg, u64 value, unsigned int w)
+{
+    if (gsInterpRecording)
+    {
+        gsInterpRecordReg(reg, value, w);
+    }
+    else
+    {
+        gsExecReg(reg, value, w);
+    }
+}
+
+void gsWriteReg(int reg, u64 value)
+{
+    write_reg(reg, value, 0);
+}
+
+/* what the next primitive is assembled from, for the replays of a recorded frame */
+void gsGetState(GsState* s)
+{
+    gsFlushPrims();
+    s->regs = gsRegs;
+    memcpy(s->vq, vq, sizeof(vq));
+    s->vq_count = vq_count;
+    s->fan_first = fan_first;
+}
+
+void gsSetState(const GsState* s)
+{
+    gsFlushPrims();
+    gsRegs = s->regs;
+    memcpy(vq, s->vq, sizeof(vq));
+    vq_count = s->vq_count;
+    fan_first = s->fan_first;
+}
+
 /* ------------------------------------------------------------------------------------------- */
 /* GIF (PATH3) */
 
@@ -309,19 +363,13 @@ static void packed_write(int reg, const unsigned int* w)
         gsWriteReg(0x00, lo & 0x7FF);
         break;
     case 0x01: /* RGBAQ: Q comes from the last packed ST */
-    {
-        u64 v = (w[0] & 0xFF) | ((w[1] & 0xFF) << 8) | ((w[2] & 0xFF) << 16) | ((u64)(w[3] & 0xFF) << 24);
-        float q = gsRegs.q;
-
-        gsRegs.rgbaq = v | ((u64)(*(unsigned int*)&q) << 32);
+        write_reg(GS_REG_PACKED_RGBA, (w[0] & 0xFF) | ((w[1] & 0xFF) << 8) | ((w[2] & 0xFF) << 16) | ((u64)(w[3] & 0xFF) << 24), 0);
         break;
-    }
     case 0x02: /* ST, sets Q */
-        gsRegs.st = lo;
-        gsRegs.q = *(const float*)&w[2];
+        write_reg(GS_REG_PACKED_ST, lo, w[2]);
         break;
     case 0x03: /* UV */
-        gsRegs.uv = (w[0] & 0x3FFF) | ((u64)(w[1] & 0x3FFF) << 16);
+        write_reg(0x03, (w[0] & 0x3FFF) | ((u64)(w[1] & 0x3FFF) << 16), 0);
         break;
     case 0x04: /* XYZF2 (ADC bit -> XYZF3) */
     {
@@ -438,7 +486,14 @@ void gsGifTransfer(const void* data, int qwc)
         {
             int n = (gif.loop_left < qwc) ? gif.loop_left : qwc;
 
-            gsMemTransferData((const unsigned char*)q, n);
+            if (gsInterpRecording)
+            {
+                gsInterpRecordData((const unsigned char*)q, n);
+            }
+            else
+            {
+                gsMemTransferData((const unsigned char*)q, n);
+            }
             q += n * 4;
             qwc -= n;
             gif.loop_left -= n;
@@ -802,8 +857,10 @@ void pcGsPresent(void)
 
 void gsMemReadImageRegs(uint64_t bitbltbuf, uint64_t trxpos, uint64_t trxreg, void* out)
 {
-    GsRegs r = gsRegs;
+    GsRegs r;
 
+    gsInterpBreak();   /* the picture so far is needed now */
+    r = gsRegs;
     gsFlushPrims();
 
     r.bitbltbuf = bitbltbuf;

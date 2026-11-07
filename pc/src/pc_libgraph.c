@@ -132,7 +132,10 @@ int sceGsSwapDBuffDc(sceGsDBuffDc* db, int id)
 {
     const sceGifTag* tag = id ? &db->giftag1 : &db->giftag0;
     const sceGsDispEnv* disp = &db->disp[id & 1];
+    extern void pcGsInterpMark(void);
 
+    /* smooth motion: the frame ends here, the swap packet belongs to the next one */
+    pcGsInterpMark();
     gsGifTransfer(tag, 1 + (int)tag->NLOOP);
 
     /* the frame is complete: show the display buffer */

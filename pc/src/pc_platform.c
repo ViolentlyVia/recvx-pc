@@ -832,6 +832,7 @@ int pcVideoPumpEvents(void)
 void pcVideoPresent(void)
 {
     static double last_report;
+    double middle_shown;
 
     if (!pcVideoPumpEvents())
     {
@@ -847,6 +848,63 @@ void pcVideoPresent(void)
     pcPadUpdate();
     pcOsHeartbeat();
     fps_tick();
+
+    /* smooth motion (gs_interp.c): a picture halfway between the last frame and this one first,
+     * this frame half a frame later */
+    {
+        extern int pcGsInterpMiddle(void);
+        extern void pcGsInterpCommit(void);
+
+        extern void pcGsScreenshot(const char* path, unsigned int fbp);
+        extern unsigned int pcGsDisplayFbp(void);
+        static int shot_every = -1;
+        int shot, shot_real;
+        char path[1100], dir[1024];
+
+        /* debug: RECVX_MIDSHOTS=<n> saves every n-th in-between picture and the frame after it to
+         * shots/ (mid_<frame>.png, real_<frame>.png) */
+        if (shot_every < 0)
+        {
+            const char* e = SDL_getenv("RECVX_MIDSHOTS");
+
+            shot_every = (e != NULL) ? atoi(e) : 0;
+        }
+
+        extern int pcFastForward;
+
+        middle_shown = 0;
+        shot = (shot_every > 0) && ((frames % shot_every) == 0);
+        shot_real = (shot_every > 0) && ((frames % shot_every) == (unsigned int)shot_every - 1);
+
+        /* not while fast-forwarding: the in-between picture would hold each frame back */
+        if (!pcFastForward && (SDL_getenv("RECVX_SPEED") == NULL) && pcGsInterpMiddle())
+        {
+            pcGsPresent();
+            SDL_GL_SwapWindow(window);
+            middle_shown = pcOsTime();
+            fps_tick();
+
+            if (shot)
+            {
+                pcPlatformExeDir(dir, sizeof(dir));
+                snprintf(path, sizeof(path), "%s/shots/mid_%05u.png", dir, frames);
+                pcGsScreenshot(path, pcGsDisplayFbp());
+            }
+        }
+        else
+        {
+            shot = 0;
+        }
+
+        pcGsInterpCommit();
+
+        if (shot || shot_real)
+        {
+            pcPlatformExeDir(dir, sizeof(dir));
+            snprintf(path, sizeof(path), "%s/shots/real_%05u.png", dir, frames);
+            pcGsScreenshot(path, pcGsDisplayFbp());
+        }
+    }
 
     pcGsPresent();
 
@@ -875,6 +933,21 @@ void pcVideoPresent(void)
         }
     }
 
+
+    /* the frame itself half a frame (one VBLANK) after the in-between picture */
+    if (middle_shown > 0)
+    {
+        double at = middle_shown + 1.0 / 59.94;
+        double now;
+
+        while ((now = pcOsTime()) < at)
+        {
+            if (at - now > 0.002)
+            {
+                SDL_Delay(1);
+            }
+        }
+    }
 
     {
         double t0 = pcOsTime();

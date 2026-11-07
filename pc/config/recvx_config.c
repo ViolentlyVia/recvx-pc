@@ -263,12 +263,13 @@ enum {
     ID_SKIP_DOORS,
     ID_SAVE_ANYWHERE,
     ID_SKIP_INTRO,
+    ID_SMOOTH,
     ID_RANDO, ID_RANDO_OFF,
     ID_KEY = 1000, ID_PAD = 1100,
 };
 
 static HWND main_wnd;
-static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game, h_pause, h_movies_hd, h_skip_doors, h_save_anywhere, h_skip_intro;
+static HWND h_res, h_aspect, h_mode, h_scale, h_hd, h_saves, h_game, h_pause, h_movies_hd, h_skip_doors, h_save_anywhere, h_skip_intro, h_smooth;
 static HWND h_rando, h_rando_off;
 static int loaded_res;   /* resolution entry when the settings were loaded */
 static HWND h_key[PC_BINDING_COUNT], h_pad[PC_BINDING_COUNT];
@@ -411,6 +412,9 @@ static void load_settings(void)
     v = ini_get("skip_doors");
     SendMessageA(h_skip_doors, BM_SETCHECK, ((v != NULL) && (atoi(v) != 0)) ? BST_CHECKED : BST_UNCHECKED, 0);
 
+    v = ini_get("smooth_motion");
+    SendMessageA(h_smooth, BM_SETCHECK, ((v != NULL) && (atoi(v) != 0)) ? BST_CHECKED : BST_UNCHECKED, 0);
+
     v = ini_get("skip_intro");
     SendMessageA(h_skip_intro, BM_SETCHECK, ((v != NULL) && (atoi(v) != 0)) ? BST_CHECKED : BST_UNCHECKED, 0);
 
@@ -476,6 +480,7 @@ static int save_settings(void)
     ini_set("pause_unfocused", (SendMessageA(h_pause, BM_GETCHECK, 0, 0) == BST_CHECKED) ? NULL : "0");
     ini_set("movies_hd", (SendMessageA(h_movies_hd, BM_GETCHECK, 0, 0) == BST_CHECKED) ? NULL : "0");
     ini_set("skip_doors", (SendMessageA(h_skip_doors, BM_GETCHECK, 0, 0) == BST_CHECKED) ? "1" : NULL);
+    ini_set("smooth_motion", (SendMessageA(h_smooth, BM_GETCHECK, 0, 0) == BST_CHECKED) ? "1" : NULL);
     ini_set("skip_intro", (SendMessageA(h_skip_intro, BM_GETCHECK, 0, 0) == BST_CHECKED) ? "1" : NULL);
     ini_set("debug_save", (SendMessageA(h_save_anywhere, BM_GETCHECK, 0, 0) == BST_CHECKED) ? "1" : NULL);
 
@@ -983,6 +988,9 @@ static void create_controls(void)
     y += 32;
     h_pause = make("BUTTON", "Pause the game while its window is not active", BS_AUTOCHECKBOX | WS_TABSTOP,
                    lx, y, cx + cw - lx, 24, ID_PAUSE);
+    y += 26;
+    h_smooth = make("BUTTON", "Smooth motion: 60 pictures a second (experimental)", BS_AUTOCHECKBOX | WS_TABSTOP,
+                    lx, y, cx + cw - lx, 24, ID_SMOOTH);
     y += 30;
     make("STATIC", "Widescreen widens the 3D view; menus, text and movies stay 4:3 in the middle. "
                    "In the game, F11 or Alt+Enter switches between window and fullscreen.",
@@ -1122,7 +1130,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             dirty = 1;
         }
         else if ((code == EN_CHANGE) || (id == ID_PAUSE) || (id == ID_MOVIES_HD) || (id == ID_SKIP_DOORS) ||
-                 (id == ID_SAVE_ANYWHERE) || (id == ID_SKIP_INTRO))
+                 (id == ID_SAVE_ANYWHERE) || (id == ID_SKIP_INTRO) || (id == ID_SMOOTH))
         {
             dirty = 1;
         }

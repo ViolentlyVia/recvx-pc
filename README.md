@@ -148,6 +148,7 @@ Optional, next to `recvx.exe`, one `key=value` per line (the settings app writes
 | `fullscreen=` | `1` for exclusive fullscreen at the window size, `desktop` for borderless (default `0`) |
 | `pause_unfocused=` | `0` keeps the game running while its window is not active (default `1`) |
 | `movies_hd=` | `0` plays the original movies even when upscaled ones exist (default `1`) |
+| `smooth_motion=` | `1` shows 60 pictures a second: a picture halfway between each two game frames (the game itself stays at 30; experimental, default `0`) |
 | `skip_intro=` | `1` starts at the title screen, without the warning screens, Capcom logo and opening movie (default `0`) |
 | `skip_doors=` | `1` lets OK / Attack (Cross or Square) skip the door animations (default `0`) |
 | `mod=` | folder whose files replace the data folder's files of the same name (relative to the exe; see [Randomizer](#randomizer)) |
