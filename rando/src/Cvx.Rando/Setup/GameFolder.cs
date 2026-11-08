@@ -162,7 +162,10 @@ public sealed class GameFolder
         if (!dir.Exists)
             return;
         foreach (var file in dir.EnumerateFiles())
+        {
+            ClearReadOnly(file);
             file.Delete();
+        }
         foreach (var sub in dir.EnumerateDirectories())
             DeleteFolder(sub);
     }
@@ -214,7 +217,14 @@ public sealed class GameFolder
             {
                 dir.Refresh();
                 if (dir.Exists)
+                {
+                    // A read-only folder or file (OneDrive marks some) cannot be deleted: "Access to
+                    // the path is denied".
+                    ClearReadOnly(dir);
+                    foreach (var entry in dir.EnumerateFileSystemInfos("*", SearchOption.AllDirectories))
+                        ClearReadOnly(entry);
                     dir.Delete(recursive: true);
+                }
                 return;
             }
             catch (Exception ex) when (attempt < 10 && ex is IOException or UnauthorizedAccessException)
@@ -222,6 +232,12 @@ public sealed class GameFolder
                 Thread.Sleep(200);
             }
         }
+    }
+
+    private static void ClearReadOnly(FileSystemInfo entry)
+    {
+        if ((entry.Attributes & FileAttributes.ReadOnly) != 0)
+            entry.Attributes &= ~FileAttributes.ReadOnly;
     }
 
     /// <summary>The seed folders in rando\, newest first.</summary>
