@@ -1,5 +1,11 @@
 # Biorand++
 
+## 1.0.1
+- CV:X random items: with a custom item pool, the random starting inventory only gets weapons
+  ticked there (an unticked sniper rifle could still be a starting weapon).
+- A new seed could not clear the random run's saves when OneDrive had made their folder
+  read-only ("Access to the path is denied").
+
 ## 1.0.0
 - Dark mode: the whole window, with a dark title bar. It follows Windows until you use the
   Dark mode toggle in the settings (Window); then your choice stays.
