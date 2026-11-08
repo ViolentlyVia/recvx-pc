@@ -17,7 +17,7 @@ public sealed record StartInventory(string Character, IReadOnlyList<InventoryIte
 
     /// <summary>
     /// Up to two weapons of the chosen kinds (loaded, often with spare ammo; the knife is a
-    /// sidearm), then one basic healing item, in 8 slots. Two-slot weapons go first, as the game
+    /// sidearm; a custom item pool's unticked weapons are left out), then one basic healing item, in 8 slots. Two-slot weapons go first, as the game
     /// sorts them (itemdata type bit 0x100).
     /// </summary>
     public static StartInventory Make(string character, ItemCatalog items, RandoSettings settings, Rng rng)
@@ -38,7 +38,13 @@ public sealed record StartInventory(string Character, IReadOnlyList<InventoryIte
             return true;
         }
 
-        var weapons = items.Items.Where(i => i.WeaponKind is "sidearm" or "primary" or "powerful").ToList();
+        // With a custom item pool, only the weapons ticked there (as for the pickups).
+        var allowed = settings.RandomItems && settings.ItemMode == ItemMode.Custom && settings.Weapons.Length != 0
+            ? settings.Weapons
+            : null;
+        var weapons = items.Items.Where(i => i.WeaponKind is "sidearm" or "primary" or "powerful")
+            .Where(i => allowed == null || allowed.Contains(i.Id))
+            .ToList();
         var chosen = new List<ItemInfo>();
         foreach (var choice in new[] { settings.StartWeapon1, settings.StartWeapon2 })
         {
