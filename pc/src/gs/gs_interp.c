@@ -88,21 +88,21 @@ static void count_frame(int blended)
     }
 }
 
+static int smooth_on = -1;
+
 static int enabled(void)
 {
-    static int on = -1;
-
-    if (on < 0)
+    if (smooth_on < 0)
     {
-        on = pcIniGetInt("smooth_motion", 0) != 0;
+        smooth_on = pcIniGetInt("smooth_motion", 0) != 0;
 
-        if (on)
+        if (smooth_on)
         {
             pcLog("smooth motion: on");
         }
     }
 
-    return on;
+    return smooth_on;
 }
 
 static void* grow(void* p, int* cap, int need, size_t size)
@@ -486,11 +486,30 @@ void gsInterpBreak(void)
     reset();
 }
 
+/* switched in the game's OPTION screen (pc_options.c); takes effect at the next frame */
+int pcGsInterpEnabled(void)
+{
+    return enabled();
+}
+
+void pcGsInterpSetEnabled(int on)
+{
+    enabled();
+    smooth_on = on;
+}
+
 /* the frame's double buffer swap is about to be sent (sceGsSwapDBuffDc) */
 void pcGsInterpMark(void)
 {
     if (!enabled())
     {
+        if (gsInterpRecording)
+        {
+            /* switched off: what was recorded is drawn as it is, from here on frames are live */
+            gsInterpBreak();
+            frame_live = 1;
+        }
+
         return;
     }
 

@@ -356,6 +356,38 @@ static RenderTarget* get_rt(unsigned int fbp, unsigned int fbw)
     return rt;
 }
 
+/* the internal resolution or aspect changed (OPTION screen): render targets and depth buffers
+ * are made again at the new size when next used, from GS memory */
+void pcGsResize(void)
+{
+    int i;
+
+    gsRendererFlush();
+
+    for (i = 0; i < MAX_RT; i++)
+    {
+        if (rts[i].used)
+        {
+            glDeleteFramebuffers(1, &rts[i].fbo);
+            glDeleteTextures(1, &rts[i].color);
+        }
+
+        memset(&rts[i], 0, sizeof(rts[i]));
+    }
+
+    for (i = 0; i < MAX_DB; i++)
+    {
+        if (dbs[i].used)
+        {
+            glDeleteTextures(1, &dbs[i].tex);
+        }
+
+        memset(&dbs[i], 0, sizeof(dbs[i]));
+    }
+
+    pcLog("gs: internal resolution x%d horizontal, x%d vertical", pcGsScaleX, pcGsScale);
+}
+
 static DepthBuffer* get_db(unsigned int zbp, int w, int h)
 {
     int i;

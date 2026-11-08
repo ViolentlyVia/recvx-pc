@@ -28,6 +28,7 @@ static int pcPadFullscreenKey(void);
 static int pcPadFullscreenButton(void);
 static int title_event(const SDL_Event* ev);
 static void save_event(const SDL_Event* ev);
+static int capture_event(const SDL_Event* ev);
 static void save_tick(void);
 static void fps_tick(void);
 static void update_title(int force);
@@ -541,6 +542,135 @@ static void toggle_fullscreen(void)
     }
 }
 
+/* ---- settings changed in the game's OPTION screen (pc_options.c) ---- */
+
+/* 0 windowed, 1 fullscreen, 2 borderless fullscreen */
+int pcVideoMode(void)
+{
+    Uint32 flags = SDL_GetWindowFlags(window);
+
+    if ((flags & SDL_WINDOW_FULLSCREEN_DESKTOP) == SDL_WINDOW_FULLSCREEN_DESKTOP)
+    {
+        return 2;
+    }
+
+    return (flags & SDL_WINDOW_FULLSCREEN) ? 1 : 0;
+}
+
+void pcVideoSetMode(int mode)
+{
+    if (mode != 0)
+    {
+        video_cfg.fullscreen = mode;
+    }
+
+    SDL_SetWindowFullscreen(window, (mode == 1) ? SDL_WINDOW_FULLSCREEN : (mode == 2) ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+    pcIniSet("fullscreen", (mode == 1) ? "1" : (mode == 2) ? "desktop" : NULL);
+}
+
+/* the window size, which is also the screen mode in exclusive fullscreen */
+void pcVideoWindowSize(int* w, int* h)
+{
+    *w = win_state.w;
+    *h = win_state.h;
+}
+
+void pcVideoSetWindowSize(int w, int h, int automatic)
+{
+    char v[32];
+
+    if (SDL_GetWindowFlags(window) & SDL_WINDOW_MAXIMIZED)
+    {
+        SDL_RestoreWindow(window);
+    }
+
+    SDL_SetWindowSize(window, w, h);
+
+    if (pcVideoMode() == 1)
+    {
+        SDL_DisplayMode m;
+
+        if (SDL_GetWindowDisplayMode(window, &m) == 0)
+        {
+            m.w = w;
+            m.h = h;
+            SDL_SetWindowDisplayMode(window, &m);
+        }
+    }
+
+    win_state.w = video_cfg.win_w = w;
+    win_state.h = video_cfg.win_h = h;
+    win_state.maximized = video_cfg.maximized = 0;
+    snprintf(v, sizeof(v), "%dx%d", w, h);
+    pcIniSet("window", automatic ? NULL : v);
+    pcIniSet("window_max", NULL);
+}
+
+int pcVideoScale(void)
+{
+    extern int pcGsScale;
+
+    video_settings();
+    return pcGsScale;
+}
+
+static void rescale(void)
+{
+    extern int pcGsScale, pcGsScaleX;
+    extern void pcGsResize(void);
+
+    pcGsScaleX = (int)(pcGsScale * video_cfg.aspect / (4.0f / 3.0f) + 0.5f);
+    pcGsResize();
+}
+
+void pcVideoSetScale(int scale)
+{
+    extern int pcGsScale;
+
+    video_settings();
+    pcGsScale = scale;
+    rescale();
+}
+
+/* 1 if the aspect changed */
+int pcVideoSetAspect(int w, int h)
+{
+    extern void pcNaReapplyAspect(void);
+    char v[32];
+    float a = (float)w / (float)h;
+
+    video_settings();
+
+    if (a == video_cfg.aspect)
+    {
+        return 0;
+    }
+
+    video_cfg.aspect = a;
+    rescale();
+    pcNaReapplyAspect();
+
+    /* an automatic window size follows the aspect */
+    if (!pcIniGet("window", v, sizeof(v)) && (pcVideoMode() == 0))
+    {
+        pcVideoSetWindowSize((int)(win_state.h * a + 0.5f), win_state.h, 1);
+    }
+
+    return 1;
+}
+
+int pcVideoPauseUnfocused(void)
+{
+    video_settings();
+    return video_cfg.pause_unfocused;
+}
+
+void pcVideoSetPauseUnfocused(int on)
+{
+    video_cfg.pause_unfocused = on;
+    pcIniSet("pause_unfocused", on ? NULL : "0");
+}
+
 /* the remembered spot is used only while it is still on a connected monitor */
 static int position_visible(int x, int y, int w, int h)
 {
@@ -789,6 +919,11 @@ int pcVideoPumpEvents(void)
             {
                 return 0;
             }
+        }
+
+        if (capture_event(&ev))
+        {
+            continue;   /* a key or button being bound: not for the game */
         }
 
         /* the mouse is not used by the game: it hides after 2 seconds without moving */
@@ -1042,17 +1177,18 @@ static PadMap pad_map[PC_BINDING_COUNT];
 #define PAD_TITLE       (PC_BINDING_PS2_BUTTONS + 2)
 #define PAD_SAVE        (PC_BINDING_PS2_BUTTONS + 3)
 
+static int bindings_loaded;
+
 static void load_bindings(void)
 {
-    static int loaded;
     int i;
 
-    if (loaded)
+    if (bindings_loaded)
     {
         return;
     }
 
-    loaded = 1;
+    bindings_loaded = 1;
 
     for (i = 0; i < PC_BINDING_COUNT; i++)
     {
@@ -1100,6 +1236,100 @@ static void load_bindings(void)
             }
         }
     }
+}
+
+/* the bindings changed in recvx.ini (the KEY CONFIG page) */
+void pcPadReloadBindings(void)
+{
+    bindings_loaded = 0;
+    load_bindings();
+}
+
+/* KEY CONFIG: the next key (pad = 0) or controller button (pad = 1) pressed is taken for a
+ * binding instead of going to the game; Esc cancels, Delete clears the binding */
+static struct {
+    int active, pad, result, cooldown;
+    char name[64];
+} capture;
+
+void pcPadCaptureStart(int pad)
+{
+    capture.active = 1;
+    capture.pad = pad;
+    capture.result = 0;
+    capture.name[0] = 0;
+}
+
+/* 0 waiting, 1 taken (name: SDL name, "" to clear), -1 cancelled */
+int pcPadCaptureResult(char* name, int size)
+{
+    if (capture.active)
+    {
+        return 0;
+    }
+
+    snprintf(name, size, "%s", capture.name);
+    return capture.result;
+}
+
+static int capture_event(const SDL_Event* ev)
+{
+    if (!capture.active)
+    {
+        return 0;
+    }
+
+    if ((ev->type == SDL_KEYDOWN) && !ev->key.repeat)
+    {
+        SDL_Scancode sc = ev->key.keysym.scancode;
+
+        if (sc == SDL_SCANCODE_ESCAPE)
+        {
+            capture.result = -1;
+        }
+        else if (sc == SDL_SCANCODE_DELETE)
+        {
+            capture.result = 1;
+            capture.name[0] = 0;
+        }
+        else if (!capture.pad)
+        {
+            capture.result = 1;
+            snprintf(capture.name, sizeof(capture.name), "%s", SDL_GetScancodeName(sc));
+        }
+        else
+        {
+            return 1;   /* waiting for a controller button */
+        }
+
+        capture.active = 0;
+        capture.cooldown = 10;
+        return 1;
+    }
+
+    if (capture.pad && (ev->type == SDL_CONTROLLERBUTTONDOWN))
+    {
+        capture.result = 1;
+        snprintf(capture.name, sizeof(capture.name), "%s",
+                 SDL_GameControllerGetStringForButton((SDL_GameControllerButton)ev->cbutton.button));
+        capture.active = 0;
+        capture.cooldown = 10;
+        return 1;
+    }
+
+    if (capture.pad && (ev->type == SDL_CONTROLLERAXISMOTION) && (ev->caxis.value > 16000) &&
+        ((ev->caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT) || (ev->caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT)))
+    {
+        capture.result = 1;
+        snprintf(capture.name, sizeof(capture.name), "%s",
+                 SDL_GameControllerGetStringForAxis((SDL_GameControllerAxis)ev->caxis.axis));
+        capture.active = 0;
+        capture.cooldown = 10;
+        return 1;
+    }
+
+    return (ev->type == SDL_KEYDOWN) || (ev->type == SDL_KEYUP) || (ev->type == SDL_CONTROLLERBUTTONDOWN) ||
+           (ev->type == SDL_CONTROLLERBUTTONUP);
 }
 
 static int pcPadFullscreenKey(void)
@@ -1712,6 +1942,19 @@ void pcPadUpdate(void)
         r[5] = axis_to_byte(SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTY));
         r[6] = axis_to_byte(SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX));
         r[7] = axis_to_byte(SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY));
+    }
+
+    /* a binding being set (KEY CONFIG): the game sees no buttons until a little after */
+    if (capture.active || (capture.cooldown > 0))
+    {
+        if (!capture.active)
+        {
+            capture.cooldown--;
+        }
+
+        r[2] = r[3] = 0xFF;
+        r[4] = r[5] = r[6] = r[7] = 0x80;
+        memset(&r[8], 0, 12);
     }
 
     pcPadRecordReplay(r);

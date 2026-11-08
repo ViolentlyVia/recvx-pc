@@ -2601,6 +2601,30 @@ void DisplayOptionScrollPlate(float PosX, float PosY)
 
     njTextureFilterMode(1); 
     
+#ifdef TARGET_PC
+    {
+        /* PC: in widescreen the film strips run across the whole width: the set is drawn again on
+         * either side, into the side areas (the 4:3 edge cut the scrolling tiles off unevenly) */
+        extern float pcVideoWideScale(void);
+        extern int pcWide2DUnclipped;
+        int k, copies = (pcVideoWideScale() < 1.0f) ? 1 : 0;
+
+        pcWide2DUnclipped = copies;
+
+        for (k = -copies; k <= copies; k++)
+        {
+            for (i = 0; i < 6; i++)
+            {
+                SetQuadPos(PosX + (k * 672.0f) + (i * 112.0f), PosY, 114.0f, 80.0f, qp);
+                SetQuadUv2(400.0f, 80.0f * i, 114.0f, 80.0f, 2, qp);
+
+                AdvEasyDrawTexture(2, -1, qp, (0.01f * i) + 0.92f, 0);
+            }
+        }
+
+        pcWide2DUnclipped = 0;
+    }
+#else
     for (i = 0; i < 6; i++)
     { 
         SetQuadPos(PosX + (i * 112.0f), PosY, 114.0f, 80.0f, qp); 
@@ -2608,6 +2632,7 @@ void DisplayOptionScrollPlate(float PosX, float PosY)
         
         AdvEasyDrawTexture(2, -1, qp, (0.01f * i) + 0.92f, 0); 
     } 
+#endif
     
     njTextureFilterMode(0); 
 } 
@@ -2629,8 +2654,14 @@ void DisplayOptionBg(int Level, int Flag)
     case 0:
     case 1:
         break;
+#ifdef TARGET_PC
+    case 2:   /* PC: SCREEN SETUP is a settings page on the OPTION background */
+        break;
+#endif
     case -1:
+#ifndef TARGET_PC
     case 2:
+#endif
     case 3:
         return;
     }
@@ -2680,8 +2711,203 @@ void DisplayOptionBg(int Level, int Flag)
 
 // 99.65% matching
 #ifdef TARGET_PC
-/* PC: OPTION row not shown: 1 key config (recvx-config.exe sets the buttons) */
-#define PC_OPTION_HIDDEN(i) ((i) == 1)
+/* PC: OPTION rows not shown (none: KEY CONFIG and SCREEN SETUP are the PC settings pages) */
+#define PC_OPTION_HIDDEN(i) 0
+
+/* PC: KEY CONFIG and SCREEN SETUP open the PC settings pages (pc_options.c): key and controller
+ * bindings, and the display settings, in the game's font over the OPTION background */
+extern float FontScaleY, FontScaleCR;
+void bhDispFontEx(NJS_POINT2* pos, int code, unsigned int argb, float pri);   /* no prototype in message.h */
+void pcOptOpen(int page);
+int pcOptRows(int page);
+int pcOptBackRow(int page);
+const char* pcOptLabel(int page, int row);
+const char* pcOptValue(int page, int row, int col);
+void pcOptChange(int page, int row, int dir);
+void pcOptActivate(int page, int row, int col);
+int pcOptBusy(void);
+const char* pcOptHelp(int page, int row);
+
+#define PC_OPT_DIM    0x7FAFAFAF
+#define PC_OPT_LIT    0xDFFFFFFF
+#define PC_OPT_HALF   0xBFD8D8D8
+
+/* plain ASCII in the game's font, glyph by glyph (the font's slash advances a full cell, which
+ * leaves a wide gap after it: it advances like a narrow letter here); right: x is where the text
+ * ends; x < 0: centred */
+static float pc_opt_advance(unsigned char c)
+{
+    if ((c <= ' ') || (c > '~'))
+    {
+        return 14.0f * FontScaleX;
+    }
+
+    return FontScaleX * ((c == '/') ? 16.0f : bhGetFontSize((unsigned short)(c - 0x20)));
+}
+
+static void pc_opt_text(float x, float y, const char* s, unsigned int argb, int right)
+{
+    NJS_POINT2 pos;
+    const char* p;
+    float w = 0;
+
+    for (p = s; *p != 0; p++)
+    {
+        w += pc_opt_advance((unsigned char)*p);
+    }
+
+    if (x < 0)
+    {
+        x = 320.0f - (w / 2.0f);
+    }
+    else if (right)
+    {
+        x -= w;
+    }
+
+    pos.x = x;
+    pos.y = y;
+
+    for (p = s; *p != 0; p++)
+    {
+        unsigned char c = (unsigned char)*p;
+
+        if ((c > ' ') && (c <= '~'))
+        {
+            bhDispFontEx(&pos, c - 0x20, argb, -1.0f);
+        }
+
+        pos.x += pc_opt_advance(c);
+    }
+}
+
+/* page 0: SCREEN SETUP (display), 1: KEY CONFIG; returns the level to show next */
+static int pc_option_page(int PortId, int Flag, int page, int level)
+{
+    static int open_page = -1;
+    static int row, col, top;
+    const int visible = (page == 0) ? 7 : 8;
+    float scale_x = FontScaleX, scale_y = FontScaleY, scale_cr = FontScaleCR;
+    int ReturnCode = level;
+    int rows, back, i;
+
+    if (open_page != page)
+    {
+        pcOptOpen(page);
+        open_page = page;
+        row = col = top = 0;
+    }
+
+    rows = pcOptRows(page);
+    back = pcOptBackRow(page);
+
+    if ((Flag != 0) && !pcOptBusy())
+    {
+        if ((Pad[PortId].press & AdvGetCancelButton()) ||
+            ((Pad[PortId].press & AdvGetOkButton()) && (row == back)))
+        {
+            CallSystemSe(0, 0);
+            open_page = -1;
+            ReturnCode = 0;
+        }
+        else if ((Pad[PortId].press & AdvGetOkButton()))
+        {
+            pcOptActivate(page, row, col);
+            CallSystemSe(0, 3);
+        }
+        else if ((Pad[PortId].Rept & 0x1000))
+        {
+            row = (row + rows - 1) % rows;
+            CallSystemSe(0, 2);
+        }
+        else if ((Pad[PortId].Rept & 0x4000))
+        {
+            row = (row + 1) % rows;
+            CallSystemSe(0, 2);
+        }
+        else if ((Pad[PortId].press & (0x8000 | 0x2000)) && (row != back))
+        {
+            int dir = (Pad[PortId].press & 0x8000) ? -1 : 1;
+
+            if (page == 0)
+            {
+                pcOptChange(page, row, dir);
+            }
+            else
+            {
+                col = (dir > 0);
+            }
+
+            CallSystemSe(0, 2);
+        }
+    }
+
+    if (row < top)
+    {
+        top = row;
+    }
+    else if (row >= top + visible)
+    {
+        top = row - visible + 1;
+    }
+
+    bhFontScaleSet(0.9f, 0.9f, 1.0f);
+    pc_opt_text(-1.0f, 100.0f, (page == 0) ? "SCREEN SETUP" : "KEY CONFIG", PC_OPT_LIT, 0);
+
+    if (page == 0)
+    {
+        bhFontScaleSet(0.8f, 0.8f, 1.0f);
+
+        for (i = 0; i < rows; i++)
+        {
+            float y = 146.0f + (i * 28.0f);
+            unsigned int c = (i == row) ? PC_OPT_LIT : PC_OPT_DIM;
+
+            pc_opt_text(64.0f, y, pcOptLabel(page, i), c, 0);
+            pc_opt_text(588.0f, y, pcOptValue(page, i, 0), c, 1);
+        }
+    }
+    else
+    {
+        bhFontScaleSet(0.6f, 0.6f, 1.0f);
+        pc_opt_text(300.0f, 128.0f, "Keyboard", PC_OPT_DIM, 0);
+        pc_opt_text(450.0f, 128.0f, "Controller", PC_OPT_DIM, 0);
+
+        bhFontScaleSet(0.7f, 0.7f, 1.0f);
+
+        for (i = top; (i < rows) && (i < top + visible); i++)
+        {
+            float y = 150.0f + ((i - top) * 25.0f);
+            unsigned int c = (i == row) ? PC_OPT_LIT : PC_OPT_DIM;
+
+            pc_opt_text(48.0f, y, pcOptLabel(page, i), c, 0);
+            pc_opt_text(300.0f, y, pcOptValue(page, i, 0), (i != row) ? c : (col == 0) ? PC_OPT_LIT : PC_OPT_HALF, 0);
+            pc_opt_text(450.0f, y, pcOptValue(page, i, 1), (i != row) ? c : (col == 1) ? PC_OPT_LIT : PC_OPT_HALF, 0);
+        }
+
+        if (top > 0)
+        {
+            pc_opt_text(28.0f, 150.0f, "^", PC_OPT_DIM, 0);
+        }
+
+        if (top + visible < rows)
+        {
+            pc_opt_text(28.0f, 150.0f + ((visible - 1) * 25.0f), "v", PC_OPT_DIM, 0);
+        }
+    }
+
+    bhFontScaleSet(0.55f, 0.55f, 1.0f);
+    pc_opt_text(-1.0f, 356.0f, pcOptHelp(page, row), PC_OPT_DIM, 0);
+
+    bhFontScaleSet(scale_x, scale_y, scale_cr);
+
+    /* the font set its own texture list: the OPTION background draws from the screen's */
+    AdvEasySetTextureList(0);
+
+    FlushPlate();
+
+    return ReturnCode;
+}
 #endif
 
 int DisplayOptionPlateLevel0(int PortId, int Flag)
@@ -2913,13 +3139,13 @@ int DisplayOptionPlateLevel0(int PortId, int Flag)
     SetQuadUv2(0, 320.0f, 448.0f, 48.0f, 2, &qp[13]);
     
 #ifdef TARGET_PC
-    /* PC: the key config row (recvx-config.exe sets the buttons) is left out; the rows below
-     * it move up, with the vibration row's ON and OFF */
+    /* PC: a row left out moves the rows below it up, with the vibration row's ON and OFF */
     while (PC_OPTION_HIDDEN(ap->OptIndex))
     {
         ap->OptIndex++;
     }
 
+    if (PC_OPTION_HIDDEN(1))
     {
         static const float up[13] = { 0, 0, 32.0f, 32.0f, 32.0f, 32.0f, 32.0f, 0, 0, 0, 0, 32.0f, 32.0f };
 
@@ -3492,10 +3718,17 @@ int DisplayOptionPlate(int PortId, int Level, int Flag)
     {                  
     case 0:
         return DisplayOptionPlateLevel0(PortId, Flag); 
+#ifdef TARGET_PC
+    case 1:
+        return pc_option_page(PortId, Flag, 1, 1);
+    case 2:
+        return pc_option_page(PortId, Flag, 0, 2);
+#else
     case 1:
         return DisplayOptionPlateLevel1(PortId, Flag); 
     case 2:
         return DisplayOptionPlateLevel2(PortId, Flag); 
+#endif
     case 3: 
         return DisplayOptionPlateLevel3(PortId, Flag); 
     }

@@ -78,11 +78,24 @@ void njSetScreenProjection(float dist)
 } 
 
 // 100% matching!
+#ifdef TARGET_PC
+static Float pc_aspect_x = 1.0f, pc_aspect_y = 1.0f;   /* as the game last set them */
+
+/* the display aspect changed (OPTION screen): the view is set again for it */
+void pcNaReapplyAspect(void)
+{
+    njSetAspect(pc_aspect_x, pc_aspect_y);
+}
+#endif
+
 void    njSetAspect(Float ax, Float ay)
 { 
 #ifdef TARGET_PC
     {
         extern float pcVideoWideScale(void);
+
+        pc_aspect_x = ax;
+        pc_aspect_y = ay;
 
         /* widescreen: a wider view squeezed into the 640 wide frame, stretched when shown */
         ax *= pcVideoWideScale();

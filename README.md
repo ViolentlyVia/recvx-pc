@@ -131,6 +131,11 @@ Run `recvx-config.exe` (next to `recvx.exe`) to change the display settings, fol
 key / controller bindings; it writes `recvx.ini`. "Save and play" starts the game, and
 "Randomizer..." starts Biorand++.
 
+The display settings and bindings can also be changed in the game: OPTION > SCREEN SETUP
+(resolution, display mode, aspect ratio, internal resolution, 30 or 60 frames a second, pausing
+while inactive) and OPTION > KEY CONFIG (select a binding and press the new key or controller
+button; Esc cancels, Delete clears it). Changes take effect at once and are saved to `recvx.ini`.
+
 ### recvx.ini
 
 Optional, next to `recvx.exe`, one `key=value` per line (the settings app writes it too):
