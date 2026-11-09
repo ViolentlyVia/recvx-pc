@@ -151,11 +151,22 @@ void pcOsFiberDelete(void* fiber)
 }
 
 /* The PS2 scratchpad (16 KB at 0x70000000) is addressed with literal constants by the game
- * (WORKBASE, DMA tags), so it is placed at that very address. */
+ * (WORKBASE, DMA tags), so it is placed at that very address. main() takes it first of all, before
+ * any library can load there. The first call allocates, later ones return it. */
 void* pcOsAllocScratchpad(void)
 {
+    static void* spr;
+    static int tried;
     void* want = (void*)0x70000000;
-    void* p = mmap(want, 0x4000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
+    void* p;
+
+    if (tried)
+    {
+        return spr;
+    }
+
+    tried = 1;
+    p = mmap(want, 0x4000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
 
     if (p == MAP_FAILED)
     {
@@ -168,7 +179,8 @@ void* pcOsAllocScratchpad(void)
         return NULL;
     }
 
-    return p;
+    spr = p;
+    return spr;
 }
 
 double pcOsTime(void)

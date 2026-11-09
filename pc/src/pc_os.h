@@ -15,4 +15,4 @@ int  pcOsLaunch(const char* exe_path);    /* start another program (no waiting);
 void pcOsInstallDiagnostics(void);   /* crash handler + hang watchdog (stack traces to the log) */
 void pcOsHeartbeat(void);            /* call once per presented frame */
 
-void* pcOsAllocScratchpad(void);    /* 16 KB at 0x70000000, or NULL */
+void* pcOsAllocScratchpad(void);    /* 16 KB at 0x70000000 (the same block every call), or NULL */

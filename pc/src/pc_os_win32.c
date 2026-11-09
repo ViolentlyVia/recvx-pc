@@ -13,6 +13,8 @@ typedef struct {
     void* arg;
 } FiberStart;
 
+void pcLog(const char* fmt, ...);
+
 static void* main_fiber;
 
 void* pcOsFiberFromThread(void)
@@ -54,12 +56,39 @@ void pcOsFiberDelete(void* fiber)
 }
 
 /* The PS2 scratchpad (16 KB at 0x70000000) is addressed with literal constants by the game
- * (WORKBASE, DMA tags), so it is placed at that very address. */
+ * (WORKBASE, DMA tags), so it is placed at that very address. In a 32-bit process Windows loads
+ * DLLs all around there, differently on every PC, so main() takes it first of all: the graphics
+ * driver and SDL's DLLs then load elsewhere. The first call allocates, later ones return it. */
 void* pcOsAllocScratchpad(void)
 {
-    void* p = VirtualAlloc((void*)0x70000000, 0x4000, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    static void* spr;
+    static int tried;
 
-    return p;
+    if (!tried)
+    {
+        tried = 1;
+        spr = VirtualAlloc((void*)0x70000000, 0x4000, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+        if (spr == NULL)
+        {
+            DWORD error = GetLastError();
+            MEMORY_BASIC_INFORMATION m;
+            char name[MAX_PATH] = "";
+
+            memset(&m, 0, sizeof(m));
+            VirtualQuery((void*)0x70000000, &m, sizeof(m));
+
+            if (m.Type == MEM_IMAGE)
+            {
+                GetModuleFileNameA((HMODULE)m.AllocationBase, name, sizeof(name));
+            }
+
+            pcLog("scratchpad: error %lu, the address belongs to a block at %p (state 0x%lx, type 0x%lx) %s", error,
+                  m.AllocationBase, m.State, m.Type, name);
+        }
+    }
+
+    return spr;
 }
 
 double pcOsTime(void)

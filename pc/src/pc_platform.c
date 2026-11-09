@@ -820,7 +820,10 @@ void pcVideoInit(void)
 
         if (spr == NULL)
         {
-            pcPlatformFatal("Could not reserve the PS2 scratchpad address range (0x70000000).");
+            pcPlatformFatal("Could not reserve the PS2 scratchpad address range (0x70000000).\n\n"
+                            "Something else on this PC is already using that address. Restarting the PC may "
+                            "clear it. If it keeps happening, please report it with recvx.log, which names "
+                            "what is there.");
         }
 
         pcGsInit(spr);
