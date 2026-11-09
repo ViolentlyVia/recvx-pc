@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+void pcLog(const char* fmt, ...);
+#endif
 #include "../../../ps2/veronica/prog/dread.h"
 #include "../../../ps2/veronica/prog/binfunc.h"
 #include "../../../ps2/veronica/prog/njplus.h"
@@ -324,7 +327,32 @@ void bhReadWeaponData()
         npCopyMemory(plmtnp, dp, sz);
         
         sys->wmt_size = sz;
-        
+
+#ifdef TARGET_PC
+        {
+            /* The previous weapon's motions were in the buffer just overwritten, and a motion this
+             * weapon has none of keeps its pointers into it. A character can now carry weapons
+             * made for the other one (the randomizer), whose files leave such slots empty. A
+             * missing motion is one that is over at once (frm_num 1). */
+            int i, stale = 0;
+            MN_WORK* table = (MN_WORK*)sys->plmthp;
+
+            for (i = 100; i < (12288 / (int)sizeof(MN_WORK)); i++)
+            {
+                unsigned char* md = (unsigned char*)table[i].md2P;
+
+                if ((md >= sys->plwmtp) && (md < (sys->plwmtp + 65536)))
+                {
+                    memset(&table[i], 0, sizeof(MN_WORK));
+                    table[i].frm_num = 1;
+                    stale++;
+                }
+            }
+
+            pcLog("weapon %d: %d bytes of motions, %d old motion slots cleared", wpn_no, sz, stale);
+        }
+#endif
+
         for (mtnp = &plp->mnwP[100]; (mtsz = *(unsigned int*)plmtnp) != -1; mtnp++) 
         {
             if (mtsz != 0) 

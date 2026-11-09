@@ -2,6 +2,11 @@
 #include "../../../ps2/veronica/prog/ps2_NaMath.h"
 #include "../../../ps2/veronica/prog/ps2_NaMatrix.h"
 
+#ifdef TARGET_PC
+void pcLog(const char* fmt, ...);
+extern SYS_WORK* sys;
+#endif
+
 static int mka_ang[3];
 
 static const char NormalTbl[64] = 
@@ -22,10 +27,38 @@ int bhSetMotion(BH_PWORK* ewP, int add, int mode, void* datP)
 {
     float rate;           
     unsigned int* flgP;   
-    unsigned short* atrP; 
-    int frm_num;          
+    unsigned short* atrP;
+    int frm_num;
+#ifdef TARGET_PC
+    int pc_no_keys;
+#endif
 
     flgP = &ewP->mnwP[ewP->mtn_no].flg;
+    
+#ifdef TARGET_PC
+    {
+        /* a motion with no key data (the PS2 reads address 0 here and gets away with it): the
+         * pose stays, the frame count goes on so that whatever waits for its end still gets it */
+        MN_WORK* mn = &ewP->mnwP[ewP->mtn_no];
+        static int logged;
+
+        pc_no_keys = 0;
+
+        if ((mn->datP != NULL) && ((mn->md2P == NULL) || (mn->md2P->p[0] == NULL)))
+        {
+            if (logged < 20)
+            {
+                logged++;
+                pcLog("motion: no key data: work %p mtn %d frm %d mnwP %p mnwPb %p plmthp %p rmthp %p mode %x datP %p md2P %p obj %u frm_num %u flg %x wpn %d ply %d",
+                      (void*)ewP, ewP->mtn_no, ewP->frm_no, (void*)ewP->mnwP, (void*)ewP->mnwPb, (void*)sys->plmthp, (void*)sys->rmthp,
+                      mode, mn->datP, (void*)mn->md2P, mn->obj_num, mn->frm_num, mn->flg, ewP->wpnr_no, (int)sys->ply_id);
+            }
+
+            pc_no_keys = 1;
+        }
+    }
+#endif
+
     
     if (ewP->mnwP[ewP->mtn_no].datP != NULL)
     {
@@ -38,7 +71,13 @@ int bhSetMotion(BH_PWORK* ewP, int add, int mode, void* datP)
             rate = 0.000015258789f * (65536 - ewP->hokan_rate);
         }
         
-        if (((mode & 0x8)) || ((*flgP & 0x20))) 
+#ifdef TARGET_PC
+        if (pc_no_keys)
+        {
+        }
+        else
+#endif
+        if (((mode & 0x8)) || ((*flgP & 0x20)))
         {
             if (ewP->hokan_count == 0)
             {
@@ -111,6 +150,19 @@ int bhSetMotion(BH_PWORK* ewP, int add, int mode, void* datP)
             }
         }
     }
+    
+#ifdef TARGET_PC
+    else if (ewP->mtn_no >= 100)
+    {
+        static int missing;
+
+        if (missing < 20)
+        {
+            missing++;
+            pcLog("motion: %d is empty for weapon %d", ewP->mtn_no, ewP->wpnr_no);
+        }
+    }
+#endif
     
     return 0;
 }
