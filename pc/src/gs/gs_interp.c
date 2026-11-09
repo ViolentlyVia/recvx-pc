@@ -7,14 +7,19 @@
  * where it is now (shown at once), then as it is (shown half a frame later).
  *
  * Vertices are matched between the two frames by primitive: a frame is split into segments at
- * every PRIM write, and segments with the same primitive, texture, render target and vertex count
- * are paired in order (skipping ones that only one frame has). A segment that moved too far (a
+ * every PRIM write, and segments with the same primitive, texture, render target, vertex count and
+ * texture coordinates are paired in order (skipping ones that only one frame has). The coordinates
+ * tell apart polygons that are otherwise alike, such as the steps of a staircase: when one goes
+ * off screen the rest must not pair with their neighbours. Runs of segments whose coordinates
+ * changed (scrolling water) are paired afterwards if both frames have the same number of them
+ * between the same matched segments. A segment that moved too far (a
  * camera cut, something placed elsewhere) is drawn where it is now; when most of the picture
  * changed, or anything needs the GS's output during the frame (sceGsExecStoreImage), the frame is
  * shown as it is, once.
  *
  * The recording ends where the frame's double buffer swap starts (pcGsInterpMark): that packet
  * sets up and clears the buffer the next frame draws into, so it begins the next recording. */
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -56,6 +61,8 @@ typedef struct {
     int nxyz, xyz_cap;
     u64* rgba;
     int nrgba, rgba_cap;
+    float* uv;              /* two per xyz: texture coordinates */
+    int uv_cap;
 } Geo;
 
 static Geo geo[2];
@@ -65,7 +72,7 @@ static int prev_valid;
 static int* match;          /* per segment of cur: the segment of prev, or -1 */
 static int match_cap;
 
-static struct { int frames, blended, plain, broken; } stats;
+static struct { int frames, blended, plain, broken; long verts, loose, wrong; } stats;
 
 static void count_frame(int blended)
 {
@@ -82,8 +89,8 @@ static void count_frame(int blended)
 
     if (stats.frames >= 300)
     {
-        pcLog("smooth motion: %d of %d frames blended, %d not, %d broken off", stats.blended, stats.frames,
-              stats.plain, stats.broken);
+        pcLog("smooth motion: %d of %d frames blended, %d not, %d broken off; %ld verts, %ld unmatched, %ld look-alikes kept apart",
+              stats.blended, stats.frames, stats.plain, stats.broken, stats.verts, stats.loose, stats.wrong);
         memset(&stats, 0, sizeof(stats));
     }
 }
@@ -173,11 +180,50 @@ static int is_xyz(int reg)
     return (reg == 0x04) || (reg == 0x05) || (reg == 0x0c) || (reg == 0x0d);
 }
 
+static float reg_float(u64 bits)
+{
+    unsigned int b = (unsigned int)bits;
+    float f;
+
+    memcpy(&f, &b, sizeof(f));
+    return f;
+}
+
+/* a vertex's texture coordinates, as the same polygon has them in every frame */
+static void vertex_uv(unsigned int prim, u64 st, u64 uv, float q, float* out)
+{
+    if (!(prim & 0x10))        /* not textured */
+    {
+        out[0] = 0.0f;
+        out[1] = 0.0f;
+    }
+    else if (prim & 0x100)     /* UV: 1/16 texels */
+    {
+        out[0] = (float)(uv & 0x3FFF) / 4096.0f;
+        out[1] = (float)((uv >> 16) & 0x3FFF) / 4096.0f;
+    }
+    else                       /* ST: multiplied by Q, which changes with the distance */
+    {
+        float s = reg_float(st), t = reg_float(st >> 32);
+
+        if (q != 0.0f)
+        {
+            s /= q;
+            t /= q;
+        }
+
+        out[0] = s;
+        out[1] = t;
+    }
+}
+
 /* splits ops [0, n) into segments; the first one starts with the recording */
 static void scan(Geo* g, int n)
 {
     unsigned int prim = (unsigned int)start_state.regs.prim & 0x7FF;
     u64 tex0[2], frame[2];
+    u64 st = start_state.regs.st, uv = start_state.regs.uv;
+    float q = reg_float(start_state.regs.rgbaq >> 32);
     int i;
 
     tex0[0] = start_state.regs.tex0[0];
@@ -218,7 +264,18 @@ static void scan(Geo* g, int n)
             g->rgba = (u64*)grow(g->rgba, &g->rgba_cap, g->nrgba + 1, sizeof(u64));
             g->rgba[g->nrgba++] = o->v;
             g->seg[g->nseg - 1].rgba_count++;
+
+            if (o->reg == 0x01)
+            {
+                q = reg_float(o->v >> 32);
+            }
             break;
+        case 0x02: st = o->v; break;
+        case GS_REG_PACKED_ST:
+            st = o->v;
+            q = reg_float(o->w);
+            break;
+        case 0x03: uv = o->v; break;
         case 0x06: tex0[0] = o->v; break;
         case 0x07: tex0[1] = o->v; break;
         case 0x4c: frame[0] = o->v; break;
@@ -238,6 +295,8 @@ static void scan(Geo* g, int n)
                 }
 
                 g->xyz = (u64*)grow(g->xyz, &g->xyz_cap, g->nxyz + 1, sizeof(u64));
+                g->uv = (float*)grow(g->uv, &g->uv_cap, (g->nxyz + 1) * 2, sizeof(float));
+                vertex_uv(prim, st, uv, q, &g->uv[g->nxyz * 2]);
                 g->xyz[g->nxyz++] = o->v;
                 s->count++;
             }
@@ -251,8 +310,107 @@ static int same(const Seg* a, const Seg* b)
     return (a->count != 0) && (a->count == b->count) && (a->prim == b->prim) && (a->tex == b->tex);
 }
 
+#define UV_EPS 0.002f       /* about half a texel of a 256 texel texture */
+
+/* the same polygon in both frames */
+static int same_poly(const Seg* a, const Seg* b)
+{
+    const float* ua = &prev->uv[a->first * 2];
+    const float* ub = &cur->uv[b->first * 2];
+    int n;
+
+    if (!same(a, b))
+    {
+        return 0;
+    }
+
+    for (n = 0; n < b->count * 2; n++)
+    {
+        if (fabsf(ua[n] - ub[n]) > UV_EPS)
+        {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 #define LOOKAHEAD 24
 #define MAX_MOVE  (48 * 16)    /* 48 pixels, in the GS's 1/16 pixel units */
+
+/* Between two matched segments, equally many unmatched ones in both frames that differ only in
+ * their texture coordinates: the same polygons with the coordinates animated. */
+static void fill_gaps(void)
+{
+    int j = 0, after = 0;
+
+    while (j < cur->nseg)
+    {
+        int end, a, b, n = 0, m = 0, ok = 1, next;
+
+        if ((match[j] >= 0) || (cur->seg[j].count == 0))
+        {
+            if (match[j] >= 0)
+            {
+                after = match[j] + 1;
+            }
+
+            j++;
+            continue;
+        }
+
+        for (end = j; (end < cur->nseg) && (match[end] < 0); end++)
+        {
+            n += cur->seg[end].count != 0;
+        }
+
+        next = (end < cur->nseg) ? match[end] : prev->nseg;
+
+        for (a = after; a < next; a++)
+        {
+            m += prev->seg[a].count != 0;
+        }
+
+        if (n == m)
+        {
+            for (a = after, b = j; ok && (b < end); b++)
+            {
+                if (cur->seg[b].count == 0)
+                {
+                    continue;
+                }
+
+                while (prev->seg[a].count == 0)
+                {
+                    a++;
+                }
+
+                ok = same(&prev->seg[a], &cur->seg[b]);
+                a++;
+            }
+
+            if (ok)
+            {
+                for (a = after, b = j; b < end; b++)
+                {
+                    if (cur->seg[b].count == 0)
+                    {
+                        continue;
+                    }
+
+                    while (prev->seg[a].count == 0)
+                    {
+                        a++;
+                    }
+
+                    match[b] = a++;
+                }
+            }
+        }
+
+        j = end;
+    }
+}
 
 /* pairs cur's segments with prev's; returns 0 when the picture changed too much to blend */
 static int align(void)
@@ -284,12 +442,17 @@ static int align(void)
             continue;
         }
 
-        if (same(&prev->seg[i], b))
+        if (same_poly(&prev->seg[i], b))
         {
             match[j] = i;
             i++;
             j++;
             continue;
+        }
+
+        if (same(&prev->seg[i], b))
+        {
+            stats.wrong += b->count;    /* alike, but not the same polygon */
         }
 
         /* one of the frames has segments the other has not: skip to the nearer resync */
@@ -298,7 +461,7 @@ static int align(void)
 
             for (k = 1; (k < LOOKAHEAD) && (i + k < prev->nseg); k++)
             {
-                if (same(&prev->seg[i + k], b))
+                if (same_poly(&prev->seg[i + k], b))
                 {
                     da = k;
                     break;
@@ -307,7 +470,7 @@ static int align(void)
 
             for (k = 1; (k < LOOKAHEAD) && (j + k < cur->nseg); k++)
             {
-                if (same(&prev->seg[i], &cur->seg[j + k]))
+                if (same_poly(&prev->seg[i], &cur->seg[j + k]))
                 {
                     db = k;
                     break;
@@ -330,6 +493,8 @@ static int align(void)
         }
     }
 
+    fill_gaps();
+
     /* segments that moved too far are drawn where they are now */
     for (j = 0; j < cur->nseg; j++)
     {
@@ -339,6 +504,7 @@ static int align(void)
 
         if (match[j] < 0)
         {
+            stats.loose += b->count;
             continue;
         }
 
@@ -367,6 +533,8 @@ static int align(void)
             matched += b->count;
         }
     }
+
+    stats.verts += total;
 
     /* a camera cut, a new screen: nothing to blend */
     return (total > 0) && (matched * 2 >= total) && (moved * 4 < total);
