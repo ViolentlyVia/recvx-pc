@@ -80,7 +80,7 @@ Environment variables for testing:
 | `RECVX_AUTOPRESS=1` | tap Start/Cross for unattended tests |
 | `RECVX_SPEED=<n>` | run n times faster |
 | `RECVX_SHOTS=<seconds>` | save screenshots to `shots/` periodically |
-| `RECVX_GSDUMP=<frame>` | log every GS draw of that frame |
+| `RECVX_GSDUMP=<frame>` | log every GS draw of that frame (`status+<n>`: n frames after the status screen first opens) |
 | `RECVX_MIDSHOTS=<n>` | smooth motion: save every n-th in-between picture with the frames around it to `shots/` (`mid_<frame>.png`, `real_<frame>.png`) |
 | `RECVX_DATA`, `RECVX_ISO`, `RECVX_SAVES`, `RECVX_HDTEX`, `RECVX_MOD` | override the `recvx.ini` paths |
 | `RECVX_WARP=<stage>,<room>[,<entrance>[,<room case>[,<player>]]]` | a new game starts in that room instead of the first one (stage 7 room 11 is `RM_7110.RDX`; player 0 Claire, 1 Chris); the input script's presses still apply |

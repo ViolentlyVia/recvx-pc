@@ -1213,9 +1213,14 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
     {
         float x0 = 1e9f, x1 = -1e9f, y0 = 1e9f, y1 = -1e9f;
         unsigned int z0 = 0xFFFFFFFF, z1 = 0;
+        float u0 = 1e9f, u1 = -1e9f, v0 = 1e9f, v1 = -1e9f;
 
         for (i = 0; i < nverts; i++)
         {
+            if (v[i].u < u0) u0 = v[i].u;
+            if (v[i].u > u1) u1 = v[i].u;
+            if (v[i].v < v0) v0 = v[i].v;
+            if (v[i].v > v1) v1 = v[i].v;
             if (v[i].x < x0) x0 = v[i].x;
             if (v[i].x > x1) x1 = v[i].x;
             if (v[i].y < y0) y0 = v[i].y;
@@ -1225,10 +1230,10 @@ void gsRendererDraw(const GsDrawState* st, const GsVertex* v, int nverts)
         }
 
         pcLog("draw fb %u/%u psm %u msk %08x type %d n %d iip %d tme %d fst %d abe %d fge %d | tex0 %016llx tex1 %llx clamp %llx"
-              " | alpha %010llx test %05llx zbuf %llx sc %016llx texa %llx | x %.1f..%.1f y %.1f..%.1f z %u..%u c0 %02x%02x%02x%02x q %g st %g,%g",
+              " | alpha %010llx test %05llx zbuf %llx sc %016llx texa %llx | x %.1f..%.1f y %.1f..%.1f z %u..%u c0 %02x%02x%02x%02x q %g st %g,%g uv %g..%g,%g..%g",
               fbp, fbw, fpsm, fbmsk, st->type, nverts, st->iip, st->tme, st->fst, st->abe, st->fge,
               st->tex0, st->tex1, st->clamp, st->alpha, st->test, st->zbuf, st->scissor, st->texa,
-              x0, x1, y0, y1, z0, z1, v[0].r, v[0].g, v[0].b, v[0].a, v[0].q, v[0].s, v[0].t);
+              x0, x1, y0, y1, z0, z1, v[0].r, v[0].g, v[0].b, v[0].a, v[0].q, v[0].s, v[0].t, u0, u1, v0, v1);
     }
 
     if (rt->vram_dirty)
@@ -1572,13 +1577,32 @@ void gsRendererPresent(unsigned int dispfb_fbp, unsigned int dispfb_fbw)
 
     /* debug: RECVX_GSDUMP=<frame> logs every draw of that frame (and the next one) */
     {
-        static int dump_at = -2;
+        static int dump_at = -2, dump_status_after = -1;
 
         if (dump_at == -2)
         {
             const char* e = SDL_getenv("RECVX_GSDUMP");
 
             dump_at = (e != NULL) ? atoi(e) : -1;
+
+            /* "status+<n>": n frames after the status screen first opens */
+            if ((e != NULL) && (strncmp(e, "status+", 7) == 0))
+            {
+                dump_status_after = atoi(e + 7);
+                dump_at = -1;
+            }
+        }
+
+        if (dump_status_after >= 0)
+        {
+            extern int pcGameInStatusScreen(void);
+            static unsigned int status_opened;
+
+            if ((status_opened == 0) && pcGameInStatusScreen())
+            {
+                status_opened = frame_counter;
+                dump_at = (int)(frame_counter + dump_status_after);
+            }
         }
 
         if (dump_frame)

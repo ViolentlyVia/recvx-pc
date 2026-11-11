@@ -322,11 +322,13 @@ void PS2_swap()
 // 99.93% matching
 #ifdef TARGET_PC
 /* Upscaling: 2D pieces drawn texel for pixel (UI panels, backgrounds) often start half a texel
- * into their image (u = 60.5). At the PS2's resolution the screen samples never fall in that
- * outer half texel; upscaled, the outermost sub-pixels do and pick up a sliver of the next image
- * on the sheet: thin lines at every tile edge. Moving such a piece's texture coordinates to the
- * texel boundary keeps the texels the PS2 shows and stops the bleeding. UV (integer) coordinates
- * only: U and V are 1/16 texel in words 0 and 1 of each vertex, x and y floats in words 8, 9. */
+ * into their image (u = 60.5 .. 76.5). The PS2 samples at its pixel centres, u = 61 .. 76: never
+ * beyond those, so its first and last texel columns only blend in halfway at the outermost
+ * pixels. Upscaled, the outermost sub-pixels do reach the outer half texels: on one side a sliver
+ * of the next image on the sheet, on the other the image's last column at full strength (dark
+ * or light lines along every strip of a panel). The piece's texture coordinates are pulled in to
+ * the texels the PS2 samples (61 .. 76). UV (integer) coordinates only: U and V are 1/16 texel in
+ * words 0 and 1 of each vertex, x and y floats in words 8, 9. */
 static void pc_snap_uv(unsigned int* v, unsigned int num)
 {
     int axis;
@@ -371,8 +373,10 @@ static void pc_snap_uv(unsigned int* v, unsigned int num)
         for (i = 0; i < num; i++)
         {
             unsigned int w = v[(i * 12) + axis];
+            float t = (w & 0x3FFF) / 16.0f;
+            int d = (t == tmin) ? k : (t == tmax) ? -k : 0;
 
-            v[(i * 12) + axis] = (w & ~0x3FFFu) | (((w & 0x3FFF) + k) & 0x3FFF);
+            v[(i * 12) + axis] = (w & ~0x3FFFu) | (((w & 0x3FFF) + d) & 0x3FFF);
         }
     }
 }
@@ -380,7 +384,6 @@ static void pc_snap_uv(unsigned int* v, unsigned int num)
 int pcWide2DUnclipped;   /* widescreen: 2D drawn into the side areas on purpose (backgrounds) */
 int pcWide2DFullWidth;   /* widescreen: full-width 2D that covers the picture (screen filters) */
 int pcWide2DKeep43;      /* widescreen: full screen 2D that is 4:3 art although translucent */
-int pcWide2DTrimRight;   /* widescreen: leave out the piece's last texel column (a screen-edge border) */
 int pcWide2DStretch;     /* widescreen: 2D that is the 3D view itself (drawn back from a render texture) */
 
 /* widescreen: clip a 2D rectangle (sprite, or quad with two distinct x values) to the 4:3
@@ -524,21 +527,6 @@ void Ps2AddPrim(unsigned long prim, void* dp, unsigned int num, unsigned int cli
         memcpy(wide_buf, dp, num * 48);
         dp = wide_buf;
         pc_snap_uv((unsigned int*)wide_buf, num);
-
-        if (pcWide2DTrimRight)
-        {
-            unsigned int i2, umax = 0;
-
-            for (i2 = 0; i2 < num; i2++)
-            {
-                if ((wide_buf[i2 * 12] & 0x3FFF) > umax) umax = wide_buf[i2 * 12] & 0x3FFF;
-            }
-
-            for (i2 = 0; i2 < num; i2++)
-            {
-                if ((wide_buf[i2 * 12] & 0x3FFF) == umax) wide_buf[i2 * 12] -= 16;
-            }
-        }
     }
 
     /* widescreen: 2D keeps its 4:3 layout in the middle of the stretched frame. Primitives
