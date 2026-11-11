@@ -152,6 +152,7 @@ Optional, next to `recvx.exe`, one `key=value` per line (the settings app writes
 | `window=` | window size, e.g. `1920x1080` (default: 960 pixels high at the chosen aspect) |
 | `fullscreen=` | `1` for exclusive fullscreen at the window size, `desktop` for borderless (default `0`) |
 | `pause_unfocused=` | `0` keeps the game running while its window is not active (default `1`) |
+| `vsync=` | `1` waits for the display before showing each picture, against tearing in exclusive fullscreen (default `0`) |
 | `movies_hd=` | `0` plays the original movies even when upscaled ones exist (default `1`) |
 | `smooth_motion=` | `1` shows 60 pictures a second: a picture halfway between each two game frames (the game itself stays at 30; experimental, default `0`) |
 | `skip_intro=` | `1` starts at the title screen, without the warning screens, Capcom logo and opening movie (default `0`) |
@@ -164,6 +165,9 @@ Optional, next to `recvx.exe`, one `key=value` per line (the settings app writes
 
 Actions: `cross square circle triangle l1 r1 l2 r2 l3 r3 start select up down left right
 fastforward fullscreen` (defaults in `pc/include/pc_bindings.h`).
+
+A controller SDL does not know can be given a mapping: put a `gamecontrollerdb.txt` (SDL's
+mapping format) next to `recvx.exe`. Its mappings are added to SDL's own when the game starts.
 
 With a widescreen `aspect=`, the 3D view is widened rather than stretched, and menus, text and
 movies stay at 4:3 in the middle of the screen. The internal resolution rises horizontally to

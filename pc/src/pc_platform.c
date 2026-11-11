@@ -449,7 +449,8 @@ static struct {
     int maximized;               /* window_max= */
     int fullscreen;          /* 0 window, 1 exclusive, 2 desktop */
     int pause_unfocused;     /* pause_unfocused= (default 1) */
-    float aspect;            /* display aspect, 4:3 = 1.333 */
+    int vsync;               /* vsync= (default 0) */
+    float aspect;           /* display aspect, 4:3 = 1.333 */
 } video_cfg;
 
 /* the window as it was last seen windowed: saved to recvx.ini when the game closes */
@@ -509,6 +510,7 @@ static void video_settings(void)
 
     video_cfg.maximized = pcIniGetInt("window_max", 0) != 0;
     video_cfg.pause_unfocused = pcIniGetInt("pause_unfocused", 1) != 0;
+    video_cfg.vsync = pcIniGetInt("vsync", 0) != 0;
 
     /* the 640 wide frame is stretched to the display aspect: render more columns to match */
     pcGsScaleX = (int)(pcGsScale * video_cfg.aspect / (4.0f / 3.0f) + 0.5f);
@@ -813,7 +815,11 @@ void pcVideoInit(void)
         pcPlatformFatal("Could not create an OpenGL 3.3 context: %s", SDL_GetError());
     }
 
-    SDL_GL_SetSwapInterval(0);   /* frame pacing comes from the emulated VBLANK */
+    /* frame pacing comes from the emulated VBLANK; vsync=1 also waits for the display (no tearing) */
+    if (SDL_GL_SetSwapInterval(video_cfg.vsync) != 0)
+    {
+        pcLog("video: could not set vsync=%d: %s", video_cfg.vsync, SDL_GetError());
+    }
 
     {
         unsigned char* spr = pcOsAllocScratchpad();
@@ -1561,11 +1567,44 @@ int pcTitleRequested(void)
     return 1;
 }
 
+/* gamecontrollerdb.txt next to the exe (optional): the player's own controller mappings, added to
+ * SDL's built-in ones before a controller is opened */
+static void load_controller_mappings(void)
+{
+    char dir[1024], path[1200];
+    FILE* f;
+    int added;
+
+    pcPlatformExeDir(dir, sizeof(dir));
+    snprintf(path, sizeof(path), "%s/gamecontrollerdb.txt", dir);
+
+    f = fopen(path, "rb");
+
+    if (f == NULL)
+    {
+        return;
+    }
+
+    fclose(f);
+
+    added = SDL_GameControllerAddMappingsFromFile(path);
+
+    if (added < 0)
+    {
+        pcLog("controller: could not read %s: %s", path, SDL_GetError());
+    }
+    else
+    {
+        pcLog("controller: %d mapping(s) from %s", added, path);
+    }
+}
+
 void pcPadInit(void)
 {
     int i;
 
     load_bindings();
+    load_controller_mappings();
 
     if (controller != NULL)
     {
