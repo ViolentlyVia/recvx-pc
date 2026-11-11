@@ -88,6 +88,7 @@ typedef ptrdiff_t GLintptr;
     X(void, glBlendColor, (GLfloat r, GLfloat g, GLfloat b, GLfloat a)) \
     X(void, glDepthFunc, (GLenum f)) \
     X(void, glDepthMask, (GLboolean m)) \
+    X(void, glPolygonOffset, (GLfloat factor, GLfloat units)) \
     X(void, glColorMask, (GLboolean r, GLboolean g, GLboolean b, GLboolean a)) \
     X(void, glClear, (GLbitfield m)) \
     X(void, glClearColor, (GLfloat r, GLfloat g, GLfloat b, GLfloat a)) \
@@ -151,6 +152,7 @@ PC_GL_FUNCS(PC_GL_DECLARE)
 #define glBlendColor pc_glBlendColor
 #define glDepthFunc pc_glDepthFunc
 #define glDepthMask pc_glDepthMask
+#define glPolygonOffset pc_glPolygonOffset
 #define glColorMask pc_glColorMask
 #define glClear pc_glClear
 #define glClearColor pc_glClearColor
