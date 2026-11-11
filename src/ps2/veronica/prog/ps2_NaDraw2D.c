@@ -192,10 +192,34 @@ void njDrawPolygon2DM(NJS_POINT2COL* p, int n, float pri, unsigned int attr)
     
     for (i = 0; i < n; i++, bp += 3) 
     {
-        if ((attr & 0x80000000)) 
+        if ((attr & 0x80000000))
         {
-            switch (i) 
-            {                 
+#ifdef TARGET_PC
+            /* Upscaling: the PS2's offsets (half a texel in at the left and top, a quarter out at
+             * the right and bottom) let the outermost sub-pixels of a glyph sample the next cell
+             * of the font sheet. A quarter texel in on every side keeps to the glyph's own cell. */
+            switch (i)
+            {
+            case 0:   /* left, top */
+                *(int*)&bp[0][0] = (p->tex[i].tex.u * 16) + 4;
+                *(int*)&bp[0][1] = (p->tex[i].tex.v * 16) + 4;
+                break;
+            case 1:   /* right, top */
+                *(int*)&bp[0][0] = (p->tex[i].tex.u * 16) - 4;
+                *(int*)&bp[0][1] = (p->tex[i].tex.v * 16) + 4;
+                break;
+            case 2:   /* right, bottom */
+                *(int*)&bp[0][0] = (p->tex[i].tex.u * 16) - 4;
+                *(int*)&bp[0][1] = (p->tex[i].tex.v * 16) - 4;
+                break;
+            case 3:   /* left, bottom */
+                *(int*)&bp[0][0] = (p->tex[i].tex.u * 16) + 4;
+                *(int*)&bp[0][1] = (p->tex[i].tex.v * 16) - 4;
+                break;
+            }
+#else
+            switch (i)
+            {
             case 0:
                 *(int*)&bp[0][0] = (p->tex[i].tex.u * 16) + 8;
                 *(int*)&bp[0][1] = (p->tex[i].tex.v * 16) + 8;
@@ -213,7 +237,8 @@ void njDrawPolygon2DM(NJS_POINT2COL* p, int n, float pri, unsigned int attr)
                 *(int*)&bp[0][1] = (p->tex[i].tex.v * 16) + 4;
                 break;
             }
-            
+#endif
+
             *(int*)&bp[0][2] = 4096;
             *(int*)&bp[0][3] = 0;
             
