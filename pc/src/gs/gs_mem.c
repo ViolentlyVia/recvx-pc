@@ -11,8 +11,20 @@
 
 #include "gs_internal.h"
 
+/* 0 builds the plain pixel by pixel image transfers: the reference pc/tests/gs_mem_blockpath_test.c
+ * compares the block paths with */
+#ifndef GS_BLOCK_FASTPATH
+#define GS_BLOCK_FASTPATH 1
+#endif
+
 unsigned char gsVram[GS_VRAM_SIZE];
 unsigned int gsPageGen[GS_PAGES];
+
+/* A page's generation only says "changed" to the texture cache: one step per page for each
+ * piece of image data is enough, instead of one for every pixel written. */
+static unsigned int pageTouchEpoch[GS_PAGES];
+static unsigned int currentPageTouchEpoch;
+static int coalescePageTouches;
 
 static const unsigned char blockTable32[4][8] = {
     {  0,  1,  4,  5, 16, 17, 20, 21 },
@@ -234,7 +246,20 @@ int gsBlockNumber(int psm, unsigned int bp, unsigned int bw, unsigned int x, uns
 
 static void touch(unsigned int byte_addr)
 {
-    gsPageGen[(byte_addr >> 13) & (GS_PAGES - 1)]++;
+    unsigned int page = (byte_addr >> 13) & (GS_PAGES - 1);
+
+    if (coalescePageTouches)
+    {
+        if (pageTouchEpoch[page] != currentPageTouchEpoch)
+        {
+            pageTouchEpoch[page] = currentPageTouchEpoch;
+            gsPageGen[page]++;
+        }
+    }
+    else
+    {
+        gsPageGen[page]++;
+    }
 }
 
 unsigned int gsMemRead(int psm, unsigned int bp, unsigned int bw, unsigned int x, unsigned int y)
@@ -517,6 +542,194 @@ void gsMemStartTransfer(const GsRegs* r)
     }
 }
 
+/* Image data in whole blocks. A block of GS memory is 256 bytes (8x8 pixels at 32 bits, 16x16 at
+ * 8, 32x16 at 4) with its pixels in the GS's own order inside: where a transfer covers whole
+ * blocks, each is put together in that order, compared with what is there and copied at once.
+ * The rest (rectangles that start or end inside a block) goes pixel by pixel. */
+#if GS_BLOCK_FASTPATH
+/* 32 bits: whole 8x8 blocks, then runs of up to 8 pixels (within one, only the pixel's place in
+ * its block changes) */
+static void transfer32Run(const unsigned char* data, int bytes, const unsigned char bt[4][8])
+{
+    int i = 0;
+
+    while (xfer.active &&
+           xfer.x == xfer.sx &&
+           (xfer.sx & 7u) == 0 &&
+           (xfer.w & 7u) == 0 &&
+           (xfer.y & 7u) == 0 &&
+           xfer.sy + xfer.h - xfer.y >= 8u &&
+           bytes - i >= (int)(xfer.w * 32u))
+    {
+        unsigned int row_bytes = xfer.w * 32u;
+        unsigned int bx, yy, xx;
+
+        for (bx = 0; bx < xfer.w; bx += 8u)
+        {
+            unsigned int block[64];
+            unsigned int a = addr32(xfer.bp, xfer.bw, xfer.sx + bx, xfer.y, bt);
+
+            for (yy = 0; yy < 8u; yy++)
+            {
+                for (xx = 0; xx < 8u; xx++)
+                {
+                    unsigned int v;
+                    unsigned int src_offset = (yy * xfer.w + bx + xx) * 4u;
+
+                    memcpy(&v, &data[i + src_offset], sizeof(v));
+                    block[columnTable32[yy][xx]] = v;
+                }
+            }
+
+            if (memcmp(&gsVram[a], block, sizeof(block)) != 0)
+            {
+                memcpy(&gsVram[a], block, sizeof(block));
+                touch(a);
+                xfer.changed = 1;
+            }
+        }
+
+        i += (int)row_bytes;
+        xfer.y += 8u;
+
+        if (xfer.y >= xfer.sy + xfer.h)
+        {
+            xfer.active = 0;
+            gsXferDone(xfer.bp, xfer.bw, xfer.psm, xfer.sx, xfer.sy,
+                       xfer.w, xfer.h, xfer.changed);
+        }
+    }
+
+    while ((i + 4 <= bytes) && xfer.active)
+    {
+        unsigned int run = 8u - (xfer.x & 7u);
+        unsigned int row_left = xfer.sx + xfer.w - xfer.x;
+        unsigned int available = (unsigned int)((bytes - i) / 4);
+        unsigned int page, block, block_base;
+        unsigned int j;
+
+        if (run > row_left)
+            run = row_left;
+        if (run > available)
+            run = available;
+
+        page = (xfer.y >> 5) * xfer.bw + (xfer.x >> 6);
+        block = xfer.bp + page * 32 + bt[(xfer.y >> 3) & 3][(xfer.x >> 3) & 7];
+        block_base = (block * 256u) & (GS_VRAM_SIZE - 1);
+
+        for (j = 0; j < run; j++)
+        {
+            unsigned int x = xfer.x + j;
+            unsigned int a = (block_base +
+                              (unsigned int)columnTable32[xfer.y & 7][x & 7] * 4u) &
+                             (GS_VRAM_SIZE - 1);
+            unsigned int v = *(const unsigned int*)&data[i + j * 4];
+            unsigned int* dst = (unsigned int*)&gsVram[a];
+
+            if (*dst != v)
+            {
+                *dst = v;
+                touch(a);
+                xfer.changed = 1;
+            }
+        }
+
+        i += (int)(run * 4u);
+        xfer.x += run;
+
+        if (xfer.x >= xfer.sx + xfer.w)
+        {
+            xfer.x = xfer.sx;
+
+            if (++xfer.y >= xfer.sy + xfer.h)
+            {
+                xfer.active = 0;
+                gsXferDone(xfer.bp, xfer.bw, xfer.psm, xfer.sx, xfer.sy,
+                           xfer.w, xfer.h, xfer.changed);
+            }
+        }
+    }
+}
+
+/* 8 and 4 bits: the whole blocks at the start of the data; returns the bytes taken */
+static int transfer8Blocks(const unsigned char* data, int bytes)
+{
+    int i = 0;
+    while (xfer.active && xfer.x == xfer.sx && (xfer.sx & 15u) == 0 &&
+           (xfer.w & 15u) == 0 && (xfer.y & 15u) == 0 &&
+           xfer.sy + xfer.h - xfer.y >= 16u && bytes - i >= (int)(xfer.w * 16u))
+    {
+        unsigned int bx, yy, xx;
+        for (bx = 0; bx < xfer.w; bx += 16u)
+        {
+            unsigned char block[256];
+            unsigned int a = addr8(xfer.bp, xfer.bw, xfer.sx + bx, xfer.y);
+            for (yy = 0; yy < 16u; yy++)
+            {
+                const unsigned char* row = &data[i + yy * xfer.w + bx];
+                for (xx = 0; xx < 16u; xx++)
+                    block[columnTable8[yy][xx]] = row[xx];
+            }
+            if (memcmp(&gsVram[a], block, sizeof(block)) != 0)
+            {
+                memcpy(&gsVram[a], block, sizeof(block));
+                touch(a);
+                xfer.changed = 1;
+            }
+        }
+        i += (int)(xfer.w * 16u);
+        xfer.y += 16u;
+        if (xfer.y >= xfer.sy + xfer.h)
+        {
+            xfer.active = 0;
+            gsXferDone(xfer.bp, xfer.bw, xfer.psm, xfer.sx, xfer.sy, xfer.w, xfer.h, xfer.changed);
+        }
+    }
+    return i;
+}
+
+static int transfer4Blocks(const unsigned char* data, int bytes)
+{
+    int i = 0;
+    while (xfer.active && xfer.x == xfer.sx && (xfer.sx & 31u) == 0 &&
+           (xfer.w & 31u) == 0 && (xfer.y & 15u) == 0 &&
+           xfer.sy + xfer.h - xfer.y >= 16u && bytes - i >= (int)(xfer.w * 8u))
+    {
+        unsigned int bx, yy, xx;
+        for (bx = 0; bx < xfer.w; bx += 32u)
+        {
+            unsigned char block[256];
+            unsigned int a = addr4(xfer.bp, xfer.bw, xfer.sx + bx, xfer.y) >> 1;
+            memset(block, 0, sizeof(block));
+            for (yy = 0; yy < 16u; yy++)
+            {
+                const unsigned char* row = &data[i + (yy * xfer.w + bx) / 2];
+                for (xx = 0; xx < 32u; xx++)
+                {
+                    unsigned int v = (row[xx >> 1] >> ((xx & 1u) * 4u)) & 15u;
+                    unsigned int n = columnTable4[yy][xx];
+                    block[n >> 1] |= (unsigned char)(v << ((n & 1u) * 4u));
+                }
+            }
+            if (memcmp(&gsVram[a], block, sizeof(block)) != 0)
+            {
+                memcpy(&gsVram[a], block, sizeof(block));
+                touch(a);
+                xfer.changed = 1;
+            }
+        }
+        i += (int)(xfer.w * 8u);
+        xfer.y += 16u;
+        if (xfer.y >= xfer.sy + xfer.h)
+        {
+            xfer.active = 0;
+            gsXferDone(xfer.bp, xfer.bw, xfer.psm, xfer.sx, xfer.sy, xfer.w, xfer.h, xfer.changed);
+        }
+    }
+    return i;
+}
+#endif
+
 /* host -> local data (IMAGE mode GIF data), qwc quadwords */
 void gsMemTransferData(const unsigned char* data, int qwc)
 {
@@ -528,15 +741,27 @@ void gsMemTransferData(const unsigned char* data, int qwc)
         return;
     }
 
+    currentPageTouchEpoch++;
+    if (currentPageTouchEpoch == 0)
+    {
+        memset(pageTouchEpoch, 0, sizeof(pageTouchEpoch));
+        currentPageTouchEpoch = 1;
+    }
+    coalescePageTouches = 1;
+
     switch (xfer.psm)
     {
     case GS_PSMCT32:
     case GS_PSMZ32:
+#if GS_BLOCK_FASTPATH
+        transfer32Run(data, bytes, (xfer.psm == GS_PSMZ32) ? blockTable32Z : blockTable32);
+#else
         for (i = 0; (i + 4 <= bytes) && xfer.active; i += 4)
         {
             xfer.changed |= mem_write(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, *(const unsigned int*)&data[i]);
             advance();
         }
+#endif
         break;
     case GS_PSMCT24:
     case GS_PSMZ24:
@@ -558,7 +783,14 @@ void gsMemTransferData(const unsigned char* data, int qwc)
         break;
     case GS_PSMT8:
     case GS_PSMT8H:
-        for (i = 0; (i < bytes) && xfer.active; i++)
+        i = 0;
+#if GS_BLOCK_FASTPATH
+        if (xfer.psm == GS_PSMT8)
+        {
+            i = transfer8Blocks(data, bytes);
+        }
+#endif
+        for (; (i < bytes) && xfer.active; i++)
         {
             xfer.changed |= mem_write(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, data[i]);
             advance();
@@ -567,7 +799,14 @@ void gsMemTransferData(const unsigned char* data, int qwc)
     case GS_PSMT4:
     case GS_PSMT4HL:
     case GS_PSMT4HH:
-        for (i = 0; (i < bytes) && xfer.active; i++)
+        i = 0;
+#if GS_BLOCK_FASTPATH
+        if (xfer.psm == GS_PSMT4)
+        {
+            i = transfer4Blocks(data, bytes);
+        }
+#endif
+        for (; (i < bytes) && xfer.active; i++)
         {
             xfer.changed |= mem_write(xfer.psm, xfer.bp, xfer.bw, xfer.x, xfer.y, data[i] & 15);
             advance();
@@ -580,6 +819,7 @@ void gsMemTransferData(const unsigned char* data, int qwc)
         }
         break;
     }
+    coalescePageTouches = 0;
 }
 
 /* local -> host (sceGsExecStoreImage) */
