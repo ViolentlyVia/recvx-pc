@@ -34,7 +34,9 @@ def msvc_env():
 
 def run(args, **kw):
     env = msvc_env()
-    exe = shutil.which(args[0], path=env["PATH"]) or args[0]
+    # the variable is "Path" in some shells (GitHub's runners): look it up whatever its case
+    path = next((v for k, v in env.items() if k.upper() == "PATH"), "")
+    exe = shutil.which(args[0], path=path) or args[0]
     return subprocess.run([exe] + list(args[1:]), env=env, **kw)
 
 
